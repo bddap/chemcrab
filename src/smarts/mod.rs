@@ -15,7 +15,11 @@ use crate::atom::Atom;
 use crate::bond::Bond;
 use crate::mol::Mol;
 use crate::rings::RingInfo;
-use crate::substruct::{get_substruct_match_with, get_substruct_matches_with, AtomMapping};
+use crate::atom::Chirality;
+use crate::substruct::{
+    get_substruct_match_with, get_substruct_match_with_filter, get_substruct_matches_with,
+    get_substruct_matches_with_filter, AtomMapping,
+};
 
 use query::MatchContext;
 
@@ -103,6 +107,228 @@ pub fn get_smarts_matches(
     )
 }
 
+pub fn has_smarts_match_chiral(target: &Mol<Atom, Bond>, query: &Mol<AtomExpr, BondExpr>) -> bool {
+    get_smarts_match_chiral(target, query).is_some()
+}
+
+pub fn get_smarts_match_chiral(
+    target: &Mol<Atom, Bond>,
+    query: &Mol<AtomExpr, BondExpr>,
+) -> Option<AtomMapping> {
+    let ring_info = RingInfo::sssr(target);
+    let recursive_matches = pre_evaluate_recursive(target, query, &ring_info);
+
+    let ctx = MatchContext {
+        mol: target,
+        ring_info: &ring_info,
+        recursive_matches,
+    };
+
+    let chiral_query_atoms = collect_chiral_query_atoms(query);
+
+    get_substruct_match_with_filter(
+        target,
+        query,
+        |t_atom: &Atom, q_expr: &AtomExpr| {
+            let idx = target
+                .atoms()
+                .find(|&i| std::ptr::eq(target.atom(i), t_atom))
+                .unwrap();
+            match_atom_expr(q_expr, t_atom, &ctx, idx)
+        },
+        |t_bond: &Bond, q_bond: &BondExpr, t_endpoints: (&Atom, &Atom), _q_endpoints| {
+            let t_a = target
+                .atoms()
+                .find(|&i| std::ptr::eq(target.atom(i), t_endpoints.0))
+                .unwrap();
+            let t_b = target
+                .atoms()
+                .find(|&i| std::ptr::eq(target.atom(i), t_endpoints.1))
+                .unwrap();
+            q_bond.matches_with_ring_info(t_bond, t_endpoints, &ring_info, (t_a, t_b))
+        },
+        |mapping: &AtomMapping| validate_chirality(mapping, target, query, &chiral_query_atoms),
+    )
+}
+
+pub fn get_smarts_matches_chiral(
+    target: &Mol<Atom, Bond>,
+    query: &Mol<AtomExpr, BondExpr>,
+) -> Vec<AtomMapping> {
+    let ring_info = RingInfo::sssr(target);
+    let recursive_matches = pre_evaluate_recursive(target, query, &ring_info);
+
+    let ctx = MatchContext {
+        mol: target,
+        ring_info: &ring_info,
+        recursive_matches,
+    };
+
+    let chiral_query_atoms = collect_chiral_query_atoms(query);
+
+    get_substruct_matches_with_filter(
+        target,
+        query,
+        |t_atom: &Atom, q_expr: &AtomExpr| {
+            let idx = target
+                .atoms()
+                .find(|&i| std::ptr::eq(target.atom(i), t_atom))
+                .unwrap();
+            match_atom_expr(q_expr, t_atom, &ctx, idx)
+        },
+        |t_bond: &Bond, q_bond: &BondExpr, t_endpoints: (&Atom, &Atom), _q_endpoints| {
+            let t_a = target
+                .atoms()
+                .find(|&i| std::ptr::eq(target.atom(i), t_endpoints.0))
+                .unwrap();
+            let t_b = target
+                .atoms()
+                .find(|&i| std::ptr::eq(target.atom(i), t_endpoints.1))
+                .unwrap();
+            q_bond.matches_with_ring_info(t_bond, t_endpoints, &ring_info, (t_a, t_b))
+        },
+        |mapping: &AtomMapping| validate_chirality(mapping, target, query, &chiral_query_atoms),
+    )
+}
+
+struct ChiralQueryAtom {
+    query_idx: NodeIndex,
+    chirality: Chirality,
+    has_implicit_h: bool,
+}
+
+fn collect_chiral_query_atoms(query: &Mol<AtomExpr, BondExpr>) -> Vec<ChiralQueryAtom> {
+    let mut result = Vec::new();
+    for q_idx in query.atoms() {
+        if let Some((chiral, has_h)) = extract_chirality_and_h(query.atom(q_idx)) {
+            if chiral != Chirality::None {
+                result.push(ChiralQueryAtom {
+                    query_idx: q_idx,
+                    chirality: chiral,
+                    has_implicit_h: has_h,
+                });
+            }
+        }
+    }
+    result
+}
+
+fn extract_chirality_and_h(expr: &AtomExpr) -> Option<(Chirality, bool)> {
+    match expr {
+        AtomExpr::Chirality(c) => Some((*c, false)),
+        AtomExpr::And(parts) => {
+            let mut chiral = None;
+            let mut has_h = false;
+            for p in parts {
+                match p {
+                    AtomExpr::Chirality(c) => chiral = Some(*c),
+                    AtomExpr::TotalHCount(n) if *n > 0 => has_h = true,
+                    AtomExpr::And(inner) => {
+                        if let Some((c, h)) = extract_chirality_and_h(&AtomExpr::And(inner.clone())) {
+                            if c != Chirality::None {
+                                chiral = Some(c);
+                            }
+                            if h {
+                                has_h = true;
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            chiral.map(|c| (c, has_h))
+        }
+        _ => None,
+    }
+}
+
+fn validate_chirality(
+    mapping: &AtomMapping,
+    target: &Mol<Atom, Bond>,
+    query: &Mol<AtomExpr, BondExpr>,
+    chiral_query_atoms: &[ChiralQueryAtom],
+) -> bool {
+    for cqa in chiral_query_atoms {
+        let q_idx = cqa.query_idx;
+        let t_idx = match mapping.iter().find(|&&(q, _)| q == q_idx) {
+            Some(&(_, t)) => t,
+            None => continue,
+        };
+
+        let t_atom = target.atom(t_idx);
+        if t_atom.chirality == Chirality::None {
+            return false;
+        }
+
+        let q_neighbor_count = query.neighbors(q_idx).count()
+            + if cqa.has_implicit_h { 1 } else { 0 };
+        if q_neighbor_count < 3 {
+            continue;
+        }
+
+        let q_chiral = cqa.chirality;
+        let t_chiral = t_atom.chirality;
+
+        let mut mapped_target_neighbors: Vec<NodeIndex> = Vec::new();
+
+        if cqa.has_implicit_h {
+            let sentinel = NodeIndex::new(usize::MAX);
+            mapped_target_neighbors.push(sentinel);
+        }
+
+        for q_nb in query.neighbors(q_idx) {
+            let t_nb = match mapping.iter().find(|&&(q, _)| q == q_nb) {
+                Some(&(_, t)) => t,
+                None => return false,
+            };
+            mapped_target_neighbors.push(t_nb);
+        }
+
+        let target_stored_neighbors: Vec<NodeIndex> = {
+            let mut nbs: Vec<NodeIndex> = target.neighbors(t_idx).collect();
+            if t_atom.hydrogen_count > 0 && cqa.has_implicit_h {
+                let sentinel = NodeIndex::new(usize::MAX);
+                nbs.insert(0, sentinel);
+            }
+            nbs
+        };
+
+        let perm_count = count_inversions(&mapped_target_neighbors, &target_stored_neighbors);
+
+        let parities_match = if perm_count.is_multiple_of(2) {
+            q_chiral == t_chiral
+        } else {
+            q_chiral != t_chiral
+        };
+
+        if !parities_match {
+            return false;
+        }
+    }
+    true
+}
+
+fn count_inversions(mapped: &[NodeIndex], stored: &[NodeIndex]) -> usize {
+    let position_of = |node: NodeIndex| -> Option<usize> {
+        stored.iter().position(|&n| n == node)
+    };
+
+    let positions: Vec<usize> = mapped
+        .iter()
+        .filter_map(|&n| position_of(n))
+        .collect();
+
+    let mut inversions = 0;
+    for i in 0..positions.len() {
+        for j in (i + 1)..positions.len() {
+            if positions[i] > positions[j] {
+                inversions += 1;
+            }
+        }
+    }
+    inversions
+}
+
 fn match_atom_expr(expr: &AtomExpr, atom: &Atom, ctx: &MatchContext, idx: NodeIndex) -> bool {
     match expr {
         AtomExpr::Recursive(inner) => {
@@ -117,6 +343,7 @@ fn match_atom_expr(expr: &AtomExpr, atom: &Atom, ctx: &MatchContext, idx: NodeIn
         AtomExpr::Or(exprs) => exprs
             .iter()
             .any(|e| match_atom_expr(e, atom, ctx, idx)),
+        AtomExpr::Chirality(_) => expr.matches(atom, ctx, idx),
         AtomExpr::Not(inner) => !match_atom_expr(inner, atom, ctx, idx),
         _ => expr.matches(atom, ctx, idx),
     }
@@ -942,5 +1169,220 @@ mod tests {
         let q = smarts("[se]");
         let expr = q.atom(NodeIndex::new(0));
         assert!(matches!(expr, AtomExpr::Element { atomic_num: 34, aromatic: Some(true) }));
+    }
+
+    // ---- Chirality parser tests ----
+
+    #[test]
+    fn parse_chirality_ccw() {
+        let q = smarts("[C@](F)(Cl)Br");
+        let expr = q.atom(NodeIndex::new(0));
+        match expr {
+            AtomExpr::And(parts) => {
+                assert!(parts.iter().any(|p| matches!(p, AtomExpr::Chirality(Chirality::Cw | Chirality::Ccw))),
+                    "expected chirality variant, got {parts:?}");
+            }
+            _ => panic!("expected And, got {expr:?}"),
+        }
+    }
+
+    #[test]
+    fn parse_chirality_cw() {
+        let q = smarts("[C@@](F)(Cl)Br");
+        let expr = q.atom(NodeIndex::new(0));
+        match expr {
+            AtomExpr::And(parts) => {
+                assert!(parts.iter().any(|p| matches!(p, AtomExpr::Chirality(Chirality::Cw | Chirality::Ccw))),
+                    "expected chirality variant, got {parts:?}");
+            }
+            _ => panic!("expected And, got {expr:?}"),
+        }
+    }
+
+    #[test]
+    fn parse_chirality_opposite_labels() {
+        let q_at = smarts("[C@](F)(Cl)Br");
+        let q_atat = smarts("[C@@](F)(Cl)Br");
+        let get_chirality = |expr: &AtomExpr| -> Option<Chirality> {
+            match expr {
+                AtomExpr::And(parts) => parts.iter().find_map(|p| match p {
+                    AtomExpr::Chirality(c) => Some(*c),
+                    _ => None,
+                }),
+                _ => None,
+            }
+        };
+        let c1 = get_chirality(q_at.atom(NodeIndex::new(0))).unwrap();
+        let c2 = get_chirality(q_atat.atom(NodeIndex::new(0))).unwrap();
+        assert_ne!(c1, c2, "@ and @@ must produce different chirality labels");
+    }
+
+    #[test]
+    fn parse_chirality_with_hydrogen() {
+        let q = smarts("[C@H](F)(Cl)Br");
+        let expr = q.atom(NodeIndex::new(0));
+        match expr {
+            AtomExpr::And(parts) => {
+                assert!(parts.iter().any(|p| matches!(p, AtomExpr::Element { atomic_num: 6, aromatic: Some(false) })));
+                assert!(parts.iter().any(|p| matches!(p, AtomExpr::Chirality(Chirality::Cw | Chirality::Ccw))));
+                assert!(parts.iter().any(|p| matches!(p, AtomExpr::TotalHCount(1))));
+            }
+            _ => panic!("expected And, got {expr:?}"),
+        }
+    }
+
+    #[test]
+    fn parse_chirality_cw_with_hydrogen() {
+        let q = smarts("[C@@H](F)(Cl)Br");
+        let expr = q.atom(NodeIndex::new(0));
+        match expr {
+            AtomExpr::And(parts) => {
+                assert!(parts.iter().any(|p| matches!(p, AtomExpr::Chirality(Chirality::Cw | Chirality::Ccw))));
+                assert!(parts.iter().any(|p| matches!(p, AtomExpr::TotalHCount(1))));
+            }
+            _ => panic!("expected And, got {expr:?}"),
+        }
+    }
+
+    // ---- Chirality writer tests ----
+
+    #[test]
+    fn writer_chirality_ccw() {
+        let q = smarts("[C@]");
+        let written = to_smarts(&q);
+        assert_eq!(written, "[C&@]");
+        let reparsed = smarts(&written);
+        assert_eq!(q.atom(NodeIndex::new(0)), reparsed.atom(NodeIndex::new(0)));
+    }
+
+    #[test]
+    fn writer_chirality_cw() {
+        let q = smarts("[C@@]");
+        let written = to_smarts(&q);
+        assert_eq!(written, "[C&@@]");
+        let reparsed = smarts(&written);
+        assert_eq!(q.atom(NodeIndex::new(0)), reparsed.atom(NodeIndex::new(0)));
+    }
+
+    #[test]
+    fn writer_chirality_with_h_round_trip() {
+        let q = smarts("[C@H]");
+        let written = to_smarts(&q);
+        let reparsed = smarts(&written);
+        assert_eq!(q.atom(NodeIndex::new(0)), reparsed.atom(NodeIndex::new(0)));
+    }
+
+    // ---- Chirality matching tests ----
+
+    #[test]
+    fn chiral_query_matches_correct_enantiomer() {
+        let target = mol("[C@](F)(Cl)Br");
+        let query = smarts("[C@](F)(Cl)Br");
+        assert!(has_smarts_match_chiral(&target, &query));
+    }
+
+    #[test]
+    fn chiral_query_rejects_wrong_enantiomer() {
+        let target = mol("[C@@](F)(Cl)Br");
+        let query = smarts("[C@](F)(Cl)Br");
+        assert!(!has_smarts_match_chiral(&target, &query));
+    }
+
+    #[test]
+    fn inverted_chirality_matches_opposite() {
+        let target = mol("[C@@](F)(Cl)Br");
+        let query = smarts("[C@@](F)(Cl)Br");
+        assert!(has_smarts_match_chiral(&target, &query));
+    }
+
+    #[test]
+    fn achiral_query_matches_chiral_target() {
+        let target = mol("[C@](F)(Cl)Br");
+        let query = smarts("[C](F)(Cl)Br");
+        assert!(has_smarts_match_chiral(&target, &query));
+    }
+
+    #[test]
+    fn achiral_query_matches_achiral_target() {
+        let target = mol("C(F)(Cl)Br");
+        let query = smarts("[C](F)(Cl)Br");
+        assert!(has_smarts_match_chiral(&target, &query));
+    }
+
+    #[test]
+    fn chiral_query_rejects_achiral_target() {
+        let target = mol("C(F)(Cl)Br");
+        let query = smarts("[C@](F)(Cl)Br");
+        assert!(!has_smarts_match_chiral(&target, &query));
+    }
+
+    #[test]
+    fn chiral_query_few_neighbors_matches_any() {
+        let target = mol("[C@@H](F)Cl");
+        let query = smarts("[C@]F");
+        assert!(has_smarts_match_chiral(&target, &query));
+    }
+
+    #[test]
+    fn chiral_with_implicit_h_matches() {
+        let target = mol("[C@H](F)(Cl)Br");
+        let query = smarts("[C@H](F)(Cl)Br");
+        assert!(has_smarts_match_chiral(&target, &query));
+    }
+
+    #[test]
+    fn chiral_with_implicit_h_rejects_wrong() {
+        let target = mol("[C@@H](F)(Cl)Br");
+        let query = smarts("[C@H](F)(Cl)Br");
+        assert!(!has_smarts_match_chiral(&target, &query));
+    }
+
+    #[test]
+    fn non_chiral_matching_ignores_chirality() {
+        let target = mol("[C@@](F)(Cl)Br");
+        let query = smarts("[C@](F)(Cl)Br");
+        assert!(has_smarts_match(&target, &query));
+    }
+
+    #[test]
+    fn get_chiral_matches_returns_correct_count() {
+        let target = mol("[C@](F)(Cl)Br");
+        let query_match = smarts("[C@](F)(Cl)Br");
+        let query_no_match = smarts("[C@@](F)(Cl)Br");
+        let matches = get_smarts_matches_chiral(&target, &query_match);
+        assert_eq!(matches.len(), 1);
+        let no_matches = get_smarts_matches_chiral(&target, &query_no_match);
+        assert_eq!(no_matches.len(), 0);
+    }
+
+    #[test]
+    fn chiral_match_alanine_l() {
+        let l_ala = mol("[C@@H](N)(C(=O)O)C");
+        let query_l = smarts("[C@@H]([NH2])(C=O)C");
+        assert!(has_smarts_match_chiral(&l_ala, &query_l));
+    }
+
+    #[test]
+    fn chiral_match_alanine_d_vs_l() {
+        let l_ala = mol("[C@@H](N)(C(=O)O)C");
+        let query_d = smarts("[C@H]([NH2])(C=O)C");
+        assert!(!has_smarts_match_chiral(&l_ala, &query_d));
+    }
+
+    #[test]
+    fn chiral_ambiguous_neighbors_matches_either() {
+        let l_ala = mol("[C@@H](N)(C(=O)O)C");
+        let query = smarts("[C@H](N)(C)C");
+        assert!(has_smarts_match_chiral(&l_ala, &query));
+    }
+
+    #[test]
+    fn debug_chirality_internals_simple() {
+        let target = mol("[C@](F)(Cl)Br");
+        let query = smarts("[C@](F)(Cl)Br");
+        assert!(has_smarts_match_chiral(&target, &query));
+
+        let query_opp = smarts("[C@@](F)(Cl)Br");
+        assert!(!has_smarts_match_chiral(&target, &query_opp));
     }
 }

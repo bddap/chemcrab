@@ -56,6 +56,8 @@ impl<'a> Parser<'a> {
         let mut pending_bond: Option<BondExpr> = None;
         let mut ring_map: std::collections::HashMap<u16, (petgraph::graph::NodeIndex, BondExpr)> =
             std::collections::HashMap::new();
+        let mut insertion_order: std::collections::HashMap<usize, Vec<petgraph::graph::NodeIndex>> =
+            std::collections::HashMap::new();
 
         while self.pos < self.chars.len() {
             let ch = self.chars[self.pos];
@@ -67,6 +69,8 @@ impl<'a> Parser<'a> {
                     if let Some(prev) = current {
                         let bond = pending_bond.take().unwrap_or(BondExpr::SingleOrAromatic);
                         mol.add_bond(prev, idx, bond);
+                        insertion_order.entry(prev.index()).or_default().push(idx);
+                        insertion_order.entry(idx.index()).or_default().push(prev);
                     }
                     current = Some(idx);
                 }
@@ -114,6 +118,8 @@ impl<'a> Parser<'a> {
                                 .or(Some(saved_bond))
                                 .unwrap_or(BondExpr::SingleOrAromatic);
                             mol.add_bond(cur, other, bond);
+                            insertion_order.entry(cur.index()).or_default().push(other);
+                            insertion_order.entry(other.index()).or_default().push(cur);
                         } else {
                             ring_map.insert(
                                 digit,
@@ -134,6 +140,8 @@ impl<'a> Parser<'a> {
                     if let Some(prev) = current {
                         let bond = pending_bond.take().unwrap_or(BondExpr::SingleOrAromatic);
                         mol.add_bond(prev, idx, bond);
+                        insertion_order.entry(prev.index()).or_default().push(idx);
+                        insertion_order.entry(idx.index()).or_default().push(prev);
                     }
                     current = Some(idx);
                 }
@@ -147,6 +155,8 @@ impl<'a> Parser<'a> {
         if let Some((&digit, _)) = ring_map.iter().next() {
             return Err(SmartsError::UnclosedRing { digit });
         }
+
+        normalize_chirality(&mut mol, &insertion_order);
 
         Ok(mol)
     }
@@ -442,6 +452,15 @@ impl<'a> Parser<'a> {
                 let n = self.parse_number().unwrap_or(1);
                 Ok(AtomExpr::RingBondCount(n as u8))
             }
+            '@' => {
+                self.pos += 1;
+                if self.pos < self.chars.len() && self.chars[self.pos] == '@' {
+                    self.pos += 1;
+                    Ok(AtomExpr::Chirality(crate::atom::Chirality::Cw))
+                } else {
+                    Ok(AtomExpr::Chirality(crate::atom::Chirality::Ccw))
+                }
+            }
             '+' => {
                 self.pos += 1;
                 let n = self.parse_number().unwrap_or(1);
@@ -638,6 +657,87 @@ fn flatten_or(mut parts: Vec<AtomExpr>) -> AtomExpr {
     } else {
         AtomExpr::Or(flattened)
     }
+}
+
+fn normalize_chirality(
+    mol: &mut Mol<AtomExpr, BondExpr>,
+    insertion_order: &std::collections::HashMap<usize, Vec<petgraph::graph::NodeIndex>>,
+) {
+    let atoms: Vec<petgraph::graph::NodeIndex> = mol.atoms().collect();
+    for idx in atoms {
+        let needs_flip = {
+            let expr = mol.atom(idx);
+            if !has_chirality(expr) {
+                continue;
+            }
+            let Some(input_order) = insertion_order.get(&idx.index()) else {
+                continue;
+            };
+            let graph_order: Vec<petgraph::graph::NodeIndex> = mol.neighbors(idx).collect();
+            eprintln!("[normalize_chirality] atom {}: input_order={:?}, graph_order={:?}, parity_even={}", 
+                idx.index(), input_order, graph_order, parity_even(input_order, &graph_order));
+            if input_order.len() != graph_order.len() || input_order.len() < 2 {
+                continue;
+            }
+            !parity_even(input_order, &graph_order)
+        };
+        if needs_flip {
+            eprintln!("[normalize_chirality] flipping atom {}", idx.index());
+            flip_chirality(mol.atom_mut(idx));
+        }
+    }
+}
+
+fn has_chirality(expr: &AtomExpr) -> bool {
+    match expr {
+        AtomExpr::Chirality(c) => *c != crate::atom::Chirality::None,
+        AtomExpr::And(parts) => parts.iter().any(has_chirality),
+        _ => false,
+    }
+}
+
+fn flip_chirality(expr: &mut AtomExpr) {
+    use crate::atom::Chirality;
+    match expr {
+        AtomExpr::Chirality(c) => {
+            *c = match *c {
+                Chirality::Cw => Chirality::Ccw,
+                Chirality::Ccw => Chirality::Cw,
+                Chirality::None => Chirality::None,
+            };
+        }
+        AtomExpr::And(parts) => {
+            for p in parts {
+                flip_chirality(p);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn parity_even(from: &[petgraph::graph::NodeIndex], to: &[petgraph::graph::NodeIndex]) -> bool {
+    let n = from.len();
+    let perm: Vec<usize> = from
+        .iter()
+        .map(|f| to.iter().position(|t| t == f).unwrap_or(0))
+        .collect();
+
+    let mut visited = vec![false; n];
+    let mut swaps = 0;
+    for i in 0..n {
+        if visited[i] {
+            continue;
+        }
+        let mut cycle_len = 0;
+        let mut j = i;
+        while !visited[j] {
+            visited[j] = true;
+            j = perm[j];
+            cycle_len += 1;
+        }
+        swaps += cycle_len - 1;
+    }
+    swaps % 2 == 0
 }
 
 pub fn parse(input: &str) -> Result<Mol<AtomExpr, BondExpr>, SmartsError> {

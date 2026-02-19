@@ -310,6 +310,14 @@ fn write_atom_expr_inner(expr: &AtomExpr, out: &mut String) {
             out.push('x');
             out.push_str(&x.to_string());
         }
+        AtomExpr::Chirality(chiral) => {
+            use crate::atom::Chirality;
+            match chiral {
+                Chirality::Ccw => out.push('@'),
+                Chirality::Cw => out.push_str("@@"),
+                Chirality::None => {}
+            }
+        }
         AtomExpr::Charge(c) => {
             if *c >= 0 {
                 out.push('+');
