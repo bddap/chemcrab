@@ -294,6 +294,33 @@ impl<'a> Parser<'a> {
 
         let expr = self.parse_semicolon_expr()?;
 
+        if self.pos < self.chars.len() && self.chars[self.pos] == ':' {
+            self.pos += 1;
+            let map_num = self.parse_number().ok_or(SmartsError::InvalidSmarts {
+                pos: self.pos,
+                msg: "expected number after ':' for atom map class".into(),
+            })?;
+            if map_num > u16::MAX as u32 {
+                return Err(SmartsError::InvalidSmarts {
+                    pos: self.pos,
+                    msg: "atom map class too large".into(),
+                });
+            }
+            let map_expr = AtomExpr::AtomMapClass(map_num as u16);
+            let combined = match expr {
+                AtomExpr::And(mut parts) => {
+                    parts.push(map_expr);
+                    AtomExpr::And(parts)
+                }
+                other => AtomExpr::And(vec![other, map_expr]),
+            };
+            if self.pos >= self.chars.len() || self.chars[self.pos] != ']' {
+                return Err(SmartsError::UnclosedBracket { pos: bracket_start });
+            }
+            self.pos += 1;
+            return Ok(combined);
+        }
+
         if self.pos >= self.chars.len() || self.chars[self.pos] != ']' {
             return Err(SmartsError::UnclosedBracket { pos: bracket_start });
         }
@@ -327,7 +354,7 @@ impl<'a> Parser<'a> {
                 break;
             }
             let ch = self.chars[self.pos];
-            if ch == ']' || ch == ',' || ch == ';' {
+            if ch == ']' || ch == ',' || ch == ';' || ch == ':' {
                 break;
             }
             if ch == '&' {

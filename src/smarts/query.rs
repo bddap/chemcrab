@@ -60,6 +60,7 @@ pub enum AtomExpr {
     InRing,
     NotInRing,
     Recursive(Mol<AtomExpr, BondExpr>),
+    AtomMapClass(u16),
     And(Vec<AtomExpr>),
     Or(Vec<AtomExpr>),
     Chirality(crate::atom::Chirality),
@@ -260,6 +261,7 @@ impl AtomExpr {
                 let val = range_value(*kind, atom, ctx, idx);
                 in_range(val, *low, *high)
             }
+            AtomExpr::AtomMapClass(_) => true,
             AtomExpr::InRing => ctx.ring_info.is_ring_atom(idx),
             AtomExpr::NotInRing => !ctx.ring_info.is_ring_atom(idx),
             AtomExpr::Chirality(q_chiral) => {
