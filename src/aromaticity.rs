@@ -7,7 +7,7 @@ use crate::traits::{HasAtomicNum, HasBondOrder, HasFormalCharge, HasHydrogenCoun
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AromaticityModel {
-    Rdkit,
+    Huckel,
 }
 
 const SP2_CAPABLE: [u8; 9] = [
@@ -27,7 +27,7 @@ where
     A: HasAtomicNum + HasFormalCharge + HasHydrogenCount,
     B: HasBondOrder,
 {
-    find_aromatic_atoms_rdkit(mol)
+    find_aromatic_atoms_huckel(mol)
 }
 
 pub fn set_aromaticity(
@@ -35,8 +35,8 @@ pub fn set_aromaticity(
     model: AromaticityModel,
 ) {
     match model {
-        AromaticityModel::Rdkit => {
-            let aromatic = find_aromatic_atoms_rdkit(mol);
+        AromaticityModel::Huckel => {
+            let aromatic = find_aromatic_atoms_huckel(mol);
             let indices: Vec<_> = mol.atoms().collect();
             for idx in indices {
                 mol.atom_mut(idx).is_aromatic = aromatic[idx.index()];
@@ -45,7 +45,7 @@ pub fn set_aromaticity(
     }
 }
 
-fn find_aromatic_atoms_rdkit<A, B>(mol: &Mol<A, B>) -> Vec<bool>
+fn find_aromatic_atoms_huckel<A, B>(mol: &Mol<A, B>) -> Vec<bool>
 where
     A: HasAtomicNum + HasFormalCharge + HasHydrogenCount,
     B: HasBondOrder,
@@ -358,7 +358,7 @@ mod tests {
             assert!(!mol.atom(idx).is_aromatic);
         }
 
-        set_aromaticity(&mut mol, AromaticityModel::Rdkit);
+        set_aromaticity(&mut mol, AromaticityModel::Huckel);
 
         for idx in mol.atoms() {
             assert!(

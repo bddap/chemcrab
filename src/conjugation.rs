@@ -154,8 +154,8 @@ mod tests {
     #[test]
     fn ethene_not_conjugated() {
         // A single double bond with no adjacent unsaturation
-        // RDKit: double bond by itself is NOT conjugated
-        // (markConjAtomBonds requires finding a PAIR of bonds)
+        // A lone double bond is not conjugated; conjugation requires
+        // adjacent unsaturation.
         let c = conj("C=C");
         assert_eq!(c, vec![false]);
     }

@@ -363,7 +363,7 @@ fn approval_canonical_smiles() {
         // Soft string comparison — log but don't fail
         if our_canonical != entry.canonical_isomeric {
             mismatches.push(format!(
-                "{}: rdkit={:?}, ours={:?}",
+                "{}: expected={:?}, ours={:?}",
                 entry.input, entry.canonical_isomeric, our_canonical
             ));
         }
