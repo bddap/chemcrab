@@ -25,7 +25,7 @@ pub use hydrogen::{add_hs, remove_hs};
 pub use kekulize::{kekulize, KekulizeError};
 pub use mol::Mol;
 pub use rings::RingInfo;
-pub use smiles::{from_smiles, parse_smiles, SmilesError};
+pub use smiles::{from_smiles, parse_smiles, to_smiles, SmilesError};
 pub use traits::{
     HasAromaticity, HasAtomicNum, HasBondOrder, HasBondStereo, HasChirality, HasFormalCharge,
     HasHybridization, HasHydrogenCount, HasIsotope, HasPosition2D, HasPosition3D, HasValence,
