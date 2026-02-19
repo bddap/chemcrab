@@ -200,7 +200,7 @@ fn permutation_parity(from: &[NodeIndex], to: &[NodeIndex]) -> bool {
         }
         swaps += cycle_len - 1;
     }
-    swaps % 2 == 0
+    swaps.is_multiple_of(2)
 }
 
 pub fn renumber_atoms<A: Clone, B: Clone>(
