@@ -1,3 +1,5 @@
+use petgraph::graph::NodeIndex;
+
 use crate::atom::{Atom, Chirality};
 use crate::bond::{Bond, BondOrder, BondStereo};
 use crate::mol::Mol;
@@ -8,6 +10,34 @@ fn flip_chirality(c: Chirality) -> Chirality {
         Chirality::Ccw => Chirality::Cw,
         Chirality::None => Chirality::None,
     }
+}
+
+fn remap_stereo(stereo: BondStereo, map: &dyn Fn(NodeIndex) -> Option<NodeIndex>) -> BondStereo {
+    match stereo {
+        BondStereo::Cis(a, b) => match (map(a), map(b)) {
+            (Some(na), Some(nb)) => BondStereo::Cis(na, nb),
+            _ => BondStereo::None,
+        },
+        BondStereo::Trans(a, b) => match (map(a), map(b)) {
+            (Some(na), Some(nb)) => BondStereo::Trans(na, nb),
+            _ => BondStereo::None,
+        },
+        BondStereo::None => BondStereo::None,
+    }
+}
+
+fn stereo_referenced_atoms(mol: &Mol<Atom, Bond>) -> Vec<bool> {
+    let mut referenced = vec![false; mol.atom_count()];
+    for edge in mol.bonds() {
+        match mol.bond(edge).stereo {
+            BondStereo::Cis(a, b) | BondStereo::Trans(a, b) => {
+                referenced[a.index()] = true;
+                referenced[b.index()] = true;
+            }
+            BondStereo::None => {}
+        }
+    }
+    referenced
 }
 
 pub fn add_hs(mol: &Mol<Atom, Bond>) -> Mol<Atom, Bond> {
@@ -26,11 +56,16 @@ pub fn add_hs(mol: &Mol<Atom, Bond>) -> Mol<Atom, Bond> {
     for edge in mol.bonds() {
         let (a, b) = mol.bond_endpoints(edge).unwrap();
         let bond = mol.bond(edge);
-        result.add_bond(index_map[a.index()], index_map[b.index()], bond.clone());
+        let stereo = remap_stereo(bond.stereo, &|n| Some(index_map[n.index()]));
+        result.add_bond(
+            index_map[a.index()],
+            index_map[b.index()],
+            Bond { stereo, ..bond.clone() },
+        );
     }
 
     for (idx, &parent) in index_map.iter().enumerate() {
-        let orig_idx = petgraph::graph::NodeIndex::new(idx);
+        let orig_idx = NodeIndex::new(idx);
         let atom = mol.atom(orig_idx);
         let h_count = atom.hydrogen_count as usize;
         for _ in 0..h_count {
@@ -58,8 +93,23 @@ pub fn add_hs(mol: &Mol<Atom, Bond>) -> Mol<Atom, Bond> {
     result
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct RemoveHsOptions {
+    pub keep_stereo_hs: bool,
+}
+
 pub fn remove_hs(mol: &Mol<Atom, Bond>) -> Mol<Atom, Bond> {
+    remove_hs_with(mol, &RemoveHsOptions::default())
+}
+
+pub fn remove_hs_with(mol: &Mol<Atom, Bond>, opts: &RemoveHsOptions) -> Mol<Atom, Bond> {
     let node_count = mol.atom_count();
+    let stereo_refs = if opts.keep_stereo_hs {
+        stereo_referenced_atoms(mol)
+    } else {
+        vec![false; node_count]
+    };
+
     let mut removable = vec![false; node_count];
     let mut extra_h: Vec<u8> = vec![0; node_count];
 
@@ -71,6 +121,9 @@ pub fn remove_hs(mol: &Mol<Atom, Bond>) -> Mol<Atom, Bond> {
         {
             let neighbors: Vec<_> = mol.neighbors(idx).collect();
             if neighbors.len() == 1 {
+                if opts.keep_stereo_hs && stereo_refs[idx.index()] {
+                    continue;
+                }
                 removable[idx.index()] = true;
                 extra_h[neighbors[0].index()] += 1;
             }
@@ -78,7 +131,7 @@ pub fn remove_hs(mol: &Mol<Atom, Bond>) -> Mol<Atom, Bond> {
     }
 
     let mut result = Mol::new();
-    let mut index_map = vec![None; node_count];
+    let mut index_map: Vec<Option<NodeIndex>> = vec![None; node_count];
 
     for idx in mol.atoms() {
         if removable[idx.index()] {
@@ -118,7 +171,9 @@ pub fn remove_hs(mol: &Mol<Atom, Bond>) -> Mol<Atom, Bond> {
     for edge in mol.bonds() {
         let (a, b) = mol.bond_endpoints(edge).unwrap();
         if let (Some(new_a), Some(new_b)) = (index_map[a.index()], index_map[b.index()]) {
-            result.add_bond(new_a, new_b, mol.bond(edge).clone());
+            let bond = mol.bond(edge);
+            let stereo = remap_stereo(bond.stereo, &|n| index_map[n.index()]);
+            result.add_bond(new_a, new_b, Bond { stereo, ..bond.clone() });
         }
     }
 
@@ -129,7 +184,7 @@ pub fn remove_hs(mol: &Mol<Atom, Bond>) -> Mol<Atom, Bond> {
 mod tests {
     use super::*;
     use crate::bond::SmilesBondOrder;
-    use crate::smiles::parse_smiles;
+    use crate::smiles::{from_smiles, parse_smiles, to_smiles};
     use crate::SmilesBond;
     use petgraph::graph::NodeIndex;
 
@@ -163,6 +218,21 @@ mod tests {
 
     fn n(i: usize) -> NodeIndex {
         NodeIndex::new(i)
+    }
+
+    fn find_double_bond_stereo(mol: &Mol<Atom, Bond>) -> Option<BondStereo> {
+        mol.bonds().find_map(|e| match mol.bond(e).stereo {
+            BondStereo::None => None,
+            s => Some(s),
+        })
+    }
+
+    fn stereo_is_trans(s: BondStereo) -> bool {
+        matches!(s, BondStereo::Trans(_, _))
+    }
+
+    fn stereo_is_cis(s: BondStereo) -> bool {
+        matches!(s, BondStereo::Cis(_, _))
     }
 
     #[test]
@@ -400,5 +470,199 @@ mod tests {
         let result = remove_hs(&mol);
         assert_eq!(result.atom_count(), 0);
         assert_eq!(result.bond_count(), 0);
+    }
+
+    // ---- E/Z stereo preservation ----
+
+    #[test]
+    fn add_hs_preserves_ez_trans() {
+        let mol = from_smiles("F/C=C/F").unwrap();
+        let stereo = find_double_bond_stereo(&mol).unwrap();
+        assert!(stereo_is_trans(stereo));
+
+        let explicit = add_hs(&mol);
+        let stereo2 = find_double_bond_stereo(&explicit)
+            .expect("E/Z stereo lost after add_hs");
+        assert!(stereo_is_trans(stereo2));
+
+        if let BondStereo::Trans(a, b) = stereo2 {
+            assert!(a.index() < explicit.atom_count());
+            assert!(b.index() < explicit.atom_count());
+        }
+    }
+
+    #[test]
+    fn add_hs_preserves_ez_cis() {
+        let mol = from_smiles(r"F/C=C\F").unwrap();
+        let stereo = find_double_bond_stereo(&mol).unwrap();
+        assert!(stereo_is_cis(stereo));
+
+        let explicit = add_hs(&mol);
+        let stereo2 = find_double_bond_stereo(&explicit)
+            .expect("E/Z stereo lost after add_hs");
+        assert!(stereo_is_cis(stereo2));
+    }
+
+    #[test]
+    fn remove_hs_preserves_ez_trans() {
+        let mol = from_smiles("F/C=C/F").unwrap();
+        let explicit = add_hs(&mol);
+        let collapsed = remove_hs(&explicit);
+        let stereo = find_double_bond_stereo(&collapsed)
+            .expect("E/Z stereo lost after remove_hs");
+        assert!(stereo_is_trans(stereo));
+    }
+
+    #[test]
+    fn remove_hs_preserves_ez_cis() {
+        let mol = from_smiles(r"F/C=C\F").unwrap();
+        let explicit = add_hs(&mol);
+        let collapsed = remove_hs(&explicit);
+        let stereo = find_double_bond_stereo(&collapsed)
+            .expect("E/Z stereo lost after remove_hs");
+        assert!(stereo_is_cis(stereo));
+    }
+
+    #[test]
+    fn ez_round_trip_smiles_f_trans() {
+        let mol = from_smiles("F/C=C/F").unwrap();
+        let explicit = add_hs(&mol);
+        let collapsed = remove_hs(&explicit);
+        let smiles = to_smiles(&collapsed);
+        let reparsed = from_smiles(&smiles).unwrap();
+        let stereo = find_double_bond_stereo(&reparsed)
+            .expect("E/Z stereo lost in round trip");
+        assert!(stereo_is_trans(stereo));
+    }
+
+    #[test]
+    fn ez_round_trip_smiles_f_cis() {
+        let mol = from_smiles(r"F/C=C\F").unwrap();
+        let explicit = add_hs(&mol);
+        let collapsed = remove_hs(&explicit);
+        let smiles = to_smiles(&collapsed);
+        let reparsed = from_smiles(&smiles).unwrap();
+        let stereo = find_double_bond_stereo(&reparsed)
+            .expect("E/Z stereo lost in round trip");
+        assert!(stereo_is_cis(stereo));
+    }
+
+    #[test]
+    fn ez_round_trip_cl_trans() {
+        let mol = from_smiles("Cl/C=C/Br").unwrap();
+        let explicit = add_hs(&mol);
+        let collapsed = remove_hs(&explicit);
+        let stereo = find_double_bond_stereo(&collapsed)
+            .expect("E/Z stereo lost after round trip");
+        assert!(stereo_is_trans(stereo));
+    }
+
+    #[test]
+    fn ez_round_trip_alkyl() {
+        let mol = from_smiles("CC/C=C/CC").unwrap();
+        let explicit = add_hs(&mol);
+        let collapsed = remove_hs(&explicit);
+        let stereo = find_double_bond_stereo(&collapsed)
+            .expect("E/Z stereo lost after round trip");
+        assert!(stereo_is_trans(stereo));
+    }
+
+    #[test]
+    fn ez_stereo_ref_atoms_valid_after_add_hs() {
+        let mol = from_smiles("Cl/C=C/Br").unwrap();
+        let explicit = add_hs(&mol);
+        if let Some(BondStereo::Trans(a, b) | BondStereo::Cis(a, b)) =
+            find_double_bond_stereo(&explicit)
+        {
+            assert!(
+                a.index() < explicit.atom_count(),
+                "ref atom {a:?} out of bounds"
+            );
+            assert!(
+                b.index() < explicit.atom_count(),
+                "ref atom {b:?} out of bounds"
+            );
+        }
+    }
+
+    #[test]
+    fn ez_stereo_ref_atoms_valid_after_remove_hs() {
+        let mol = from_smiles("Cl/C=C/Br").unwrap();
+        let explicit = add_hs(&mol);
+        let collapsed = remove_hs(&explicit);
+        if let Some(BondStereo::Trans(a, b) | BondStereo::Cis(a, b)) =
+            find_double_bond_stereo(&collapsed)
+        {
+            assert!(
+                a.index() < collapsed.atom_count(),
+                "ref atom {a:?} out of bounds"
+            );
+            assert!(
+                b.index() < collapsed.atom_count(),
+                "ref atom {b:?} out of bounds"
+            );
+        }
+    }
+
+    // ---- keep_stereo_hs option ----
+
+    #[test]
+    fn remove_hs_keep_stereo_hs_preserves_ref_atoms() {
+        let mol = from_smiles("F/C=C/F").unwrap();
+        let explicit = add_hs(&mol);
+
+        let opts = RemoveHsOptions { keep_stereo_hs: true };
+        let result = remove_hs_with(&explicit, &opts);
+
+        let stereo = find_double_bond_stereo(&result)
+            .expect("E/Z stereo lost with keep_stereo_hs");
+        assert!(stereo_is_trans(stereo));
+
+        if let BondStereo::Trans(a, b) = stereo {
+            assert_eq!(result.atom(a).atomic_num, 9, "left ref should be F");
+            assert_eq!(result.atom(b).atomic_num, 9, "right ref should be F");
+        }
+    }
+
+    #[test]
+    fn keep_stereo_hs_retains_h_on_double_bond_carbon() {
+        // In CC/C=C/CC, the stereo refs are the C neighbors, not H.
+        // After add_hs, H atoms bonded to the double-bond carbons may become
+        // stereo references. keep_stereo_hs should retain those.
+        let mol = from_smiles("F/C=C/F").unwrap();
+        let explicit = add_hs(&mol);
+
+        let stereo_before = find_double_bond_stereo(&explicit).unwrap();
+
+        let opts = RemoveHsOptions { keep_stereo_hs: true };
+        let result = remove_hs_with(&explicit, &opts);
+        let stereo_after = find_double_bond_stereo(&result).unwrap();
+
+        // Both should be trans
+        assert!(stereo_is_trans(stereo_before));
+        assert!(stereo_is_trans(stereo_after));
+    }
+
+    #[test]
+    fn keep_stereo_hs_still_removes_non_stereo_hs() {
+        let mol = from_smiles("F/C=C/F").unwrap();
+        let explicit = add_hs(&mol);
+        // explicit has F, C(H), =, C(H), F => 4 heavy + some H atoms
+        let total_explicit = explicit.atom_count();
+        assert!(total_explicit > 4);
+
+        let opts = RemoveHsOptions { keep_stereo_hs: true };
+        let result = remove_hs_with(&explicit, &opts);
+        // Should have fewer atoms than fully explicit but may keep stereo H
+        assert!(result.atom_count() <= total_explicit);
+    }
+
+    #[test]
+    fn remove_hs_default_does_not_keep_stereo_hs() {
+        let mol = from_smiles("F/C=C/F").unwrap();
+        let explicit = add_hs(&mol);
+        let collapsed = remove_hs(&explicit);
+        // Default: all plain H removed, back to implicit
+        assert_eq!(collapsed.atom_count(), 4);
     }
 }

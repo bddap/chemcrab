@@ -27,7 +27,7 @@ pub use graph_ops::{
     adjacency_matrix, connected_components, distance_matrix, get_fragments, num_components,
     shortest_path,
 };
-pub use hydrogen::{add_hs, remove_hs};
+pub use hydrogen::{add_hs, remove_hs, remove_hs_with, RemoveHsOptions};
 pub use kekulize::{kekulize, KekulizeError};
 pub use mol::Mol;
 pub use reaction::{
