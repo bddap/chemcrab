@@ -17,48 +17,62 @@ impl RingInfo {
             return Self { rings: vec![] };
         }
 
-        let n = mol.atom_count();
         let num_edges = mol.bond_count();
+        let candidates = horton_candidates(mol);
+        let rings = select_independent_rings(&candidates, num_expected, num_edges, mol);
 
-        let dist = all_pairs_bfs(mol, n);
-        let pred = all_pairs_predecessors(mol, n, &dist);
+        Self { rings }
+    }
 
-        let mut candidates: Vec<Vec<NodeIndex>> = Vec::new();
+    pub fn symmetrized_sssr<A, B>(mol: &Mol<A, B>) -> Self {
+        let num_expected = Self::expected_ring_count(mol);
+        if num_expected == 0 {
+            return Self { rings: vec![] };
+        }
 
-        for edge in mol.bonds() {
-            let (u, v) = match mol.bond_endpoints(edge) {
-                Some(pair) => pair,
-                None => continue,
-            };
-            for w_idx in 0..n {
-                let w = NodeIndex::new(w_idx);
-                let du = dist[w.index()][u.index()];
-                let dv = dist[w.index()][v.index()];
-                if du == u32::MAX || dv == u32::MAX {
-                    continue;
-                }
-                let ring_size = du as usize + dv as usize + 1;
-                if ring_size < 3 {
-                    continue;
-                }
-                let path_u = reconstruct_path(&pred, w, u);
-                let path_v = reconstruct_path(&pred, w, v);
-                if paths_share_internal_node(&path_u, &path_v) {
-                    continue;
-                }
-                let mut ring = path_u;
-                for &node in path_v[1..].iter().rev() {
-                    ring.push(node);
-                }
-                candidates.push(ring);
+        let num_edges = mol.bond_count();
+        let candidates = horton_candidates(mol);
+
+        let mut basis: Vec<Vec<u64>> = Vec::with_capacity(num_expected);
+        let mut sssr_bvs: Vec<Vec<u64>> = Vec::with_capacity(num_expected);
+
+        for ring in &candidates {
+            if sssr_bvs.len() >= num_expected {
+                break;
+            }
+            let bv = ring_to_edge_bitvector(ring, num_edges, mol);
+            if bv.iter().all(|&w| w == 0) {
+                continue;
+            }
+            if try_add_to_basis(&mut basis, bv.clone()) {
+                sssr_bvs.push(bv);
             }
         }
 
-        candidates.sort_by(|a, b| a.len().cmp(&b.len()).then_with(|| a.cmp(b)));
-        candidates.dedup();
+        let mut result_bvs: Vec<Vec<u64>> = sssr_bvs.clone();
 
-        let rings =
-            select_independent_rings(&candidates, num_expected, num_edges, mol);
+        // Include Horton candidates that lie in the cycle space.
+        for ring in &candidates {
+            let bv = ring_to_edge_bitvector(ring, num_edges, mol);
+            if bv.iter().all(|&w| w == 0) {
+                continue;
+            }
+            if result_bvs.contains(&bv) {
+                continue;
+            }
+            if is_in_cycle_space(&basis, &bv) {
+                result_bvs.push(bv);
+            }
+        }
+
+        let mut rings: Vec<Vec<NodeIndex>> = result_bvs
+            .iter()
+            .filter_map(|bv| bv_to_ring(bv, mol))
+            .map(|r| normalize_ring(&r))
+            .collect();
+
+        rings.sort_by(|a, b| a.len().cmp(&b.len()).then_with(|| a.cmp(b)));
+        rings.dedup();
 
         Self { rings }
     }
@@ -106,6 +120,95 @@ impl RingInfo {
         let c = connected_components(mol.graph());
         (e + c).saturating_sub(v)
     }
+}
+
+fn horton_candidates<A, B>(mol: &Mol<A, B>) -> Vec<Vec<NodeIndex>> {
+    let n = mol.atom_count();
+    let dist = all_pairs_bfs(mol, n);
+    let pred = all_pairs_predecessors(mol, n, &dist);
+
+    let mut candidates: Vec<Vec<NodeIndex>> = Vec::new();
+
+    for edge in mol.bonds() {
+        let (u, v) = match mol.bond_endpoints(edge) {
+            Some(pair) => pair,
+            None => continue,
+        };
+        for w_idx in 0..n {
+            let w = NodeIndex::new(w_idx);
+            let du = dist[w.index()][u.index()];
+            let dv = dist[w.index()][v.index()];
+            if du == u32::MAX || dv == u32::MAX {
+                continue;
+            }
+            let ring_size = du as usize + dv as usize + 1;
+            if ring_size < 3 {
+                continue;
+            }
+            let path_u = reconstruct_path(&pred, w, u);
+            let path_v = reconstruct_path(&pred, w, v);
+            if paths_share_internal_node(&path_u, &path_v) {
+                continue;
+            }
+            let mut ring = path_u;
+            for &node in path_v[1..].iter().rev() {
+                ring.push(node);
+            }
+            candidates.push(ring);
+        }
+    }
+
+    candidates.sort_by(|a, b| a.len().cmp(&b.len()).then_with(|| a.cmp(b)));
+    candidates.dedup();
+    candidates
+}
+
+fn bv_to_ring<A, B>(bv: &[u64], mol: &Mol<A, B>) -> Option<Vec<NodeIndex>> {
+    let n = mol.atom_count();
+    let mut adj: Vec<Vec<NodeIndex>> = vec![vec![]; n];
+
+    for edge in mol.bonds() {
+        let idx = edge.index();
+        if bv[idx / 64] & (1u64 << (idx % 64)) == 0 {
+            continue;
+        }
+        let (u, v) = mol.bond_endpoints(edge)?;
+        adj[u.index()].push(v);
+        adj[v.index()].push(u);
+    }
+
+    let start = (0..n).find(|&i| !adj[i].is_empty())?;
+    let mut ring = vec![NodeIndex::new(start)];
+    let mut prev = start;
+    let mut cur = adj[start].first()?.index();
+
+    loop {
+        ring.push(NodeIndex::new(cur));
+        let next = adj[cur]
+            .iter()
+            .find(|&&nb| nb.index() != prev)?
+            .index();
+        if next == start {
+            break;
+        }
+        prev = cur;
+        cur = next;
+    }
+
+    Some(ring)
+}
+
+fn is_in_cycle_space(basis: &[Vec<u64>], bv: &[u64]) -> bool {
+    let mut v = bv.to_vec();
+    for row in basis {
+        let pivot = leading_bit(row);
+        if let Some(p) = pivot {
+            if v[p / 64] & (1u64 << (p % 64)) != 0 {
+                xor_into(&mut v, row);
+            }
+        }
+    }
+    v.iter().all(|&w| w == 0)
 }
 
 fn all_pairs_bfs<A, B>(mol: &Mol<A, B>, n: usize) -> Vec<Vec<u32>> {
@@ -456,5 +559,94 @@ mod tests {
         let mol = from_smiles("c1ccc2ccccc2c1").unwrap();
         assert_eq!(RingInfo::expected_ring_count(&mol), 2);
     }
+
+    #[test]
+    fn sym_sssr_cyclohexane() {
+        let mol = from_smiles("C1CCCCC1").unwrap();
+        let ri = RingInfo::symmetrized_sssr(&mol);
+        assert_eq!(ri.num_rings(), 1);
+        assert_eq!(ri.rings()[0].len(), 6);
+    }
+
+    #[test]
+    fn sym_sssr_acyclic() {
+        let mol = from_smiles("CCCC").unwrap();
+        let ri = RingInfo::symmetrized_sssr(&mol);
+        assert_eq!(ri.num_rings(), 0);
+    }
+
+    #[test]
+    fn sym_sssr_naphthalene() {
+        let mol = from_smiles("c1ccc2ccccc2c1").unwrap();
+        let ri = RingInfo::symmetrized_sssr(&mol);
+        let mut sizes: Vec<usize> = ri.rings().iter().map(|r| r.len()).collect();
+        sizes.sort();
+        assert_eq!(ri.num_rings(), 3);
+        assert_eq!(sizes, vec![6, 6, 10]);
+    }
+
+    #[test]
+    fn sym_sssr_norbornane() {
+        let mol = from_smiles("C1CC2CC1CC2").unwrap();
+        let ri = RingInfo::symmetrized_sssr(&mol);
+        assert_eq!(ri.num_rings(), 3);
+    }
+
+    #[test]
+    fn sym_sssr_spiro() {
+        let mol = from_smiles("C1CCC2(CC1)CCCC2").unwrap();
+        let ri = RingInfo::symmetrized_sssr(&mol);
+        assert_eq!(ri.num_rings(), 2);
+    }
+
+    #[test]
+    fn sym_sssr_decalin() {
+        let mol = from_smiles("C1CCC2CCCCC2C1").unwrap();
+        let ri = RingInfo::symmetrized_sssr(&mol);
+        let mut sizes: Vec<usize> = ri.rings().iter().map(|r| r.len()).collect();
+        sizes.sort();
+        assert_eq!(ri.num_rings(), 3);
+        assert_eq!(sizes, vec![6, 6, 10]);
+    }
+
+    #[test]
+    fn sym_sssr_anthracene() {
+        let mol = from_smiles("c1ccc2cc3ccccc3cc2c1").unwrap();
+        let ri = RingInfo::symmetrized_sssr(&mol);
+        assert!(ri.num_rings() > 3);
+    }
+
+    #[test]
+    fn sym_sssr_cubane() {
+        let mol = from_smiles("C12C3C4C1C1C2C3C41").unwrap();
+        let sssr = RingInfo::sssr(&mol);
+        let sym = RingInfo::symmetrized_sssr(&mol);
+        assert_eq!(sssr.num_rings(), 5);
+        assert!(sym.num_rings() > sssr.num_rings());
+        let four_rings = sym.rings().iter().filter(|r| r.len() == 4).count();
+        assert_eq!(four_rings, 6, "all 6 cube faces should be present");
+    }
+
+    #[test]
+    fn sym_sssr_superset_of_sssr() {
+        let mol = from_smiles("c1ccc2ccccc2c1").unwrap();
+        let sssr = RingInfo::sssr(&mol);
+        let sym = RingInfo::symmetrized_sssr(&mol);
+        assert!(sym.num_rings() >= sssr.num_rings());
+        for sssr_ring in sssr.rings() {
+            assert!(
+                sym.rings().contains(sssr_ring),
+                "symmetrized SSSR should contain all SSSR rings"
+            );
+        }
+    }
+
+    #[test]
+    fn sym_sssr_benzene() {
+        let mol = from_smiles("c1ccccc1").unwrap();
+        let ri = RingInfo::symmetrized_sssr(&mol);
+        assert_eq!(ri.num_rings(), 1);
+    }
+
 }
 
