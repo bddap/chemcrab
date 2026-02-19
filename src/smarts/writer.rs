@@ -329,11 +329,20 @@ fn write_atom_expr_inner(expr: &AtomExpr, out: &mut String) {
             out.push_str(&super::writer::to_smarts(inner));
             out.push(')');
         }
+        AtomExpr::AtomMapClass(n) => {
+            out.push(':');
+            out.push_str(&n.to_string());
+        }
         AtomExpr::And(exprs) => {
-            for (i, e) in exprs.iter().enumerate() {
+            let (map_parts, other_parts): (Vec<_>, Vec<_>) =
+                exprs.iter().partition(|e| matches!(e, AtomExpr::AtomMapClass(_)));
+            for (i, e) in other_parts.iter().enumerate() {
                 if i > 0 {
                     out.push('&');
                 }
+                write_atom_expr_inner(e, out);
+            }
+            for e in &map_parts {
                 write_atom_expr_inner(e, out);
             }
         }

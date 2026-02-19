@@ -26,6 +26,7 @@ pub enum AtomExpr {
     InRing,
     NotInRing,
     Recursive(Mol<AtomExpr, BondExpr>),
+    AtomMapClass(u16),
     And(Vec<AtomExpr>),
     Or(Vec<AtomExpr>),
     Not(Box<AtomExpr>),
@@ -111,6 +112,7 @@ impl AtomExpr {
                 count == *x
             }
             AtomExpr::Charge(c) => atom.formal_charge == *c,
+            AtomExpr::AtomMapClass(_) => true,
             AtomExpr::InRing => ctx.ring_info.is_ring_atom(idx),
             AtomExpr::NotInRing => !ctx.ring_info.is_ring_atom(idx),
             AtomExpr::Recursive(ref _inner) => {

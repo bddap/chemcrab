@@ -8,6 +8,7 @@ pub mod graph_ops;
 pub mod hydrogen;
 pub mod kekulize;
 pub mod mol;
+pub mod reaction;
 pub mod rings;
 pub mod smarts;
 pub mod smiles;
@@ -29,6 +30,10 @@ pub use graph_ops::{
 pub use hydrogen::{add_hs, remove_hs};
 pub use kekulize::{kekulize, KekulizeError};
 pub use mol::Mol;
+pub use reaction::{
+    extract_atom_map_num, from_reaction_smarts, to_reaction_smarts, Reaction, ReactionError,
+    ReactionSmartsError,
+};
 pub use rings::RingInfo;
 pub use smarts::{
     from_smarts, get_smarts_match, get_smarts_matches, has_smarts_match, to_smarts, AtomExpr,
