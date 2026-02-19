@@ -250,7 +250,7 @@ fn parse_percent_ring(
 fn parse_bracket_atom(chars: &[char], start: usize) -> Result<(AtomToken, usize), SmilesError> {
     let mut i = start + 1; // skip '['
 
-    let isotope = parse_isotope(chars, &mut i);
+    let isotope = parse_isotope(chars, &mut i)?;
 
     let (element, is_aromatic) = parse_bracket_element(chars, &mut i, start)?;
 
@@ -260,7 +260,7 @@ fn parse_bracket_atom(chars: &[char], start: usize) -> Result<(AtomToken, usize)
 
     let charge = parse_charge(chars, &mut i, start)?;
 
-    let atom_class = parse_atom_class(chars, &mut i);
+    let atom_class = parse_atom_class(chars, &mut i)?;
 
     if i >= chars.len() || chars[i] != ']' {
         return Err(SmilesError::UnclosedBracket { pos: start });
@@ -283,19 +283,19 @@ fn parse_bracket_atom(chars: &[char], start: usize) -> Result<(AtomToken, usize)
     ))
 }
 
-fn parse_isotope(chars: &[char], i: &mut usize) -> u16 {
+fn parse_isotope(chars: &[char], i: &mut usize) -> Result<u16, SmilesError> {
+    let start = *i;
     let mut val: u16 = 0;
     let mut found = false;
     while *i < chars.len() && chars[*i].is_ascii_digit() {
         found = true;
-        val = val * 10 + (chars[*i] as u16 - b'0' as u16);
+        val = val
+            .checked_mul(10)
+            .and_then(|v| v.checked_add(chars[*i] as u16 - b'0' as u16))
+            .ok_or(SmilesError::InvalidIsotope { pos: start })?;
         *i += 1;
     }
-    if found {
-        val
-    } else {
-        0
-    }
+    Ok(if found { val } else { 0 })
 }
 
 fn parse_bracket_element(
@@ -446,17 +446,21 @@ fn parse_charge(chars: &[char], i: &mut usize, bracket_start: usize) -> Result<i
     }
 }
 
-fn parse_atom_class(chars: &[char], i: &mut usize) -> u16 {
+fn parse_atom_class(chars: &[char], i: &mut usize) -> Result<u16, SmilesError> {
     if *i < chars.len() && chars[*i] == ':' {
+        let start = *i;
         *i += 1;
         let mut val: u16 = 0;
         while *i < chars.len() && chars[*i].is_ascii_digit() {
-            val = val * 10 + (chars[*i] as u16 - b'0' as u16);
+            val = val
+                .checked_mul(10)
+                .and_then(|v| v.checked_add(chars[*i] as u16 - b'0' as u16))
+                .ok_or(SmilesError::InvalidAtomClass { pos: start })?;
             *i += 1;
         }
-        val
+        Ok(val)
     } else {
-        0
+        Ok(0)
     }
 }
 
@@ -612,6 +616,40 @@ mod tests {
         let tokens = tokenize("[C:1]").unwrap();
         match &tokens[0] {
             Token::Atom(a) => assert_eq!(a.atom_class, 1),
+            _ => panic!("expected atom"),
+        }
+    }
+
+    #[test]
+    fn isotope_overflow() {
+        assert!(matches!(
+            tokenize("[99999C]"),
+            Err(SmilesError::InvalidIsotope { .. })
+        ));
+    }
+
+    #[test]
+    fn atom_class_overflow() {
+        assert!(matches!(
+            tokenize("[C:99999]"),
+            Err(SmilesError::InvalidAtomClass { .. })
+        ));
+    }
+
+    #[test]
+    fn valid_isotope_near_limit() {
+        let tokens = tokenize("[999C]").unwrap();
+        match &tokens[0] {
+            Token::Atom(a) => assert_eq!(a.isotope, 999),
+            _ => panic!("expected atom"),
+        }
+    }
+
+    #[test]
+    fn valid_atom_class_near_limit() {
+        let tokens = tokenize("[C:999]").unwrap();
+        match &tokens[0] {
+            Token::Atom(a) => assert_eq!(a.atom_class, 999),
             _ => panic!("expected atom"),
         }
     }

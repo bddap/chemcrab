@@ -1,4 +1,3 @@
-use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
 use petgraph::graph::NodeIndex;
@@ -9,6 +8,27 @@ use crate::traits::{
     HasAromaticity, HasAtomicNum, HasBondOrder, HasChirality, HasFormalCharge, HasHydrogenCount,
     HasIsotope,
 };
+
+struct Fnv1aHasher(u64);
+
+impl Fnv1aHasher {
+    fn new() -> Self {
+        Self(0xcbf29ce484222325)
+    }
+}
+
+impl Hasher for Fnv1aHasher {
+    fn finish(&self) -> u64 {
+        self.0
+    }
+
+    fn write(&mut self, bytes: &[u8]) {
+        for &b in bytes {
+            self.0 ^= b as u64;
+            self.0 = self.0.wrapping_mul(0x100000001b3);
+        }
+    }
+}
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 struct AtomInvariant {
@@ -54,7 +74,7 @@ where
 }
 
 fn hash_invariant(inv: &AtomInvariant) -> u64 {
-    let mut h = DefaultHasher::new();
+    let mut h = Fnv1aHasher::new();
     inv.hash(&mut h);
     h.finish()
 }
@@ -101,7 +121,7 @@ where
                 mol.neighbors(node).map(|nb| ranks[nb.index()]).collect();
             neighbor_ranks.sort_unstable();
 
-            let mut h = DefaultHasher::new();
+            let mut h = Fnv1aHasher::new();
             ranks[i].hash(&mut h);
             neighbor_ranks.hash(&mut h);
             new_values[i] = h.finish();

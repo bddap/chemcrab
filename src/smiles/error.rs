@@ -11,6 +11,8 @@ pub enum SmilesError {
     UnclosedRing { digit: u16 },
     UnmatchedParen { pos: usize },
     InvalidCharge { pos: usize },
+    InvalidIsotope { pos: usize },
+    InvalidAtomClass { pos: usize },
     InvalidRingBond { digit: u16, pos: usize },
     EmptyInput,
     RingBondConflict { digit: u16 },
@@ -36,6 +38,12 @@ impl fmt::Display for SmilesError {
             }
             Self::InvalidCharge { pos } => {
                 write!(f, "invalid charge at position {}", pos)
+            }
+            Self::InvalidIsotope { pos } => {
+                write!(f, "isotope overflow at position {}", pos)
+            }
+            Self::InvalidAtomClass { pos } => {
+                write!(f, "atom class overflow at position {}", pos)
             }
             Self::InvalidRingBond { digit, pos } => {
                 write!(f, "invalid ring bond {} at position {}", digit, pos)
