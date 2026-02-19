@@ -1,27 +1,10 @@
 use petgraph::graph::{EdgeIndex, NodeIndex};
 
 use crate::bond::BondOrder;
-use crate::element::Element;
+use crate::element::{outer_shell_electrons, Element};
 use crate::mol::Mol;
 use crate::traits::{HasAromaticity, HasAtomicNum, HasBondOrder, HasFormalCharge, HasHydrogenCount};
-
-fn outer_shell_electrons(atomic_num: u8) -> u8 {
-    crate::hybridization::outer_shell_electrons(atomic_num)
-}
-
-fn bond_order_val(bo: BondOrder) -> u8 {
-    match bo {
-        BondOrder::Single => 1,
-        BondOrder::Double => 2,
-        BondOrder::Triple => 3,
-    }
-}
-
-fn bond_order_sum<A, B: HasBondOrder>(mol: &Mol<A, B>, idx: NodeIndex) -> u8 {
-    mol.bonds_of(idx)
-        .map(|ei| bond_order_val(mol.bond(ei).bond_order()))
-        .sum()
-}
+use crate::valence::total_valence;
 
 fn count_atom_elec<A, B>(mol: &Mol<A, B>, idx: NodeIndex) -> i16
 where
@@ -67,7 +50,7 @@ where
         return false;
     }
 
-    let total_valence = bond_order_sum(mol, idx) as i16 + atom.hydrogen_count() as i16;
+    let total_valence = total_valence(mol, idx) as i16;
     if charge == 0 && total_valence > dv[0] as i16 {
         return false;
     }

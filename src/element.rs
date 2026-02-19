@@ -1,3 +1,25 @@
+pub fn outer_shell_electrons(atomic_num: u8) -> u8 {
+    OUTER_ELECTRONS
+        .get(atomic_num as usize)
+        .copied()
+        .unwrap_or(0)
+}
+
+static OUTER_ELECTRONS: [u8; 119] = [
+    0,  // dummy
+    1, 2,                                                       // H  He
+    1, 2, 3, 4, 5, 6, 7, 8,                                    // Li Be B  C  N  O  F  Ne
+    1, 2, 3, 4, 5, 6, 7, 8,                                    // Na Mg Al Si P  S  Cl Ar
+    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 3, 4, 5, 6, 7, 8, // K  Ca Sc..Zn Ga Ge As Se Br Kr
+    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 3, 4, 5, 6, 7, 8, // Rb Sr Y ..Cd In Sn Sb Te I  Xe
+    1, 2,                                                       // Cs Ba
+    3, 4, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,            // La Ce..Yb
+    3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 3, 4, 5, 6, 7, 8,       // Lu Hf..Hg Tl Pb Bi Po At Rn
+    1, 2,                                                       // Fr Ra
+    3, 4, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,            // Ac Th..No
+    3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 3, 4, 5, 6, 7, 8,       // Lr Rf..Cn Nh Fl Mc Lv Ts Og
+];
+
 /// Periodic table data for elements 1–118.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u8)]

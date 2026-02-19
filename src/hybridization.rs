@@ -1,43 +1,10 @@
 use petgraph::graph::NodeIndex;
 
-use crate::bond::BondOrder;
+use crate::element::outer_shell_electrons;
 use crate::mol::Mol;
 use crate::traits::{HasAromaticity, HasAtomicNum, HasBondOrder, HasFormalCharge, HasHydrogenCount};
+use crate::valence::total_valence;
 use crate::wrappers::Hybridization;
-
-pub(crate) fn outer_shell_electrons(atomic_num: u8) -> u8 {
-    OUTER_ELECTRONS
-        .get(atomic_num as usize)
-        .copied()
-        .unwrap_or(0)
-}
-
-// Outer-shell (valence) electron counts matching RDKit's PeriodicTable.
-// Index 0 is dummy (atomic_num 0), indices 1..=118 are H..Og.
-static OUTER_ELECTRONS: [u8; 119] = [
-    0,  // dummy
-    1, 2,                                                       // H  He
-    1, 2, 3, 4, 5, 6, 7, 8,                                    // Li Be B  C  N  O  F  Ne
-    1, 2, 3, 4, 5, 6, 7, 8,                                    // Na Mg Al Si P  S  Cl Ar
-    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 3, 4, 5, 6, 7, 8, // K  Ca Sc..Zn Ga Ge As Se Br Kr
-    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 3, 4, 5, 6, 7, 8, // Rb Sr Y ..Cd In Sn Sb Te I  Xe
-    1, 2,                                                       // Cs Ba
-    3, 4, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,            // La Ce..Yb
-    3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 3, 4, 5, 6, 7, 8,       // Lu Hf..Hg Tl Pb Bi Po At Rn
-    1, 2,                                                       // Fr Ra
-    3, 4, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,            // Ac Th..No
-    3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 3, 4, 5, 6, 7, 8,       // Lr Rf..Cn Nh Fl Mc Lv Ts Og
-];
-
-fn bond_order_sum<A, B: HasBondOrder>(mol: &Mol<A, B>, idx: NodeIndex) -> u8 {
-    mol.bonds_of(idx)
-        .map(|ei| match mol.bond(ei).bond_order() {
-            BondOrder::Single => 1u8,
-            BondOrder::Double => 2,
-            BondOrder::Triple => 3,
-        })
-        .sum()
-}
 
 fn num_bonds_plus_lone_pairs<A, B>(mol: &Mol<A, B>, idx: NodeIndex) -> i16
 where
@@ -54,7 +21,7 @@ where
 
     let degree = mol.neighbors(idx).count() as i16 + atom.hydrogen_count() as i16;
     let nouter = outer_shell_electrons(atomic_num) as i16;
-    let total_valence = bond_order_sum(mol, idx) as i16 + atom.hydrogen_count() as i16;
+    let total_valence = total_valence(mol, idx) as i16;
     let charge = atom.formal_charge() as i16;
 
     let free_electrons = nouter - (total_valence + charge);

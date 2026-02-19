@@ -5,7 +5,6 @@ use serde::Deserialize;
 struct AtomEntry {
     #[allow(dead_code)]
     idx: usize,
-    #[allow(dead_code)]
     symbol: String,
     hybridization: String,
 }
@@ -28,6 +27,18 @@ fn parse_hybridization(s: &str) -> Hybridization {
     }
 }
 
+fn hyb_label(h: Hybridization) -> &'static str {
+    match h {
+        Hybridization::S => "S",
+        Hybridization::SP => "SP",
+        Hybridization::SP2 => "SP2",
+        Hybridization::SP3 => "SP3",
+        Hybridization::SP3D => "SP3D",
+        Hybridization::SP3D2 => "SP3D2",
+        Hybridization::Other => "Other",
+    }
+}
+
 #[test]
 fn approval_hybridization() {
     let data: Vec<MolEntry> =
@@ -40,35 +51,42 @@ fn approval_hybridization() {
     for entry in &data {
         let mol = match from_smiles(&entry.smiles) {
             Ok(m) => m,
-            Err(_) => {
-                // Skip molecules our parser can't handle yet
-                // (e.g. explicit '-' bonds in branches like biphenyl)
-                continue;
-            }
+            Err(_) => continue,
         };
 
         let computed = assign_hybridization(&mol);
 
-        let mut expected_counts: std::collections::HashMap<Hybridization, usize> =
-            std::collections::HashMap::new();
-        for atom in &entry.atoms {
-            let h = parse_hybridization(&atom.hybridization);
-            *expected_counts.entry(h).or_default() += 1;
-        }
+        let mut expected: Vec<(&str, Hybridization)> = entry
+            .atoms
+            .iter()
+            .map(|a| (a.symbol.as_str(), parse_hybridization(&a.hybridization)))
+            .collect();
+        expected.sort_by(|a, b| a.0.cmp(&b.0).then(hyb_label(a.1).cmp(hyb_label(b.1))));
 
-        let mut computed_counts: std::collections::HashMap<Hybridization, usize> =
-            std::collections::HashMap::new();
-        for &h in &computed {
-            *computed_counts.entry(h).or_default() += 1;
-        }
+        let atom_symbols: Vec<&str> = (0..mol.atom_count())
+            .map(|i| {
+                use crabchem::traits::HasAtomicNum;
+                let anum = mol.atom(petgraph::graph::NodeIndex::new(i)).atomic_num();
+                crabchem::Element::from_atomic_num(anum)
+                    .map(|e| e.symbol())
+                    .unwrap_or("?")
+            })
+            .collect();
 
-        if expected_counts == computed_counts {
+        let mut got: Vec<(&str, Hybridization)> = atom_symbols
+            .iter()
+            .zip(computed.iter())
+            .map(|(&sym, &hyb)| (sym, hyb))
+            .collect();
+        got.sort_by(|a, b| a.0.cmp(&b.0).then(hyb_label(a.1).cmp(hyb_label(b.1))));
+
+        if expected == got {
             pass += 1;
         } else {
             fail += 1;
             failures.push(format!(
                 "{}: expected {:?}, got {:?}",
-                entry.smiles, expected_counts, computed_counts
+                entry.smiles, expected, got
             ));
         }
     }

@@ -28,7 +28,7 @@ pub use bond::{Bond, BondOrder, BondStereo, SmilesBond, SmilesBondOrder};
 pub use chirality::cleanup_chirality;
 pub use conjugation::assign_conjugation;
 pub use hybridization::assign_hybridization;
-pub use element::Element;
+pub use element::{outer_shell_electrons, Element};
 pub use formula::{average_mol_weight, exact_mol_weight, mol_formula};
 pub use graph_ops::{
     adjacency_matrix, connected_components, distance_matrix, get_fragments, num_components,

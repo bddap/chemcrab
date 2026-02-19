@@ -1,13 +1,9 @@
 use petgraph::graph::NodeIndex;
 
 use crate::bond::BondOrder;
-use crate::element::Element;
+use crate::element::{outer_shell_electrons, Element};
 use crate::mol::Mol;
 use crate::traits::{HasAtomicNum, HasBondOrder, HasFormalCharge, HasHydrogenCount};
-
-fn outer_shell_electrons(atomic_num: u8) -> i16 {
-    crate::hybridization::outer_shell_electrons(atomic_num) as i16
-}
 
 pub fn num_radical_electrons<A, B>(mol: &Mol<A, B>, idx: NodeIndex) -> u8
 where
@@ -29,7 +25,7 @@ where
         if mol.neighbors(idx).count() > 0 {
             return 0;
         }
-        let n_outer = outer_shell_electrons(atomic_num);
+        let n_outer = outer_shell_electrons(atomic_num) as i16;
         let n_valence = n_outer - charge;
         if n_valence < 0 {
             return 0;
@@ -47,7 +43,7 @@ where
         .sum();
 
     let total_valence = bond_sum + hcount as i16;
-    let n_outer = outer_shell_electrons(atomic_num);
+    let n_outer = outer_shell_electrons(atomic_num) as i16;
 
     let base_count: i16 = if atomic_num <= 2 { 2 } else { 8 };
 
