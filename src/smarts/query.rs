@@ -274,7 +274,9 @@ impl AtomExpr {
                 use crate::atom::Chirality;
                 match q_chiral {
                     Chirality::None => true,
-                    Chirality::Cw | Chirality::Ccw => atom.chirality != Chirality::None,
+                    Chirality::Cw | Chirality::Ccw => {
+                        ctx.mol.tetrahedral_stereo_for(idx).is_some()
+                    }
                 }
             }
             AtomExpr::Recursive(ref _inner) => {

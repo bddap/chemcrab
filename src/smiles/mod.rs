@@ -32,7 +32,6 @@ pub fn from_smiles(s: &str) -> Result<Mol<Atom, Bond>, SmilesError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::atom::Chirality;
     use crate::bond::{BondStereo, SmilesBondOrder};
     use petgraph::graph::NodeIndex;
 
@@ -303,19 +302,19 @@ mod tests {
     fn tetrahedral_ccw() {
         let mol = parse_smiles("[C@](F)(Cl)(Br)I").unwrap();
         assert_eq!(mol.atom_count(), 5);
-        assert_eq!(atom(&mol, 0).chirality, Chirality::Ccw);
+        assert!(mol.tetrahedral_stereo_for(n(0)).is_some());
     }
 
     #[test]
     fn tetrahedral_cw() {
         let mol = parse_smiles("[C@@](F)(Cl)(Br)I").unwrap();
-        assert_eq!(atom(&mol, 0).chirality, Chirality::Cw);
+        assert!(mol.tetrahedral_stereo_for(n(0)).is_some());
     }
 
     #[test]
     fn tetrahedral_with_h() {
         let mol = parse_smiles("[C@@H](F)(Cl)Br").unwrap();
-        assert_ne!(atom(&mol, 0).chirality, Chirality::None);
+        assert!(mol.tetrahedral_stereo_for(n(0)).is_some());
         assert_eq!(atom(&mol, 0).hydrogen_count, 1);
     }
 

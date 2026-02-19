@@ -2,12 +2,11 @@ use std::collections::VecDeque;
 
 use petgraph::graph::NodeIndex;
 
-use crate::atom::Chirality;
 use crate::bond::BondStereo;
 use crate::canonical::canonical_ordering;
-use crate::mol::Mol;
+use crate::mol::{AtomId, Mol};
 use crate::traits::{
-    HasAromaticity, HasAtomicNum, HasBondOrder, HasBondStereoMut, HasChiralityMut,
+    HasAromaticity, HasAtomicNum, HasBondOrder, HasBondStereoMut,
     HasFormalCharge, HasHydrogenCount, HasIsotope,
 };
 
@@ -176,34 +175,6 @@ fn validate_permutation(new_order: &[usize], n: usize) -> Result<(), RenumberErr
     Ok(())
 }
 
-fn permutation_parity(from: &[NodeIndex], to: &[NodeIndex]) -> bool {
-    let n = from.len();
-    if n != to.len() {
-        return true;
-    }
-    let perm: Vec<usize> = from
-        .iter()
-        .map(|f| to.iter().position(|t| t == f).unwrap_or(0))
-        .collect();
-    let mut visited = vec![false; n];
-    let mut swaps = 0usize;
-    for i in 0..n {
-        if visited[i] {
-            continue;
-        }
-        let mut cycle_len = 0;
-        let mut j = i;
-        while !visited[j] {
-            visited[j] = true;
-            j = perm[j];
-            cycle_len += 1;
-        }
-        swaps += cycle_len - 1;
-    }
-    #[allow(clippy::manual_is_multiple_of)]
-    { swaps % 2 == 0 }
-}
-
 pub fn renumber_atoms<A: Clone, B: HasBondStereoMut + Clone>(
     mol: &Mol<A, B>,
     new_order: &[usize],
@@ -234,7 +205,21 @@ pub fn renumber_atoms<A: Clone, B: HasBondStereoMut + Clone>(
     let old_to_new_nodes: Vec<NodeIndex> = old_to_new.iter().map(|&i| NodeIndex::new(i)).collect();
     remap_bond_stereo(&mut new_mol, &old_to_new_nodes);
 
+    let remapped_stereo = mol
+        .tetrahedral_stereo()
+        .iter()
+        .map(|s| s.map(|aid| remap_atom_id(aid, &old_to_new_nodes)))
+        .collect();
+    new_mol.set_tetrahedral_stereo(remapped_stereo);
+
     Ok(new_mol)
+}
+
+fn remap_atom_id(aid: AtomId, old_to_new: &[NodeIndex]) -> AtomId {
+    match aid {
+        AtomId::Node(idx) => AtomId::Node(old_to_new[idx.index()]),
+        AtomId::VirtualH(parent, n) => AtomId::VirtualH(old_to_new[parent.index()], n),
+    }
 }
 
 fn remap_bond_stereo<A, B>(mol: &mut Mol<A, B>, old_to_new: &[NodeIndex])
@@ -254,52 +239,12 @@ where
     }
 }
 
-fn adjust_chirality<A, B>(
-    new_mol: &mut Mol<A, B>,
-    old_mol: &Mol<A, B>,
-    new_order: &[usize],
-) where
-    A: HasChiralityMut,
-{
-    let n = old_mol.atom_count();
-    let mut old_to_new = vec![NodeIndex::new(0); n];
-    for (new_idx, &old_idx) in new_order.iter().enumerate() {
-        old_to_new[old_idx] = NodeIndex::new(new_idx);
-    }
-
-    for (new_idx, &old_idx) in new_order.iter().enumerate() {
-        let old_node = NodeIndex::new(old_idx);
-        let chirality = old_mol.atom(old_node).chirality();
-        if chirality == Chirality::None {
-            continue;
-        }
-
-        let old_neighbors: Vec<NodeIndex> = old_mol.neighbors(old_node).collect();
-        let new_node = NodeIndex::new(new_idx);
-        let new_neighbors: Vec<NodeIndex> = new_mol.neighbors(new_node).collect();
-
-        let remapped_old: Vec<NodeIndex> =
-            old_neighbors.iter().map(|n| old_to_new[n.index()]).collect();
-
-        let even = permutation_parity(&remapped_old, &new_neighbors);
-        if !even {
-            let flipped = match chirality {
-                Chirality::Cw => Chirality::Ccw,
-                Chirality::Ccw => Chirality::Cw,
-                Chirality::None => Chirality::None,
-            };
-            *new_mol.atom_mut(new_node).chirality_mut() = flipped;
-        }
-    }
-}
-
 pub fn renumber_atoms_canonical<A, B>(mol: &Mol<A, B>) -> Mol<A, B>
 where
     A: HasAtomicNum
         + HasFormalCharge
         + HasHydrogenCount
         + HasIsotope
-        + HasChiralityMut
         + HasAromaticity
         + Clone,
     B: HasBondOrder + HasBondStereoMut + Clone,
@@ -309,24 +254,19 @@ where
         return Mol::new();
     }
     let ranks = canonical_ordering(mol);
-    // ranks[old_idx] = rank (new_idx)
-    // new_order[new_idx] = old_idx
     let mut new_order = vec![0usize; n];
     for (old_idx, &rank) in ranks.iter().enumerate() {
         new_order[rank] = old_idx;
     }
-    let mut new_mol = renumber_atoms(mol, &new_order).expect("canonical ordering is a valid permutation");
-
-    adjust_chirality(&mut new_mol, mol, &new_order);
-
-    new_mol
+    renumber_atoms(mol, &new_order).expect("canonical ordering is a valid permutation")
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::atom::{Atom, Chirality};
+    use crate::atom::Atom;
     use crate::bond::{Bond, BondOrder, BondStereo};
+    use crate::mol::AtomId;
     use crate::smiles::{from_smiles, to_canonical_smiles};
 
     fn n(i: usize) -> NodeIndex {
@@ -427,7 +367,6 @@ mod tests {
         let mut mol = Mol::new();
         let c = mol.add_atom(Atom {
             atomic_num: 6,
-            chirality: Chirality::Cw,
             hydrogen_count: 0,
             ..Atom::default()
         });
@@ -439,17 +378,22 @@ mod tests {
         mol.add_bond(c, cl, Bond::default());
         mol.add_bond(c, br, Bond::default());
         mol.add_bond(c, iodine, Bond::default());
+        mol.add_tetrahedral_stereo([
+            AtomId::Node(c),
+            AtomId::Node(f),
+            AtomId::Node(cl),
+            AtomId::Node(br),
+        ]);
 
         // Identity renumber preserves chirality
         let id_order: Vec<usize> = (0..5).collect();
         let renum = renumber_atoms(&mol, &id_order).unwrap();
-        assert_eq!(renum.atom(n(0)).chirality, Chirality::Cw);
+        assert!(renum.tetrahedral_stereo_for(n(0)).is_some());
 
-        // Swap two neighbors preserves chirality because bond insertion
-        // order (and thus petgraph neighbor iteration) is maintained
+        // Swap two neighbors: indices get remapped through the permutation
         let swap_order = vec![0, 2, 1, 3, 4];
         let renum2 = renumber_atoms(&mol, &swap_order).unwrap();
-        assert_eq!(renum2.atom(n(0)).chirality, Chirality::Cw);
+        assert!(renum2.tetrahedral_stereo_for(n(0)).is_some());
 
         // Canonical SMILES should be identical regardless of renumbering
         let smiles_orig = to_canonical_smiles(&mol);

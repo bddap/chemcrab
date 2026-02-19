@@ -3,12 +3,12 @@ use std::collections::HashMap;
 use petgraph::graph::NodeIndex;
 
 use crate::aromaticity::{set_aromaticity, AromaticityModel};
-use crate::atom::{Atom, Chirality};
+use crate::atom::Atom;
 use crate::bond::{Bond, BondOrder, BondStereo};
 use crate::canonical::canonical_ordering;
 use crate::element::Element;
 use crate::graph_ops::connected_components;
-use crate::mol::Mol;
+use crate::mol::{permutation_parity, AtomId, Mol};
 
 pub fn to_smiles(mol: &Mol<Atom, Bond>) -> String {
     let components = connected_components(mol);
@@ -280,77 +280,79 @@ impl DfsContext {
     }
 }
 
-fn parity_of_permutation(from: &[NodeIndex], to: &[NodeIndex]) -> bool {
-    if from.len() != to.len() {
-        return true;
-    }
-    let n = from.len();
-    let perm: Vec<usize> = from
-        .iter()
-        .map(|f| to.iter().position(|t| t == f).unwrap_or(0))
-        .collect();
-
-    let mut visited = vec![false; n];
-    let mut swaps = 0;
-    for i in 0..n {
-        if visited[i] {
-            continue;
-        }
-        let mut cycle_len = 0;
-        let mut j = i;
-        while !visited[j] {
-            visited[j] = true;
-            j = perm[j];
-            cycle_len += 1;
-        }
-        swaps += cycle_len - 1;
-    }
-    swaps % 2 == 0
+enum SmilesChirality {
+    None,
+    Ccw,
+    Cw,
 }
 
 fn resolve_chirality_for_smiles(
     mol: &Mol<Atom, Bond>,
     node: NodeIndex,
     ctx: &DfsContext,
-) -> Chirality {
-    let atom = mol.atom(node);
-    if atom.chirality == Chirality::None {
-        return Chirality::None;
-    }
+) -> SmilesChirality {
+    let stereo = match mol.tetrahedral_stereo_for(node) {
+        Some(s) => s,
+        None => return SmilesChirality::None,
+    };
 
-    let h_sentinel = NodeIndex::new(usize::MAX);
+    // stereo = [center, n1, n2, n3] in CCW order as viewed from excluded neighbor.
+    // Build the SMILES output neighbor order using AtomId.
+    let atom = mol.atom(node);
     let has_h = atom.hydrogen_count > 0;
     let has_parent = ctx.parent[node.index()].is_some();
 
-    let mut graph_neighbors: Vec<NodeIndex> = mol.neighbors(node).collect();
     let smiles_explicit = ctx.smiles_neighbor_order(node);
-
-    let even = if has_h {
-        graph_neighbors.insert(0, h_sentinel);
-
-        let mut smiles_with_h = Vec::with_capacity(smiles_explicit.len() + 1);
+    let mut smiles_order: Vec<AtomId> = Vec::with_capacity(smiles_explicit.len() + 1);
+    if has_h {
         if has_parent {
-            smiles_with_h.push(smiles_explicit[0]);
-            smiles_with_h.push(h_sentinel);
-            smiles_with_h.extend_from_slice(&smiles_explicit[1..]);
+            smiles_order.push(AtomId::Node(smiles_explicit[0]));
+            smiles_order.push(AtomId::VirtualH(node, 0));
+            smiles_order.extend(smiles_explicit[1..].iter().map(|&n| AtomId::Node(n)));
         } else {
-            smiles_with_h.push(h_sentinel);
-            smiles_with_h.extend_from_slice(&smiles_explicit);
+            smiles_order.push(AtomId::VirtualH(node, 0));
+            smiles_order.extend(smiles_explicit.iter().map(|&n| AtomId::Node(n)));
         }
-
-        parity_of_permutation(&graph_neighbors, &smiles_with_h)
     } else {
-        parity_of_permutation(&graph_neighbors, &smiles_explicit)
+        smiles_order.extend(smiles_explicit.iter().map(|&n| AtomId::Node(n)));
+    }
+
+    if smiles_order.len() < 3 {
+        return SmilesChirality::None;
+    }
+
+    // Build full 4-tuples: [excluded, ccw0, ccw1, ccw2] for both stored and output.
+    // The parity of the permutation between the two determines @/@@.
+    //
+    // Stored: [center, n1, n2, n3] = CCW from excluded.
+    // Full stored tuple = [excluded, n1, n2, n3].
+    let stored_three = &stereo[1..4];
+
+    let stored_full: Vec<AtomId> = if smiles_order.len() >= 4 {
+        let stored_excluded = smiles_order
+            .iter()
+            .find(|aid| !stored_three.contains(aid))
+            .copied()
+            .unwrap_or(smiles_order[0]);
+        vec![stored_excluded, stereo[1], stereo[2], stereo[3]]
+    } else {
+        vec![stereo[1], stereo[2], stereo[3]]
     };
 
+    // Output: smiles_order[0] is the prime (excluded), the remaining 3 get written
+    // as @ (CCW) or @@ (CW). For @, the full CCW tuple = [prime, s[1], s[2], s[3]].
+    let output_ccw_full: Vec<AtomId> = smiles_order.clone();
+
+    if stored_full.len() != output_ccw_full.len() {
+        return SmilesChirality::None;
+    }
+
+    let even = permutation_parity(&stored_full, &output_ccw_full);
+
     if even {
-        atom.chirality
+        SmilesChirality::Ccw // @ — same chirality
     } else {
-        match atom.chirality {
-            Chirality::Cw => Chirality::Ccw,
-            Chirality::Ccw => Chirality::Cw,
-            Chirality::None => Chirality::None,
-        }
+        SmilesChirality::Cw // @@ — inverted
     }
 }
 
@@ -361,7 +363,7 @@ fn write_node(
     out: &mut String,
 ) {
     let chirality = resolve_chirality_for_smiles(mol, node, ctx);
-    write_atom_symbol(mol, node, chirality, out);
+    write_atom_symbol(mol, node, &chirality, out);
 
     for rc in &ctx.ring_opens[node.index()] {
         write_bond_between(mol, rc.order, node, rc.other, &ctx.bond_dirs, out);
@@ -431,7 +433,7 @@ fn write_ring_digit(id: usize, out: &mut String) {
 fn write_atom_symbol(
     mol: &Mol<Atom, Bond>,
     node: NodeIndex,
-    chirality: Chirality,
+    chirality: &SmilesChirality,
     out: &mut String,
 ) {
     let atom = mol.atom(node);
@@ -462,7 +464,10 @@ fn can_write_bare(mol: &Mol<Atom, Bond>, node: NodeIndex) -> bool {
     if !elem.is_organic_subset() {
         return false;
     }
-    if atom.isotope != 0 || atom.formal_charge != 0 || atom.chirality != Chirality::None {
+    if atom.isotope != 0 || atom.formal_charge != 0 {
+        return false;
+    }
+    if mol.tetrahedral_stereo_for(node).is_some() {
         return false;
     }
 
@@ -515,7 +520,7 @@ fn reader_bond_order_sum(mol: &Mol<Atom, Bond>, node: NodeIndex) -> u8 {
 fn write_bracket_atom(
     atom: &Atom,
     elem: Option<Element>,
-    chirality: Chirality,
+    chirality: &SmilesChirality,
     out: &mut String,
 ) {
     out.push('[');
@@ -539,9 +544,9 @@ fn write_bracket_atom(
     }
 
     match chirality {
-        Chirality::Ccw => out.push('@'),
-        Chirality::Cw => out.push_str("@@"),
-        Chirality::None => {}
+        SmilesChirality::Ccw => out.push('@'),
+        SmilesChirality::Cw => out.push_str("@@"),
+        SmilesChirality::None => {}
     }
 
     if atom.hydrogen_count > 0 {
@@ -570,6 +575,7 @@ fn write_bracket_atom(
 mod tests {
     use super::*;
     use crate::bond::BondStereo;
+    use crate::mol::AtomId;
     use crate::smiles::from_smiles;
 
     fn round_trip(smiles: &str) -> (Mol<Atom, Bond>, Mol<Atom, Bond>, String) {
@@ -593,7 +599,7 @@ mod tests {
     }
 
     fn has_chiral_atom(mol: &Mol<Atom, Bond>) -> bool {
-        mol.atoms().any(|n| mol.atom(n).chirality != Chirality::None)
+        !mol.tetrahedral_stereo().is_empty()
     }
 
     fn find_double_bond_stereo(mol: &Mol<Atom, Bond>) -> Option<bool> {
@@ -606,23 +612,40 @@ mod tests {
         })
     }
 
-    fn canonical_chirality(mol: &Mol<Atom, Bond>, node: NodeIndex) -> Chirality {
-        let atom = mol.atom(node);
-        if atom.chirality == Chirality::None {
-            return Chirality::None;
-        }
-        let graph_neighbors: Vec<NodeIndex> = mol.neighbors(node).collect();
-        let mut sorted_neighbors = graph_neighbors.clone();
-        sorted_neighbors.sort_by_key(|n| mol.atom(*n).atomic_num);
-
-        let n = graph_neighbors.len();
-        let perm: Vec<usize> = graph_neighbors
+    fn canonical_parity(mol: &Mol<Atom, Bond>, node: NodeIndex) -> Option<bool> {
+        let stereo = mol.tetrahedral_stereo_for(node)?;
+        let atom_id_key = |id: &AtomId| -> (u8, u32) {
+            match id {
+                AtomId::Node(n) => (mol.atom(*n).atomic_num, n.index() as u32),
+                AtomId::VirtualH(_, i) => (1, *i as u32),
+            }
+        };
+        let stored = &stereo[1..4];
+        let all_neighbors: Vec<AtomId> = {
+            let mut v: Vec<AtomId> = mol
+                .neighbors(node)
+                .map(AtomId::Node)
+                .collect();
+            for i in 0..mol.atom(node).hydrogen_count {
+                v.push(AtomId::VirtualH(node, i));
+            }
+            v
+        };
+        let excluded = all_neighbors
             .iter()
-            .map(|g| sorted_neighbors.iter().position(|s| s == g).unwrap())
+            .find(|id| !stored.contains(id))
+            .copied()
+            .unwrap_or(stored[0]);
+        let full = [excluded, stored[0], stored[1], stored[2]];
+        let mut sorted = full;
+        sorted.sort_by_key(|id| atom_id_key(id));
+        let perm: Vec<usize> = full
+            .iter()
+            .map(|n| sorted.iter().position(|s| s == n).unwrap())
             .collect();
-        let mut visited = vec![false; n];
+        let mut visited = [false; 4];
         let mut swaps = 0;
-        for i in 0..n {
+        for i in 0..4 {
             if visited[i] {
                 continue;
             }
@@ -635,30 +658,24 @@ mod tests {
             }
             swaps += cycle_len - 1;
         }
-        if swaps % 2 == 0 {
-            atom.chirality
-        } else {
-            match atom.chirality {
-                Chirality::Cw => Chirality::Ccw,
-                Chirality::Ccw => Chirality::Cw,
-                Chirality::None => Chirality::None,
-            }
-        }
+        Some(swaps % 2 == 0)
     }
 
     fn assert_same_chirality(mol1: &Mol<Atom, Bond>, mol2: &Mol<Atom, Bond>, ctx: &str) {
-        for n1 in mol1.atoms() {
-            if mol1.atom(n1).chirality == Chirality::None {
-                continue;
-            }
-            let n2 = mol2
+        for stereo in mol1.tetrahedral_stereo() {
+            let center = match stereo[0] {
+                AtomId::Node(n) => n,
+                _ => continue,
+            };
+            let anum = mol1.atom(center).atomic_num;
+            let center2 = mol2
                 .atoms()
-                .find(|&n2| mol2.atom(n2).atomic_num == mol1.atom(n1).atomic_num
-                    && mol2.atom(n2).chirality != Chirality::None)
+                .find(|&n| mol2.atom(n).atomic_num == anum
+                    && mol2.tetrahedral_stereo_for(n).is_some())
                 .unwrap_or_else(|| panic!("{ctx}: no matching chiral atom in mol2"));
-            let c1 = canonical_chirality(mol1, n1);
-            let c2 = canonical_chirality(mol2, n2);
-            assert_eq!(c1, c2, "{ctx}: chirality mismatch for atom {}", n1.index());
+            let p1 = canonical_parity(mol1, center);
+            let p2 = canonical_parity(mol2, center2);
+            assert_eq!(p1, p2, "{ctx}: chirality mismatch for atom {}", center.index());
         }
     }
 

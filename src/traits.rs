@@ -1,4 +1,3 @@
-use crate::atom::Chirality;
 use crate::bond::{BondOrder, BondStereo};
 use crate::wrappers::Hybridization;
 
@@ -16,14 +15,6 @@ pub trait HasIsotope {
 
 pub trait HasIsotopeMut: HasIsotope {
     fn isotope_mut(&mut self) -> &mut u16;
-}
-
-pub trait HasChirality {
-    fn chirality(&self) -> Chirality;
-}
-
-pub trait HasChiralityMut: HasChirality {
-    fn chirality_mut(&mut self) -> &mut Chirality;
 }
 
 pub trait HasHydrogenCount {

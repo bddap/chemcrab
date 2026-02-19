@@ -170,6 +170,8 @@ pub fn kekulize(mol: Mol<Atom, SmilesBond>) -> Result<Mol<Atom, Bond>, KekulizeE
         );
     }
 
+    result.set_tetrahedral_stereo(mol.tetrahedral_stereo().to_vec());
+
     Ok(result)
 }
 

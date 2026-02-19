@@ -1,9 +1,9 @@
 use petgraph::graph::NodeIndex;
 
-use crate::atom::{Atom, Chirality};
+use crate::atom::Atom;
 use crate::bond::{BondStereo, SmilesBond, SmilesBondOrder};
 use crate::element::Element;
-use crate::mol::Mol;
+use crate::mol::{AtomId, Mol};
 use crate::smiles::parse_tree::{ParseAtom, ParseTree};
 use crate::smiles::tokenizer::{BondToken, ChiralityToken};
 
@@ -16,7 +16,6 @@ pub fn build_mol(tree: &ParseTree) -> Mol<Atom, SmilesBond> {
             atomic_num: parse_atom.element.atomic_num(),
             formal_charge: parse_atom.charge,
             isotope: parse_atom.isotope,
-            chirality: Chirality::None,
             hydrogen_count: 0,
             is_aromatic: parse_atom.is_aromatic,
         };
@@ -74,84 +73,71 @@ fn resolve_bond_order(
 }
 
 fn resolve_chirality(mol: &mut Mol<Atom, SmilesBond>, tree: &ParseTree, indices: &[NodeIndex]) {
-    let h_sentinel = NodeIndex::new(usize::MAX);
-
     for (i, parse_atom) in tree.atoms.iter().enumerate() {
         if parse_atom.chirality == ChiralityToken::None {
             continue;
         }
 
-        let has_bracket_h =
-            parse_atom.is_bracket && parse_atom.hcount.unwrap_or(0) > 0;
-
+        let center = indices[i];
+        let has_bracket_h = parse_atom.is_bracket && parse_atom.hcount.unwrap_or(0) > 0;
         let has_preceding =
             !parse_atom.neighbors.is_empty() && parse_atom.neighbors[0].atom_idx < i;
 
-        let explicit_smiles: Vec<NodeIndex> = parse_atom
+        let explicit_smiles: Vec<AtomId> = parse_atom
             .neighbors
             .iter()
-            .map(|n| indices[n.atom_idx])
+            .map(|n| AtomId::Node(indices[n.atom_idx]))
             .collect();
 
-        let mut graph_neighbors: Vec<NodeIndex> = mol.neighbors(indices[i]).collect();
-
-        let parity = if has_bracket_h {
-            let mut smiles_with_h = Vec::with_capacity(explicit_smiles.len() + 1);
+        let mut smiles_order: Vec<AtomId> = Vec::with_capacity(explicit_smiles.len() + 1);
+        if has_bracket_h {
             if has_preceding {
-                smiles_with_h.push(explicit_smiles[0]);
-                smiles_with_h.push(h_sentinel);
-                smiles_with_h.extend_from_slice(&explicit_smiles[1..]);
+                smiles_order.push(explicit_smiles[0]);
+                smiles_order.push(AtomId::VirtualH(center, 0));
+                smiles_order.extend_from_slice(&explicit_smiles[1..]);
             } else {
-                smiles_with_h.push(h_sentinel);
-                smiles_with_h.extend_from_slice(&explicit_smiles);
+                smiles_order.push(AtomId::VirtualH(center, 0));
+                smiles_order.extend_from_slice(&explicit_smiles);
             }
-
-            graph_neighbors.insert(0, h_sentinel);
-
-            parity_ni(&smiles_with_h, &graph_neighbors)
         } else {
-            parity_ni(&explicit_smiles, &graph_neighbors)
-        };
+            smiles_order.extend_from_slice(&explicit_smiles);
+        }
 
-        let chirality = match parse_atom.chirality {
-            ChiralityToken::CounterClockwise => {
-                if parity { Chirality::Ccw } else { Chirality::Cw }
-            }
-            ChiralityToken::Clockwise => {
-                if parity { Chirality::Cw } else { Chirality::Ccw }
-            }
-            ChiralityToken::None => unreachable!(),
-        };
-
-        mol.atom_mut(indices[i]).chirality = chirality;
-    }
-}
-
-fn parity_ni(from: &[NodeIndex], to: &[NodeIndex]) -> bool {
-    if from.len() != to.len() {
-        return true;
-    }
-    let n = from.len();
-    let perm: Vec<usize> = from
-        .iter()
-        .map(|f| to.iter().position(|t| t == f).unwrap_or(0))
-        .collect();
-    let mut visited = vec![false; n];
-    let mut swaps = 0;
-    for i in 0..n {
-        if visited[i] {
+        if smiles_order.len() < 3 {
             continue;
         }
-        let mut cycle_len = 0;
-        let mut j = i;
-        while !visited[j] {
-            visited[j] = true;
-            j = perm[j];
-            cycle_len += 1;
+
+        // Our storage convention: [center, n1, n2, n3] where n1,n2,n3 wind CCW
+        // from the excluded viewpoint.
+        //
+        // 4 neighbors: smiles_order[0] is the prime (excluded) neighbor.
+        //   @ → n1,n2,n3 = smiles_order[1..4] wind CCW from prime.
+        //   @@ → swap two to flip winding.
+        //
+        // 3 neighbors: the excluded viewpoint is the implicit viewer direction
+        //   (no atom to reference). @ → the 3 neighbors wind CCW from viewer.
+        let mut stereo = if smiles_order.len() >= 4 {
+            [
+                AtomId::Node(center),
+                smiles_order[1],
+                smiles_order[2],
+                smiles_order[3],
+            ]
+        } else {
+            [
+                AtomId::Node(center),
+                smiles_order[0],
+                smiles_order[1],
+                smiles_order[2],
+            ]
+        };
+
+        if parse_atom.chirality == ChiralityToken::Clockwise {
+            stereo.swap(2, 3);
         }
-        swaps += cycle_len - 1;
+
+        mol.add_tetrahedral_stereo(stereo);
     }
-    swaps % 2 == 0
 }
 
 fn resolve_ez_stereo(mol: &mut Mol<Atom, SmilesBond>, tree: &ParseTree, indices: &[NodeIndex]) {

@@ -14,7 +14,7 @@ use petgraph::graph::NodeIndex;
 
 use crate::atom::Atom;
 use crate::bond::Bond;
-use crate::mol::Mol;
+use crate::mol::{AtomId, Mol, permutation_parity};
 use crate::rings::RingInfo;
 use crate::atom::Chirality;
 use crate::substruct::{
@@ -254,10 +254,10 @@ fn validate_chirality(
             None => continue,
         };
 
-        let t_atom = target.atom(t_idx);
-        if t_atom.chirality == Chirality::None {
-            return false;
-        }
+        let target_stereo = match target.tetrahedral_stereo_for(t_idx) {
+            Some(s) => s,
+            None => return false,
+        };
 
         let q_neighbor_count = query.neighbors(q_idx).count()
             + if cqa.has_implicit_h { 1 } else { 0 };
@@ -265,6 +265,10 @@ fn validate_chirality(
             continue;
         }
 
+        // Build query's neighbor ordering mapped to target NeighborRefs.
+        // After SMARTS normalize_chirality, the stored chirality (Ccw/Cw) is
+        // relative to petgraph neighbor iteration order (with implicit H first
+        // if present).
         let mapped: Vec<NeighborRef> = {
             let mut v = Vec::new();
             if cqa.has_implicit_h {
@@ -279,43 +283,102 @@ fn validate_chirality(
             v
         };
 
-        let stored: Vec<NeighborRef> = {
-            let h_iter = (t_atom.hydrogen_count > 0 && cqa.has_implicit_h)
-                .then_some(NeighborRef::ImplicitH);
-            let atom_iter = target.neighbors(t_idx).map(NeighborRef::Atom);
-            h_iter.into_iter().chain(atom_iter).collect()
+        if mapped.len() < 3 {
+            continue;
+        }
+
+        // Build the target's stored CCW triple
+        let stored_three: Vec<NeighborRef> = target_stereo[1..4]
+            .iter()
+            .map(|aid| match aid {
+                AtomId::Node(idx) => NeighborRef::Atom(*idx),
+                AtomId::VirtualH(_, _) => NeighborRef::ImplicitH,
+            })
+            .collect();
+
+        // Find the target's excluded neighbor (the 4th not in stored_three)
+        let t_atom = target.atom(t_idx);
+        let all_target_neighbors: Vec<NeighborRef> = {
+            let mut v: Vec<NeighborRef> = target
+                .neighbors(t_idx)
+                .map(NeighborRef::Atom)
+                .collect();
+            for _ in 0..t_atom.hydrogen_count {
+                v.push(NeighborRef::ImplicitH);
+            }
+            v
+        };
+        let target_excluded = all_target_neighbors
+            .iter()
+            .find(|n| !stored_three.contains(n))
+            .copied();
+
+        // Build full 4-tuples for comparison: [excluded, ccw0, ccw1, ccw2].
+        // The parity of the permutation between the two 4-tuples tells us
+        // if they represent the same enantiomer (even) or opposite (odd).
+
+        // Target's full tuple: [excluded, stored[0], stored[1], stored[2]]
+        let target_full: Vec<NeighborRef> = {
+            let mut v = Vec::with_capacity(4);
+            // Use a sentinel for 3-neighbor case where there's no real excluded
+            if let Some(excl) = target_excluded {
+                v.push(excl);
+            }
+            v.extend_from_slice(&stored_three);
+            v
         };
 
-        let perm_parity = count_inversions(&mapped, &stored);
-
-        let parities_match = if perm_parity.is_multiple_of(2) {
-            cqa.chirality == t_atom.chirality
+        // Query's full tuple from its perspective.
+        // Ccw (@): looking from first mapped neighbor, the rest wind CCW.
+        //   → full tuple = [mapped[0], mapped[1], mapped[2], mapped[3]] for CCW.
+        // Cw (@@): looking from first, the rest wind CW.
+        //   → CW means the CCW order has last two swapped:
+        //     full CCW tuple = [mapped[0], mapped[1], mapped[3], mapped[2]]
+        //
+        // For 3-neighbor case: no excluded, just [mapped[0], mapped[1], mapped[2]].
+        let query_full: Vec<NeighborRef> = if mapped.len() == 4 {
+            match cqa.chirality {
+                Chirality::Ccw => vec![mapped[0], mapped[1], mapped[2], mapped[3]],
+                Chirality::Cw => vec![mapped[0], mapped[1], mapped[3], mapped[2]],
+                Chirality::None => continue,
+            }
         } else {
-            cqa.chirality != t_atom.chirality
+            // 3 neighbors
+            match cqa.chirality {
+                Chirality::Ccw => vec![mapped[0], mapped[1], mapped[2]],
+                Chirality::Cw => vec![mapped[0], mapped[2], mapped[1]],
+                Chirality::None => continue,
+            }
         };
 
-        if !parities_match {
+        if target_full.len() != query_full.len() {
+            // Different number of neighbors — can still compare if query is a subset.
+            // For now, if sizes differ, check the 3-neighbor overlap.
+            if mapped.len() < target_full.len() {
+                // Query has fewer neighbors. Extract the 3 that overlap with stored_three.
+                let query_three: Vec<NeighborRef> = query_full
+                    .iter()
+                    .filter(|n| stored_three.contains(n))
+                    .copied()
+                    .collect();
+                if query_three.len() != 3 {
+                    continue;
+                }
+                let even = permutation_parity(&stored_three, &query_three);
+                if !even {
+                    return false;
+                }
+                continue;
+            }
+            continue;
+        }
+
+        let even = permutation_parity(&target_full, &query_full);
+        if !even {
             return false;
         }
     }
     true
-}
-
-fn count_inversions(mapped: &[NeighborRef], stored: &[NeighborRef]) -> usize {
-    let positions: Vec<usize> = mapped
-        .iter()
-        .map(|n| stored.iter().position(|s| s == n).expect("mapped neighbor not found in stored"))
-        .collect();
-
-    let mut inversions = 0;
-    for i in 0..positions.len() {
-        for j in (i + 1)..positions.len() {
-            if positions[i] > positions[j] {
-                inversions += 1;
-            }
-        }
-    }
-    inversions
 }
 
 fn match_atom_expr(expr: &AtomExpr, atom: &Atom, ctx: &MatchContext, idx: NodeIndex) -> bool {

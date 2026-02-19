@@ -82,7 +82,6 @@ fn atom_trait_impls() {
         atomic_num: 6,
         formal_charge: -1,
         isotope: 13,
-        chirality: Chirality::Cw,
         hydrogen_count: 3,
         is_aromatic: true,
     };
@@ -90,7 +89,6 @@ fn atom_trait_impls() {
     assert_eq!(HasAtomicNum::atomic_num(&atom), 6);
     assert_eq!(HasFormalCharge::formal_charge(&atom), -1);
     assert_eq!(HasIsotope::isotope(&atom), 13);
-    assert_eq!(HasChirality::chirality(&atom), Chirality::Cw);
     assert_eq!(HasHydrogenCount::hydrogen_count(&atom), 3);
     assert!(HasAromaticity::is_aromatic(&atom));
 }
@@ -209,11 +207,6 @@ fn with_position_3d() {
 }
 
 #[test]
-fn chirality_default_is_none() {
-    assert_eq!(Chirality::default(), Chirality::None);
-}
-
-#[test]
 fn bond_order_default_is_single() {
     assert_eq!(BondOrder::default(), BondOrder::Single);
 }
@@ -224,7 +217,6 @@ fn atom_default() {
     assert_eq!(atom.atomic_num, 0);
     assert_eq!(atom.formal_charge, 0);
     assert_eq!(atom.isotope, 0);
-    assert_eq!(atom.chirality, Chirality::None);
     assert_eq!(atom.hydrogen_count, 0);
     assert!(!atom.is_aromatic);
 }

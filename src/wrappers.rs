@@ -107,7 +107,6 @@ macro_rules! delegate_common {
         delegate_trait!($wrapper, HasAtomicNum, atomic_num, u8);
         delegate_trait!($wrapper, HasFormalCharge, formal_charge, i8);
         delegate_trait!($wrapper, HasIsotope, isotope, u16);
-        delegate_trait!($wrapper, HasChirality, chirality, crate::atom::Chirality);
         delegate_trait!($wrapper, HasHydrogenCount, hydrogen_count, u8);
         delegate_trait!($wrapper, HasAromaticity, is_aromatic, bool);
         delegate_trait!($wrapper, HasBondOrder, bond_order, crate::bond::BondOrder);

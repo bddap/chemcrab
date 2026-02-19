@@ -1,34 +1,37 @@
-use crate::atom::{Atom, Chirality};
-use crate::mol::Mol;
+use crate::atom::Atom;
+use crate::mol::{AtomId, Mol};
 use crate::traits::HasBondOrder;
 
 pub fn cleanup_chirality<B>(mol: &mut Mol<Atom, B>)
 where
     B: HasBondOrder,
 {
-    let indices: Vec<_> = mol.atoms().collect();
-    for idx in indices {
-        let atom = mol.atom(idx);
-        if atom.chirality == Chirality::None {
-            continue;
-        }
+    let to_remove: Vec<petgraph::graph::NodeIndex> = mol
+        .tetrahedral_stereo()
+        .iter()
+        .filter_map(|s| {
+            let center = match s[0] {
+                AtomId::Node(idx) => idx,
+                _ => return Some(petgraph::graph::NodeIndex::new(usize::MAX)),
+            };
+            let atom = mol.atom(center);
+            let total_neighbors = mol.neighbors(center).count() as u8 + atom.hydrogen_count;
 
-        let total_neighbors =
-            mol.neighbors(idx).count() as u8 + atom.hydrogen_count;
+            if total_neighbors < 3 {
+                return Some(center);
+            }
+            if total_neighbors < 4 && !has_lone_pair_stereo(atom.atomic_num) {
+                return Some(center);
+            }
+            if all_neighbors_identical(mol, center) {
+                return Some(center);
+            }
+            None
+        })
+        .collect();
 
-        if total_neighbors < 3 {
-            mol.atom_mut(idx).chirality = Chirality::None;
-            continue;
-        }
-
-        if total_neighbors < 4 && !has_lone_pair_stereo(atom.atomic_num) {
-            mol.atom_mut(idx).chirality = Chirality::None;
-            continue;
-        }
-
-        if all_neighbors_identical(mol, idx) {
-            mol.atom_mut(idx).chirality = Chirality::None;
-        }
+    for center in to_remove {
+        mol.remove_tetrahedral_stereo(center);
     }
 }
 
@@ -69,7 +72,7 @@ mod tests {
     use super::*;
     use crate::atom::Atom;
     use crate::bond::Bond;
-    use crate::mol::Mol;
+    use crate::mol::{AtomId, Mol};
     use crate::smiles::from_smiles;
 
     #[test]
@@ -80,7 +83,7 @@ mod tests {
             .atoms()
             .find(|&idx| mol.atom(idx).atomic_num == 6)
             .unwrap();
-        assert_ne!(mol.atom(c_idx).chirality, Chirality::None);
+        assert!(mol.tetrahedral_stereo_for(c_idx).is_some());
     }
 
     #[test]
@@ -88,7 +91,6 @@ mod tests {
         let mut mol = Mol::<Atom, Bond>::new();
         let c = mol.add_atom(Atom {
             atomic_num: 6,
-            chirality: Chirality::Cw,
             hydrogen_count: 1,
             ..Atom::default()
         });
@@ -97,9 +99,15 @@ mod tests {
             ..Atom::default()
         });
         mol.add_bond(c, f, Bond::default());
+        mol.add_tetrahedral_stereo([
+            AtomId::Node(c),
+            AtomId::Node(f),
+            AtomId::VirtualH(c, 0),
+            AtomId::VirtualH(c, 0),
+        ]);
         // C has 1 explicit + 1 implicit H = 2 neighbors. < 3 → remove chirality.
         cleanup_chirality(&mut mol);
-        assert_eq!(mol.atom(c).chirality, Chirality::None);
+        assert!(mol.tetrahedral_stereo_for(c).is_none());
     }
 
     #[test]
@@ -107,19 +115,26 @@ mod tests {
         let mut mol = Mol::<Atom, Bond>::new();
         let c = mol.add_atom(Atom {
             atomic_num: 6,
-            chirality: Chirality::Cw,
             hydrogen_count: 0,
             ..Atom::default()
         });
+        let mut fs = Vec::new();
         for _ in 0..4 {
             let f = mol.add_atom(Atom {
                 atomic_num: 9,
                 ..Atom::default()
             });
             mol.add_bond(c, f, Bond::default());
+            fs.push(f);
         }
+        mol.add_tetrahedral_stereo([
+            AtomId::Node(c),
+            AtomId::Node(fs[0]),
+            AtomId::Node(fs[1]),
+            AtomId::Node(fs[2]),
+        ]);
         cleanup_chirality(&mut mol);
-        assert_eq!(mol.atom(c).chirality, Chirality::None);
+        assert!(mol.tetrahedral_stereo_for(c).is_none());
     }
 
     #[test]
@@ -127,7 +142,6 @@ mod tests {
         let mut mol = Mol::<Atom, Bond>::new();
         let c = mol.add_atom(Atom {
             atomic_num: 6,
-            chirality: Chirality::Cw,
             hydrogen_count: 1,
             ..Atom::default()
         });
@@ -146,8 +160,14 @@ mod tests {
         mol.add_bond(c, f, Bond::default());
         mol.add_bond(c, cl, Bond::default());
         mol.add_bond(c, br, Bond::default());
+        mol.add_tetrahedral_stereo([
+            AtomId::Node(c),
+            AtomId::Node(f),
+            AtomId::Node(cl),
+            AtomId::Node(br),
+        ]);
         cleanup_chirality(&mut mol);
-        assert_eq!(mol.atom(c).chirality, Chirality::Cw);
+        assert!(mol.tetrahedral_stereo_for(c).is_some());
     }
 
     #[test]
@@ -155,27 +175,32 @@ mod tests {
         let mut mol = Mol::<Atom, Bond>::new();
         let n = mol.add_atom(Atom {
             atomic_num: 7,
-            chirality: Chirality::Cw,
             hydrogen_count: 0,
             ..Atom::default()
         });
+        let mut neighbors = Vec::new();
         for anum in [6, 9, 17] {
             let a = mol.add_atom(Atom {
                 atomic_num: anum,
                 ..Atom::default()
             });
             mol.add_bond(n, a, Bond::default());
+            neighbors.push(a);
         }
+        mol.add_tetrahedral_stereo([
+            AtomId::Node(n),
+            AtomId::Node(neighbors[0]),
+            AtomId::Node(neighbors[1]),
+            AtomId::Node(neighbors[2]),
+        ]);
         cleanup_chirality(&mut mol);
-        assert_eq!(mol.atom(n).chirality, Chirality::Cw);
+        assert!(mol.tetrahedral_stereo_for(n).is_some());
     }
 
     #[test]
     fn non_chiral_atom_untouched() {
         let mut mol = from_smiles("CC").unwrap();
         cleanup_chirality(&mut mol);
-        for idx in mol.atoms() {
-            assert_eq!(mol.atom(idx).chirality, Chirality::None);
-        }
+        assert!(mol.tetrahedral_stereo().is_empty());
     }
 }

@@ -37,7 +37,7 @@ pub use graph_ops::{
 };
 pub use hydrogen::{add_hs, remove_hs, remove_hs_with, RemoveHsOptions};
 pub use kekulize::{kekulize, KekulizeError};
-pub use mol::Mol;
+pub use mol::{AtomId, Mol};
 pub use reaction::{
     extract_atom_map_num, from_reaction_smarts, to_reaction_smarts, Reaction, ReactionError,
     ReactionSmartsError,
@@ -57,8 +57,8 @@ pub use substruct::{
     has_substruct_match_with, uniquify_atom_mappings, AtomMapping,
 };
 pub use traits::{
-    HasAromaticity, HasAtomicNum, HasBondOrder, HasBondStereo, HasBondStereoMut, HasChirality,
-    HasChiralityMut, HasFormalCharge, HasHybridization, HasHydrogenCount, HasIsotope,
+    HasAromaticity, HasAtomicNum, HasBondOrder, HasBondStereo, HasBondStereoMut,
+    HasFormalCharge, HasHybridization, HasHydrogenCount, HasIsotope,
     HasIsotopeMut, HasPosition2D, HasPosition3D, HasValence,
 };
 pub use radical::num_radical_electrons;

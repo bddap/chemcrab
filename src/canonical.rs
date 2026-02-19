@@ -5,7 +5,7 @@ use petgraph::graph::NodeIndex;
 use crate::bond::BondOrder;
 use crate::mol::Mol;
 use crate::traits::{
-    HasAromaticity, HasAtomicNum, HasBondOrder, HasChirality, HasFormalCharge, HasHydrogenCount,
+    HasAromaticity, HasAtomicNum, HasBondOrder, HasFormalCharge, HasHydrogenCount,
     HasIsotope,
 };
 
@@ -152,7 +152,6 @@ where
         + HasHydrogenCount
         + HasFormalCharge
         + HasAromaticity
-        + HasChirality
         + HasIsotope,
     B: HasBondOrder,
 {

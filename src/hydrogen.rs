@@ -1,16 +1,8 @@
 use petgraph::graph::NodeIndex;
 
-use crate::atom::{Atom, Chirality};
+use crate::atom::Atom;
 use crate::bond::{Bond, BondOrder, BondStereo};
-use crate::mol::Mol;
-
-fn flip_chirality(c: Chirality) -> Chirality {
-    match c {
-        Chirality::Cw => Chirality::Ccw,
-        Chirality::Ccw => Chirality::Cw,
-        Chirality::None => Chirality::None,
-    }
-}
+use crate::mol::{AtomId, Mol};
 
 fn remap_stereo(stereo: BondStereo, map: &dyn Fn(NodeIndex) -> Option<NodeIndex>) -> BondStereo {
     match stereo {
@@ -35,6 +27,15 @@ fn stereo_referenced_atoms(mol: &Mol<Atom, Bond>) -> Vec<bool> {
                 referenced[b.index()] = true;
             }
             BondStereo::None => {}
+        }
+    }
+    for stereo in mol.tetrahedral_stereo() {
+        for aid in stereo {
+            if let AtomId::Node(idx) = aid {
+                if idx.index() < referenced.len() {
+                    referenced[idx.index()] = true;
+                }
+            }
         }
     }
     referenced
@@ -64,10 +65,13 @@ pub fn add_hs(mol: &Mol<Atom, Bond>) -> Mol<Atom, Bond> {
         );
     }
 
+    let mut new_h_map: Vec<Option<NodeIndex>> = vec![None; mol.atom_count()];
+
     for (idx, &parent) in index_map.iter().enumerate() {
         let orig_idx = NodeIndex::new(idx);
         let atom = mol.atom(orig_idx);
         let h_count = atom.hydrogen_count as usize;
+        let mut first_h = None;
         for _ in 0..h_count {
             let h = result.add_atom(Atom {
                 atomic_num: 1,
@@ -81,14 +85,29 @@ pub fn add_hs(mol: &Mol<Atom, Bond>) -> Mol<Atom, Bond> {
                     stereo: BondStereo::None,
                 },
             );
-        }
-        if matches!(atom.chirality, Chirality::Cw | Chirality::Ccw) && h_count > 0 {
-            let graph_neighbor_count = mol.neighbors(orig_idx).count();
-            if (h_count * graph_neighbor_count) % 2 == 1 {
-                result.atom_mut(parent).chirality = flip_chirality(atom.chirality);
+            if first_h.is_none() {
+                first_h = Some(h);
             }
         }
+        new_h_map[idx] = first_h;
     }
+
+    let new_stereo: Vec<[AtomId; 4]> = mol
+        .tetrahedral_stereo()
+        .iter()
+        .map(|s| {
+            s.map(|aid| match aid {
+                AtomId::Node(idx) => AtomId::Node(index_map[idx.index()]),
+                AtomId::VirtualH(parent, _) => {
+                    match new_h_map[parent.index()] {
+                        Some(h_idx) => AtomId::Node(h_idx),
+                        None => aid,
+                    }
+                }
+            })
+        })
+        .collect();
+    result.set_tetrahedral_stereo(new_stereo);
 
     result
 }
@@ -138,30 +157,7 @@ pub fn remove_hs_with(mol: &Mol<Atom, Bond>, opts: &RemoveHsOptions) -> Mol<Atom
             continue;
         }
         let atom = mol.atom(idx);
-        let chirality = match atom.chirality {
-            Chirality::Cw | Chirality::Ccw => {
-                let neighbors: Vec<_> = mol.neighbors(idx).collect();
-                let removable_after_count: usize = neighbors
-                    .iter()
-                    .enumerate()
-                    .filter(|(_, n)| removable[n.index()])
-                    .map(|(pos, _)| {
-                        neighbors[pos + 1..]
-                            .iter()
-                            .filter(|n| !removable[n.index()])
-                            .count()
-                    })
-                    .sum();
-                if removable_after_count % 2 == 1 {
-                    flip_chirality(atom.chirality)
-                } else {
-                    atom.chirality
-                }
-            }
-            Chirality::None => Chirality::None,
-        };
         let new_idx = result.add_atom(Atom {
-            chirality,
             hydrogen_count: atom.hydrogen_count + extra_h[idx.index()],
             ..*atom
         });
@@ -177,6 +173,34 @@ pub fn remove_hs_with(mol: &Mol<Atom, Bond>, opts: &RemoveHsOptions) -> Mol<Atom
         }
     }
 
+    let new_stereo: Vec<[AtomId; 4]> = mol
+        .tetrahedral_stereo()
+        .iter()
+        .filter_map(|s| {
+            let mapped: Option<[AtomId; 4]> = {
+                let mut arr = [AtomId::Node(NodeIndex::new(0)); 4];
+                for (i, &aid) in s.iter().enumerate() {
+                    arr[i] = match aid {
+                        AtomId::Node(idx) => {
+                            if removable[idx.index()] {
+                                let parent = mol.neighbors(idx).next()?;
+                                AtomId::VirtualH(index_map[parent.index()]?, 0)
+                            } else {
+                                AtomId::Node(index_map[idx.index()]?)
+                            }
+                        }
+                        AtomId::VirtualH(parent, n) => {
+                            AtomId::VirtualH(index_map[parent.index()]?, n)
+                        }
+                    };
+                }
+                Some(arr)
+            };
+            mapped
+        })
+        .collect();
+    result.set_tetrahedral_stereo(new_stereo);
+
     result
 }
 
@@ -184,6 +208,7 @@ pub fn remove_hs_with(mol: &Mol<Atom, Bond>, opts: &RemoveHsOptions) -> Mol<Atom
 mod tests {
     use super::*;
     use crate::bond::SmilesBondOrder;
+    use crate::mol::AtomId;
     use crate::smiles::{from_smiles, parse_smiles, to_smiles};
     use crate::SmilesBond;
     use petgraph::graph::NodeIndex;
@@ -281,19 +306,26 @@ mod tests {
         let mut mol = Mol::new();
         let c = mol.add_atom(Atom {
             atomic_num: 6,
-            chirality: Chirality::Cw,
             hydrogen_count: 0,
             ..Atom::default()
         });
+        let mut ns = Vec::new();
         for _ in 0..4 {
-            let n = mol.add_atom(Atom {
+            let nbr = mol.add_atom(Atom {
                 atomic_num: 7,
                 ..Atom::default()
             });
-            mol.add_bond(c, n, Bond::default());
+            mol.add_bond(c, nbr, Bond::default());
+            ns.push(nbr);
         }
+        mol.add_tetrahedral_stereo([
+            AtomId::Node(c),
+            AtomId::Node(ns[0]),
+            AtomId::Node(ns[1]),
+            AtomId::Node(ns[2]),
+        ]);
         let explicit = add_hs(&mol);
-        assert_eq!(explicit.atom(n(0)).chirality, Chirality::Cw);
+        assert!(explicit.tetrahedral_stereo_for(n(0)).is_some());
     }
 
     #[test]
@@ -301,19 +333,30 @@ mod tests {
         let mut mol = Mol::new();
         let c = mol.add_atom(Atom {
             atomic_num: 6,
-            chirality: Chirality::Ccw,
             hydrogen_count: 1,
             ..Atom::default()
         });
+        let mut ns = Vec::new();
         for _ in 0..3 {
-            let n = mol.add_atom(Atom {
+            let nbr = mol.add_atom(Atom {
                 atomic_num: 7,
                 ..Atom::default()
             });
-            mol.add_bond(c, n, Bond::default());
+            mol.add_bond(c, nbr, Bond::default());
+            ns.push(nbr);
         }
+        mol.add_tetrahedral_stereo([
+            AtomId::Node(c),
+            AtomId::Node(ns[0]),
+            AtomId::Node(ns[1]),
+            AtomId::VirtualH(c, 0),
+        ]);
         let explicit = add_hs(&mol);
-        assert_eq!(explicit.atom(n(0)).chirality, Chirality::Cw);
+        let stereo = explicit.tetrahedral_stereo_for(n(0)).expect("chirality should exist");
+        assert!(
+            stereo.iter().all(|id| matches!(id, AtomId::Node(_))),
+            "VirtualH should have been replaced with Node"
+        );
     }
 
     #[test]
@@ -321,19 +364,26 @@ mod tests {
         let mut mol = Mol::new();
         let c = mol.add_atom(Atom {
             atomic_num: 6,
-            chirality: Chirality::Cw,
             hydrogen_count: 0,
             ..Atom::default()
         });
+        let mut ns = Vec::new();
         for _ in 0..4 {
-            let n = mol.add_atom(Atom {
+            let nbr = mol.add_atom(Atom {
                 atomic_num: 7,
                 ..Atom::default()
             });
-            mol.add_bond(c, n, Bond::default());
+            mol.add_bond(c, nbr, Bond::default());
+            ns.push(nbr);
         }
+        mol.add_tetrahedral_stereo([
+            AtomId::Node(c),
+            AtomId::Node(ns[0]),
+            AtomId::Node(ns[1]),
+            AtomId::Node(ns[2]),
+        ]);
         let result = remove_hs(&mol);
-        assert_eq!(result.atom(n(0)).chirality, Chirality::Cw);
+        assert!(result.tetrahedral_stereo_for(n(0)).is_some());
     }
 
     #[test]
@@ -341,21 +391,28 @@ mod tests {
         let mut mol = Mol::new();
         let c = mol.add_atom(Atom {
             atomic_num: 6,
-            chirality: Chirality::Ccw,
             hydrogen_count: 0,
             ..Atom::default()
         });
+        let mut ns = Vec::new();
         for _ in 0..4 {
-            let n = mol.add_atom(Atom {
+            let nbr = mol.add_atom(Atom {
                 atomic_num: 7,
                 ..Atom::default()
             });
-            mol.add_bond(c, n, Bond::default());
+            mol.add_bond(c, nbr, Bond::default());
+            ns.push(nbr);
         }
+        mol.add_tetrahedral_stereo([
+            AtomId::Node(c),
+            AtomId::Node(ns[0]),
+            AtomId::Node(ns[1]),
+            AtomId::Node(ns[2]),
+        ]);
         let explicit = add_hs(&mol);
-        assert_eq!(explicit.atom(n(0)).chirality, Chirality::Ccw);
+        assert!(explicit.tetrahedral_stereo_for(n(0)).is_some());
         let collapsed = remove_hs(&explicit);
-        assert_eq!(collapsed.atom(n(0)).chirality, Chirality::Ccw);
+        assert!(collapsed.tetrahedral_stereo_for(n(0)).is_some());
     }
 
     #[test]
@@ -363,21 +420,28 @@ mod tests {
         let mut mol = Mol::new();
         let c = mol.add_atom(Atom {
             atomic_num: 6,
-            chirality: Chirality::Cw,
             hydrogen_count: 1,
             ..Atom::default()
         });
+        let mut ns = Vec::new();
         for _ in 0..3 {
-            let nn = mol.add_atom(Atom {
+            let nbr = mol.add_atom(Atom {
                 atomic_num: 7,
                 ..Atom::default()
             });
-            mol.add_bond(c, nn, Bond::default());
+            mol.add_bond(c, nbr, Bond::default());
+            ns.push(nbr);
         }
+        mol.add_tetrahedral_stereo([
+            AtomId::Node(c),
+            AtomId::Node(ns[0]),
+            AtomId::Node(ns[1]),
+            AtomId::VirtualH(c, 0),
+        ]);
         let explicit = add_hs(&mol);
-        assert_eq!(explicit.atom(n(0)).chirality, Chirality::Ccw);
+        assert!(explicit.tetrahedral_stereo_for(n(0)).is_some());
         let collapsed = remove_hs(&explicit);
-        assert_eq!(collapsed.atom(n(0)).chirality, Chirality::Cw);
+        assert!(collapsed.tetrahedral_stereo_for(n(0)).is_some());
         assert_eq!(collapsed.atom(n(0)).hydrogen_count, 1);
     }
 

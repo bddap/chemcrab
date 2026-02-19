@@ -1,12 +1,9 @@
-use crate::atom::Chirality;
 use crate::bond::BondStereo;
 use crate::mol::Mol;
-use crate::traits::{HasBondStereoMut, HasChiralityMut, HasIsotopeMut};
+use crate::traits::{HasBondStereoMut, HasIsotopeMut};
 
-pub fn strip_chirality<A: HasChiralityMut, B>(mol: &mut Mol<A, B>) {
-    for idx in mol.atoms().collect::<Vec<_>>() {
-        *mol.atom_mut(idx).chirality_mut() = Chirality::None;
-    }
+pub fn strip_chirality<A, B>(mol: &mut Mol<A, B>) {
+    mol.set_tetrahedral_stereo(vec![]);
 }
 
 pub fn strip_bond_stereo<A, B: HasBondStereoMut>(mol: &mut Mol<A, B>) {
@@ -30,9 +27,7 @@ mod tests {
     fn strip_chirality_removes_tetrahedral() {
         let mut mol = from_smiles("F[C@H](Cl)Br").unwrap();
         strip_chirality(&mut mol);
-        for idx in mol.atoms() {
-            assert_eq!(mol.atom(idx).chirality, Chirality::None);
-        }
+        assert!(mol.tetrahedral_stereo().is_empty());
     }
 
     #[test]
