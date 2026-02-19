@@ -1,3 +1,4 @@
+pub mod aromaticity;
 pub mod atom;
 pub mod bond;
 pub mod element;
@@ -11,6 +12,7 @@ pub mod smiles;
 pub mod traits;
 pub mod wrappers;
 
+pub use aromaticity::{find_aromatic_atoms, set_aromaticity, AromaticityModel};
 pub use atom::{Atom, Chirality};
 pub use bond::{Bond, BondOrder, BondStereo, SmilesBond, SmilesBondOrder};
 pub use element::Element;
