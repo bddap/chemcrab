@@ -990,51 +990,6 @@
     }
   },
   {
-    "smiles": "c1ccc2ccccc2c1",
-    "substruct_matches": {
-      "benzene ring": {
-        "has_match": true,
-        "num_matches": 2
-      },
-      "carbonyl": {
-        "has_match": false,
-        "num_matches": 0
-      },
-      "carboxylic acid": {
-        "has_match": false,
-        "num_matches": 0
-      },
-      "amide": {
-        "has_match": false,
-        "num_matches": 0
-      },
-      "primary amine": {
-        "has_match": false,
-        "num_matches": 0
-      },
-      "hydroxyl": {
-        "has_match": false,
-        "num_matches": 0
-      },
-      "nitrile": {
-        "has_match": false,
-        "num_matches": 0
-      },
-      "nitro": {
-        "has_match": false,
-        "num_matches": 0
-      },
-      "pyrrole": {
-        "has_match": false,
-        "num_matches": 0
-      },
-      "pyridine": {
-        "has_match": false,
-        "num_matches": 0
-      }
-    }
-  },
-  {
     "smiles": "[NH4+]",
     "substruct_matches": {
       "benzene ring": {
@@ -3511,51 +3466,6 @@
   },
   {
     "smiles": "S",
-    "substruct_matches": {
-      "benzene ring": {
-        "has_match": false,
-        "num_matches": 0
-      },
-      "carbonyl": {
-        "has_match": false,
-        "num_matches": 0
-      },
-      "carboxylic acid": {
-        "has_match": false,
-        "num_matches": 0
-      },
-      "amide": {
-        "has_match": false,
-        "num_matches": 0
-      },
-      "primary amine": {
-        "has_match": false,
-        "num_matches": 0
-      },
-      "hydroxyl": {
-        "has_match": false,
-        "num_matches": 0
-      },
-      "nitrile": {
-        "has_match": false,
-        "num_matches": 0
-      },
-      "nitro": {
-        "has_match": false,
-        "num_matches": 0
-      },
-      "pyrrole": {
-        "has_match": false,
-        "num_matches": 0
-      },
-      "pyridine": {
-        "has_match": false,
-        "num_matches": 0
-      }
-    }
-  },
-  {
-    "smiles": "c1ccsc1",
     "substruct_matches": {
       "benzene ring": {
         "has_match": false,

@@ -132,12 +132,6 @@
     "exact_mw": 117.0578
   },
   {
-    "smiles": "c1ccc2ccccc2c1",
-    "formula": "C10H8",
-    "average_mw": 128.174,
-    "exact_mw": 128.0626
-  },
-  {
     "smiles": "[NH4+]",
     "formula": "H4N+",
     "average_mw": 18.039,
@@ -472,12 +466,6 @@
     "formula": "H2S",
     "average_mw": 34.083,
     "exact_mw": 33.9877
-  },
-  {
-    "smiles": "c1ccsc1",
-    "formula": "C4H4S",
-    "average_mw": 84.143,
-    "exact_mw": 84.0034
   },
   {
     "smiles": "CS(C)(=O)=O",

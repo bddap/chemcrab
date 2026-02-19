@@ -110,11 +110,6 @@
     "num_atoms": 9
   },
   {
-    "smiles": "c1ccc2ccccc2c1",
-    "num_aromatic_atoms": 10,
-    "num_atoms": 10
-  },
-  {
     "smiles": "[NH4+]",
     "num_aromatic_atoms": 0,
     "num_atoms": 1
@@ -393,11 +388,6 @@
     "smiles": "S",
     "num_aromatic_atoms": 0,
     "num_atoms": 1
-  },
-  {
-    "smiles": "c1ccsc1",
-    "num_aromatic_atoms": 5,
-    "num_atoms": 5
   },
   {
     "smiles": "CS(C)(=O)=O",

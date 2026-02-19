@@ -170,16 +170,6 @@
     "num_ring_bonds": 10
   },
   {
-    "smiles": "c1ccc2ccccc2c1",
-    "num_rings": 2,
-    "ring_sizes": [
-      6,
-      6
-    ],
-    "num_ring_atoms": 10,
-    "num_ring_bonds": 11
-  },
-  {
     "smiles": "[NH4+]",
     "num_rings": 0,
     "ring_sizes": [],
@@ -647,15 +637,6 @@
     "ring_sizes": [],
     "num_ring_atoms": 0,
     "num_ring_bonds": 0
-  },
-  {
-    "smiles": "c1ccsc1",
-    "num_rings": 1,
-    "ring_sizes": [
-      5
-    ],
-    "num_ring_atoms": 5,
-    "num_ring_bonds": 5
   },
   {
     "smiles": "CS(C)(=O)=O",

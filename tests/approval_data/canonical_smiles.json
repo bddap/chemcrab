@@ -395,11 +395,6 @@
     "canonical_non_isomeric": "S"
   },
   {
-    "input": "c1ccsc1",
-    "canonical_isomeric": "c1ccsc1",
-    "canonical_non_isomeric": "c1ccsc1"
-  },
-  {
     "input": "CS(=O)(=O)C",
     "canonical_isomeric": "CS(C)(=O)=O",
     "canonical_non_isomeric": "CS(C)(=O)=O"

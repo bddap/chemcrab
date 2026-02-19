@@ -6,6 +6,8 @@ use serde::Deserialize;
 // Shared helpers
 // ---------------------------------------------------------------------------
 
+// Known parser limitation: `c1ccc(-c2ccccc2)cc1` (biphenyl) fails because
+// the explicit `-` single bond inside an aromatic branch context is not yet handled.
 fn try_parse(smiles: &str) -> Option<crabchem::Mol<crabchem::Atom, crabchem::Bond>> {
     match crabchem::smiles::from_smiles(smiles) {
         Ok(m) => Some(m),
@@ -319,20 +321,10 @@ fn same_structure(
     a: &crabchem::Mol<crabchem::Atom, crabchem::Bond>,
     b: &crabchem::Mol<crabchem::Atom, crabchem::Bond>,
 ) -> bool {
-    if a.atom_count() != b.atom_count() || a.bond_count() != b.bond_count() {
-        return false;
-    }
-    let mut ea: Vec<u8> = a
-        .atoms()
-        .map(|n| crabchem::traits::HasAtomicNum::atomic_num(a.atom(n)))
-        .collect();
-    let mut eb: Vec<u8> = b
-        .atoms()
-        .map(|n| crabchem::traits::HasAtomicNum::atomic_num(b.atom(n)))
-        .collect();
-    ea.sort();
-    eb.sort();
-    ea == eb
+    a.atom_count() == b.atom_count()
+        && a.bond_count() == b.bond_count()
+        && crabchem::has_substruct_match(a, b)
+        && crabchem::has_substruct_match(b, a)
 }
 
 #[test]
