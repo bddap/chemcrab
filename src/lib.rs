@@ -10,6 +10,7 @@ pub mod mol;
 pub mod rings;
 pub mod smiles;
 pub mod traits;
+pub mod valence;
 pub mod wrappers;
 
 pub use aromaticity::{find_aromatic_atoms, set_aromaticity, AromaticityModel};
@@ -30,6 +31,7 @@ pub use traits::{
     HasAromaticity, HasAtomicNum, HasBondOrder, HasBondStereo, HasChirality, HasFormalCharge,
     HasHybridization, HasHydrogenCount, HasIsotope, HasPosition2D, HasPosition3D, HasValence,
 };
+pub use valence::{check_valence, total_valence, ValenceError};
 pub use wrappers::{Hybridization, WithHybridization, WithPosition2D, WithPosition3D, WithValence};
 
 #[cfg(test)]
