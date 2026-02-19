@@ -1,0 +1,494 @@
+[
+  {
+    "smiles": "C",
+    "formula": "CH4",
+    "average_mw": 16.043,
+    "exact_mw": 16.0313
+  },
+  {
+    "smiles": "CC",
+    "formula": "C2H6",
+    "average_mw": 30.07,
+    "exact_mw": 30.047
+  },
+  {
+    "smiles": "CCC",
+    "formula": "C3H8",
+    "average_mw": 44.097,
+    "exact_mw": 44.0626
+  },
+  {
+    "smiles": "CCCC",
+    "formula": "C4H10",
+    "average_mw": 58.124,
+    "exact_mw": 58.0783
+  },
+  {
+    "smiles": "CC(C)C",
+    "formula": "C4H10",
+    "average_mw": 58.124,
+    "exact_mw": 58.0783
+  },
+  {
+    "smiles": "C=C",
+    "formula": "C2H4",
+    "average_mw": 28.054,
+    "exact_mw": 28.0313
+  },
+  {
+    "smiles": "C#C",
+    "formula": "C2H2",
+    "average_mw": 26.038,
+    "exact_mw": 26.0157
+  },
+  {
+    "smiles": "C=CC=C",
+    "formula": "C4H6",
+    "average_mw": 54.092,
+    "exact_mw": 54.047
+  },
+  {
+    "smiles": "CC=CC",
+    "formula": "C4H8",
+    "average_mw": 56.108,
+    "exact_mw": 56.0626
+  },
+  {
+    "smiles": "CCO",
+    "formula": "C2H6O",
+    "average_mw": 46.069,
+    "exact_mw": 46.0419
+  },
+  {
+    "smiles": "CC=O",
+    "formula": "C2H4O",
+    "average_mw": 44.053,
+    "exact_mw": 44.0262
+  },
+  {
+    "smiles": "CC(=O)O",
+    "formula": "C2H4O2",
+    "average_mw": 60.052,
+    "exact_mw": 60.0211
+  },
+  {
+    "smiles": "COC(C)=O",
+    "formula": "C3H6O2",
+    "average_mw": 74.079,
+    "exact_mw": 74.0368
+  },
+  {
+    "smiles": "CCN",
+    "formula": "C2H7N",
+    "average_mw": 45.085,
+    "exact_mw": 45.0578
+  },
+  {
+    "smiles": "CC(N)=O",
+    "formula": "C2H5NO",
+    "average_mw": 59.068,
+    "exact_mw": 59.0371
+  },
+  {
+    "smiles": "c1ccccc1",
+    "formula": "C6H6",
+    "average_mw": 78.114,
+    "exact_mw": 78.047
+  },
+  {
+    "smiles": "c1ccncc1",
+    "formula": "C5H5N",
+    "average_mw": 79.102,
+    "exact_mw": 79.0422
+  },
+  {
+    "smiles": "c1cc[nH]c1",
+    "formula": "C4H5N",
+    "average_mw": 67.091,
+    "exact_mw": 67.0422
+  },
+  {
+    "smiles": "c1ccoc1",
+    "formula": "C4H4O",
+    "average_mw": 68.075,
+    "exact_mw": 68.0262
+  },
+  {
+    "smiles": "c1ccsc1",
+    "formula": "C4H4S",
+    "average_mw": 84.143,
+    "exact_mw": 84.0034
+  },
+  {
+    "smiles": "c1ccc2ccccc2c1",
+    "formula": "C10H8",
+    "average_mw": 128.174,
+    "exact_mw": 128.0626
+  },
+  {
+    "smiles": "c1ccc2[nH]ccc2c1",
+    "formula": "C8H7N",
+    "average_mw": 117.151,
+    "exact_mw": 117.0578
+  },
+  {
+    "smiles": "c1ccc2ccccc2c1",
+    "formula": "C10H8",
+    "average_mw": 128.174,
+    "exact_mw": 128.0626
+  },
+  {
+    "smiles": "[NH4+]",
+    "formula": "H4N+",
+    "average_mw": 18.039,
+    "exact_mw": 18.0338
+  },
+  {
+    "smiles": "[O-]",
+    "formula": "O-",
+    "average_mw": 15.999,
+    "exact_mw": 15.9955
+  },
+  {
+    "smiles": "[Cl-].[Na+]",
+    "formula": "ClNa",
+    "average_mw": 58.443,
+    "exact_mw": 57.9586
+  },
+  {
+    "smiles": "CC(=O)[O-]",
+    "formula": "C2H3O2-",
+    "average_mw": 59.044,
+    "exact_mw": 59.0139
+  },
+  {
+    "smiles": "[NH3+]CC(=O)[O-]",
+    "formula": "C2H5NO2",
+    "average_mw": 75.067,
+    "exact_mw": 75.032
+  },
+  {
+    "smiles": "[2H]C([2H])([2H])[2H]",
+    "formula": "CH4",
+    "average_mw": 20.0674,
+    "exact_mw": 20.0564
+  },
+  {
+    "smiles": "[13C]c1ccccc1",
+    "formula": "C7H5",
+    "average_mw": 90.1094,
+    "exact_mw": 90.0425
+  },
+  {
+    "smiles": "F[C@H](Cl)Br",
+    "formula": "CHBrClF",
+    "average_mw": 147.374,
+    "exact_mw": 145.8934
+  },
+  {
+    "smiles": "F[C@@H](Cl)Br",
+    "formula": "CHBrClF",
+    "average_mw": 147.374,
+    "exact_mw": 145.8934
+  },
+  {
+    "smiles": "C[C@@H](N)O",
+    "formula": "C2H7NO",
+    "average_mw": 61.084,
+    "exact_mw": 61.0528
+  },
+  {
+    "smiles": "C[C@H](N)O",
+    "formula": "C2H7NO",
+    "average_mw": 61.084,
+    "exact_mw": 61.0528
+  },
+  {
+    "smiles": "CC[C@@H](C)O",
+    "formula": "C4H10O",
+    "average_mw": 74.123,
+    "exact_mw": 74.0732
+  },
+  {
+    "smiles": "CC[C@H](C)O",
+    "formula": "C4H10O",
+    "average_mw": 74.123,
+    "exact_mw": 74.0732
+  },
+  {
+    "smiles": "C[C@H](N)C(=O)O",
+    "formula": "C3H7NO2",
+    "average_mw": 89.094,
+    "exact_mw": 89.0477
+  },
+  {
+    "smiles": "C[C@@H](N)C(=O)O",
+    "formula": "C3H7NO2",
+    "average_mw": 89.094,
+    "exact_mw": 89.0477
+  },
+  {
+    "smiles": "F/C=C/F",
+    "formula": "C2H2F2",
+    "average_mw": 64.034,
+    "exact_mw": 64.0125
+  },
+  {
+    "smiles": "F/C=C\\F",
+    "formula": "C2H2F2",
+    "average_mw": 64.034,
+    "exact_mw": 64.0125
+  },
+  {
+    "smiles": "CC/C=C/CC",
+    "formula": "C6H12",
+    "average_mw": 84.162,
+    "exact_mw": 84.0939
+  },
+  {
+    "smiles": "CC/C=C\\CC",
+    "formula": "C6H12",
+    "average_mw": 84.162,
+    "exact_mw": 84.0939
+  },
+  {
+    "smiles": "Cl/C=C/Br",
+    "formula": "C2H2BrCl",
+    "average_mw": 141.395,
+    "exact_mw": 139.9028
+  },
+  {
+    "smiles": "C1CC1",
+    "formula": "C3H6",
+    "average_mw": 42.081,
+    "exact_mw": 42.047
+  },
+  {
+    "smiles": "C1CCC1",
+    "formula": "C4H8",
+    "average_mw": 56.108,
+    "exact_mw": 56.0626
+  },
+  {
+    "smiles": "C1CCCC1",
+    "formula": "C5H10",
+    "average_mw": 70.135,
+    "exact_mw": 70.0783
+  },
+  {
+    "smiles": "C1CCCCC1",
+    "formula": "C6H12",
+    "average_mw": 84.162,
+    "exact_mw": 84.0939
+  },
+  {
+    "smiles": "C1CCCCCC1",
+    "formula": "C7H14",
+    "average_mw": 98.189,
+    "exact_mw": 98.1096
+  },
+  {
+    "smiles": "C1CCCCCCC1",
+    "formula": "C8H16",
+    "average_mw": 112.216,
+    "exact_mw": 112.1252
+  },
+  {
+    "smiles": "C1CC2CCC(C1)C2",
+    "formula": "C8H14",
+    "average_mw": 110.2,
+    "exact_mw": 110.1096
+  },
+  {
+    "smiles": "C1CCC2CCCC2C1",
+    "formula": "C9H16",
+    "average_mw": 124.227,
+    "exact_mw": 124.1252
+  },
+  {
+    "smiles": "C1CC2CCC1C2",
+    "formula": "C7H12",
+    "average_mw": 96.173,
+    "exact_mw": 96.0939
+  },
+  {
+    "smiles": "C1CCC2(CC1)CCCC2",
+    "formula": "C10H18",
+    "average_mw": 138.254,
+    "exact_mw": 138.1409
+  },
+  {
+    "smiles": "c1ccc2cc3ccccc3cc2c1",
+    "formula": "C14H10",
+    "average_mw": 178.234,
+    "exact_mw": 178.0783
+  },
+  {
+    "smiles": "C12C3C4C1C1C2C3C41",
+    "formula": "C8H8",
+    "average_mw": 104.152,
+    "exact_mw": 104.0626
+  },
+  {
+    "smiles": "CC(=O)OC(C)=O",
+    "formula": "C4H6O3",
+    "average_mw": 102.089,
+    "exact_mw": 102.0317
+  },
+  {
+    "smiles": "Oc1ccccc1",
+    "formula": "C6H6O",
+    "average_mw": 94.113,
+    "exact_mw": 94.0419
+  },
+  {
+    "smiles": "Nc1ccccc1",
+    "formula": "C6H7N",
+    "average_mw": 93.129,
+    "exact_mw": 93.0578
+  },
+  {
+    "smiles": "O=C(O)c1ccccc1",
+    "formula": "C7H6O2",
+    "average_mw": 122.123,
+    "exact_mw": 122.0368
+  },
+  {
+    "smiles": "N#Cc1ccccc1",
+    "formula": "C7H5N",
+    "average_mw": 103.124,
+    "exact_mw": 103.0422
+  },
+  {
+    "smiles": "Sc1ccccc1",
+    "formula": "C6H6S",
+    "average_mw": 110.181,
+    "exact_mw": 110.019
+  },
+  {
+    "smiles": "O=[N+]([O-])c1ccccc1",
+    "formula": "C6H5NO2",
+    "average_mw": 123.111,
+    "exact_mw": 123.032
+  },
+  {
+    "smiles": "CC(C)(C)c1ccccc1",
+    "formula": "C10H14",
+    "average_mw": 134.222,
+    "exact_mw": 134.1096
+  },
+  {
+    "smiles": "c1ccc(-c2ccccc2)cc1",
+    "formula": "C12H10",
+    "average_mw": 154.212,
+    "exact_mw": 154.0783
+  },
+  {
+    "smiles": "CC(=O)Oc1ccccc1C(=O)O",
+    "formula": "C9H8O4",
+    "average_mw": 180.159,
+    "exact_mw": 180.0423
+  },
+  {
+    "smiles": "CC12CCC3C(CCC4CC(=O)CCC43C)C1CCC2O",
+    "formula": "C19H30O2",
+    "average_mw": 290.447,
+    "exact_mw": 290.2246
+  },
+  {
+    "smiles": "Cn1c(=O)c2c(ncn2C)n(C)c1=O",
+    "formula": "C8H10N4O2",
+    "average_mw": 194.194,
+    "exact_mw": 194.0804
+  },
+  {
+    "smiles": "CC(C)Cc1ccc(C(C)C(=O)O)cc1",
+    "formula": "C13H18O2",
+    "average_mw": 206.285,
+    "exact_mw": 206.1307
+  },
+  {
+    "smiles": "OC[C@H]1OC(O)[C@H](O)[C@@H](O)[C@@H]1O",
+    "formula": "C6H12O6",
+    "average_mw": 180.156,
+    "exact_mw": 180.0634
+  },
+  {
+    "smiles": "[CH3]",
+    "formula": "CH3",
+    "average_mw": 15.035,
+    "exact_mw": 15.0235
+  },
+  {
+    "smiles": "[NH2]",
+    "formula": "H2N",
+    "average_mw": 16.023,
+    "exact_mw": 16.0187
+  },
+  {
+    "smiles": "[OH]",
+    "formula": "HO",
+    "average_mw": 17.007,
+    "exact_mw": 17.0027
+  },
+  {
+    "smiles": "C1CCCCCCCCCCC1",
+    "formula": "C12H24",
+    "average_mw": 168.324,
+    "exact_mw": 168.1878
+  },
+  {
+    "smiles": "CC.CC",
+    "formula": "C4H12",
+    "average_mw": 60.14,
+    "exact_mw": 60.0939
+  },
+  {
+    "smiles": "c1ccccc1.c1ccncc1",
+    "formula": "C11H11N",
+    "average_mw": 157.216,
+    "exact_mw": 157.0891
+  },
+  {
+    "smiles": "B",
+    "formula": "H3B",
+    "average_mw": 13.836,
+    "exact_mw": 14.0328
+  },
+  {
+    "smiles": "c1ccc(B2Oc3ccccc3O2)cc1",
+    "formula": "C12H9BO2",
+    "average_mw": 196.014,
+    "exact_mw": 196.0696
+  },
+  {
+    "smiles": "P",
+    "formula": "H3P",
+    "average_mw": 33.998,
+    "exact_mw": 33.9972
+  },
+  {
+    "smiles": "S",
+    "formula": "H2S",
+    "average_mw": 34.083,
+    "exact_mw": 33.9877
+  },
+  {
+    "smiles": "c1ccsc1",
+    "formula": "C4H4S",
+    "average_mw": 84.143,
+    "exact_mw": 84.0034
+  },
+  {
+    "smiles": "CS(C)(=O)=O",
+    "formula": "C2H6O2S",
+    "average_mw": 94.135,
+    "exact_mw": 94.0089
+  },
+  {
+    "smiles": "O=P(O)(O)O",
+    "formula": "H3O4P",
+    "average_mw": 97.994,
+    "exact_mw": 97.9769
+  }
+]

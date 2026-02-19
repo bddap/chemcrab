@@ -1,0 +1,412 @@
+[
+  {
+    "smiles": "C",
+    "num_aromatic_atoms": 0,
+    "num_atoms": 1
+  },
+  {
+    "smiles": "CC",
+    "num_aromatic_atoms": 0,
+    "num_atoms": 2
+  },
+  {
+    "smiles": "CCC",
+    "num_aromatic_atoms": 0,
+    "num_atoms": 3
+  },
+  {
+    "smiles": "CCCC",
+    "num_aromatic_atoms": 0,
+    "num_atoms": 4
+  },
+  {
+    "smiles": "CC(C)C",
+    "num_aromatic_atoms": 0,
+    "num_atoms": 4
+  },
+  {
+    "smiles": "C=C",
+    "num_aromatic_atoms": 0,
+    "num_atoms": 2
+  },
+  {
+    "smiles": "C#C",
+    "num_aromatic_atoms": 0,
+    "num_atoms": 2
+  },
+  {
+    "smiles": "C=CC=C",
+    "num_aromatic_atoms": 0,
+    "num_atoms": 4
+  },
+  {
+    "smiles": "CC=CC",
+    "num_aromatic_atoms": 0,
+    "num_atoms": 4
+  },
+  {
+    "smiles": "CCO",
+    "num_aromatic_atoms": 0,
+    "num_atoms": 3
+  },
+  {
+    "smiles": "CC=O",
+    "num_aromatic_atoms": 0,
+    "num_atoms": 3
+  },
+  {
+    "smiles": "CC(=O)O",
+    "num_aromatic_atoms": 0,
+    "num_atoms": 4
+  },
+  {
+    "smiles": "COC(C)=O",
+    "num_aromatic_atoms": 0,
+    "num_atoms": 5
+  },
+  {
+    "smiles": "CCN",
+    "num_aromatic_atoms": 0,
+    "num_atoms": 3
+  },
+  {
+    "smiles": "CC(N)=O",
+    "num_aromatic_atoms": 0,
+    "num_atoms": 4
+  },
+  {
+    "smiles": "c1ccccc1",
+    "num_aromatic_atoms": 6,
+    "num_atoms": 6
+  },
+  {
+    "smiles": "c1ccncc1",
+    "num_aromatic_atoms": 6,
+    "num_atoms": 6
+  },
+  {
+    "smiles": "c1cc[nH]c1",
+    "num_aromatic_atoms": 5,
+    "num_atoms": 5
+  },
+  {
+    "smiles": "c1ccoc1",
+    "num_aromatic_atoms": 5,
+    "num_atoms": 5
+  },
+  {
+    "smiles": "c1ccsc1",
+    "num_aromatic_atoms": 5,
+    "num_atoms": 5
+  },
+  {
+    "smiles": "c1ccc2ccccc2c1",
+    "num_aromatic_atoms": 10,
+    "num_atoms": 10
+  },
+  {
+    "smiles": "c1ccc2[nH]ccc2c1",
+    "num_aromatic_atoms": 9,
+    "num_atoms": 9
+  },
+  {
+    "smiles": "c1ccc2ccccc2c1",
+    "num_aromatic_atoms": 10,
+    "num_atoms": 10
+  },
+  {
+    "smiles": "[NH4+]",
+    "num_aromatic_atoms": 0,
+    "num_atoms": 1
+  },
+  {
+    "smiles": "[O-]",
+    "num_aromatic_atoms": 0,
+    "num_atoms": 1
+  },
+  {
+    "smiles": "[Cl-].[Na+]",
+    "num_aromatic_atoms": 0,
+    "num_atoms": 2
+  },
+  {
+    "smiles": "CC(=O)[O-]",
+    "num_aromatic_atoms": 0,
+    "num_atoms": 4
+  },
+  {
+    "smiles": "[NH3+]CC(=O)[O-]",
+    "num_aromatic_atoms": 0,
+    "num_atoms": 5
+  },
+  {
+    "smiles": "[2H]C([2H])([2H])[2H]",
+    "num_aromatic_atoms": 0,
+    "num_atoms": 5
+  },
+  {
+    "smiles": "[13C]c1ccccc1",
+    "num_aromatic_atoms": 6,
+    "num_atoms": 7
+  },
+  {
+    "smiles": "F[C@H](Cl)Br",
+    "num_aromatic_atoms": 0,
+    "num_atoms": 4
+  },
+  {
+    "smiles": "F[C@@H](Cl)Br",
+    "num_aromatic_atoms": 0,
+    "num_atoms": 4
+  },
+  {
+    "smiles": "C[C@@H](N)O",
+    "num_aromatic_atoms": 0,
+    "num_atoms": 4
+  },
+  {
+    "smiles": "C[C@H](N)O",
+    "num_aromatic_atoms": 0,
+    "num_atoms": 4
+  },
+  {
+    "smiles": "CC[C@@H](C)O",
+    "num_aromatic_atoms": 0,
+    "num_atoms": 5
+  },
+  {
+    "smiles": "CC[C@H](C)O",
+    "num_aromatic_atoms": 0,
+    "num_atoms": 5
+  },
+  {
+    "smiles": "C[C@H](N)C(=O)O",
+    "num_aromatic_atoms": 0,
+    "num_atoms": 6
+  },
+  {
+    "smiles": "C[C@@H](N)C(=O)O",
+    "num_aromatic_atoms": 0,
+    "num_atoms": 6
+  },
+  {
+    "smiles": "F/C=C/F",
+    "num_aromatic_atoms": 0,
+    "num_atoms": 4
+  },
+  {
+    "smiles": "F/C=C\\F",
+    "num_aromatic_atoms": 0,
+    "num_atoms": 4
+  },
+  {
+    "smiles": "CC/C=C/CC",
+    "num_aromatic_atoms": 0,
+    "num_atoms": 6
+  },
+  {
+    "smiles": "CC/C=C\\CC",
+    "num_aromatic_atoms": 0,
+    "num_atoms": 6
+  },
+  {
+    "smiles": "Cl/C=C/Br",
+    "num_aromatic_atoms": 0,
+    "num_atoms": 4
+  },
+  {
+    "smiles": "C1CC1",
+    "num_aromatic_atoms": 0,
+    "num_atoms": 3
+  },
+  {
+    "smiles": "C1CCC1",
+    "num_aromatic_atoms": 0,
+    "num_atoms": 4
+  },
+  {
+    "smiles": "C1CCCC1",
+    "num_aromatic_atoms": 0,
+    "num_atoms": 5
+  },
+  {
+    "smiles": "C1CCCCC1",
+    "num_aromatic_atoms": 0,
+    "num_atoms": 6
+  },
+  {
+    "smiles": "C1CCCCCC1",
+    "num_aromatic_atoms": 0,
+    "num_atoms": 7
+  },
+  {
+    "smiles": "C1CCCCCCC1",
+    "num_aromatic_atoms": 0,
+    "num_atoms": 8
+  },
+  {
+    "smiles": "C1CC2CCC(C1)C2",
+    "num_aromatic_atoms": 0,
+    "num_atoms": 8
+  },
+  {
+    "smiles": "C1CCC2CCCC2C1",
+    "num_aromatic_atoms": 0,
+    "num_atoms": 9
+  },
+  {
+    "smiles": "C1CC2CCC1C2",
+    "num_aromatic_atoms": 0,
+    "num_atoms": 7
+  },
+  {
+    "smiles": "C1CCC2(CC1)CCCC2",
+    "num_aromatic_atoms": 0,
+    "num_atoms": 10
+  },
+  {
+    "smiles": "c1ccc2cc3ccccc3cc2c1",
+    "num_aromatic_atoms": 14,
+    "num_atoms": 14
+  },
+  {
+    "smiles": "C12C3C4C1C1C2C3C41",
+    "num_aromatic_atoms": 0,
+    "num_atoms": 8
+  },
+  {
+    "smiles": "CC(=O)OC(C)=O",
+    "num_aromatic_atoms": 0,
+    "num_atoms": 7
+  },
+  {
+    "smiles": "Oc1ccccc1",
+    "num_aromatic_atoms": 6,
+    "num_atoms": 7
+  },
+  {
+    "smiles": "Nc1ccccc1",
+    "num_aromatic_atoms": 6,
+    "num_atoms": 7
+  },
+  {
+    "smiles": "O=C(O)c1ccccc1",
+    "num_aromatic_atoms": 6,
+    "num_atoms": 9
+  },
+  {
+    "smiles": "N#Cc1ccccc1",
+    "num_aromatic_atoms": 6,
+    "num_atoms": 8
+  },
+  {
+    "smiles": "Sc1ccccc1",
+    "num_aromatic_atoms": 6,
+    "num_atoms": 7
+  },
+  {
+    "smiles": "O=[N+]([O-])c1ccccc1",
+    "num_aromatic_atoms": 6,
+    "num_atoms": 9
+  },
+  {
+    "smiles": "CC(C)(C)c1ccccc1",
+    "num_aromatic_atoms": 6,
+    "num_atoms": 10
+  },
+  {
+    "smiles": "c1ccc(-c2ccccc2)cc1",
+    "num_aromatic_atoms": 12,
+    "num_atoms": 12
+  },
+  {
+    "smiles": "CC(=O)Oc1ccccc1C(=O)O",
+    "num_aromatic_atoms": 6,
+    "num_atoms": 13
+  },
+  {
+    "smiles": "CC12CCC3C(CCC4CC(=O)CCC43C)C1CCC2O",
+    "num_aromatic_atoms": 0,
+    "num_atoms": 21
+  },
+  {
+    "smiles": "Cn1c(=O)c2c(ncn2C)n(C)c1=O",
+    "num_aromatic_atoms": 9,
+    "num_atoms": 14
+  },
+  {
+    "smiles": "CC(C)Cc1ccc(C(C)C(=O)O)cc1",
+    "num_aromatic_atoms": 6,
+    "num_atoms": 15
+  },
+  {
+    "smiles": "OC[C@H]1OC(O)[C@H](O)[C@@H](O)[C@@H]1O",
+    "num_aromatic_atoms": 0,
+    "num_atoms": 12
+  },
+  {
+    "smiles": "[CH3]",
+    "num_aromatic_atoms": 0,
+    "num_atoms": 1
+  },
+  {
+    "smiles": "[NH2]",
+    "num_aromatic_atoms": 0,
+    "num_atoms": 1
+  },
+  {
+    "smiles": "[OH]",
+    "num_aromatic_atoms": 0,
+    "num_atoms": 1
+  },
+  {
+    "smiles": "C1CCCCCCCCCCC1",
+    "num_aromatic_atoms": 0,
+    "num_atoms": 12
+  },
+  {
+    "smiles": "CC.CC",
+    "num_aromatic_atoms": 0,
+    "num_atoms": 4
+  },
+  {
+    "smiles": "c1ccccc1.c1ccncc1",
+    "num_aromatic_atoms": 12,
+    "num_atoms": 12
+  },
+  {
+    "smiles": "B",
+    "num_aromatic_atoms": 0,
+    "num_atoms": 1
+  },
+  {
+    "smiles": "c1ccc(B2Oc3ccccc3O2)cc1",
+    "num_aromatic_atoms": 12,
+    "num_atoms": 15
+  },
+  {
+    "smiles": "P",
+    "num_aromatic_atoms": 0,
+    "num_atoms": 1
+  },
+  {
+    "smiles": "S",
+    "num_aromatic_atoms": 0,
+    "num_atoms": 1
+  },
+  {
+    "smiles": "c1ccsc1",
+    "num_aromatic_atoms": 5,
+    "num_atoms": 5
+  },
+  {
+    "smiles": "CS(C)(=O)=O",
+    "num_aromatic_atoms": 0,
+    "num_atoms": 5
+  },
+  {
+    "smiles": "O=P(O)(O)O",
+    "num_aromatic_atoms": 0,
+    "num_atoms": 5
+  }
+]
