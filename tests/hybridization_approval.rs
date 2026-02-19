@@ -49,10 +49,8 @@ fn approval_hybridization() {
     let mut failures = Vec::new();
 
     for entry in &data {
-        let mol = match from_smiles(&entry.smiles) {
-            Ok(m) => m,
-            Err(_) => continue,
-        };
+        let mol = from_smiles(&entry.smiles)
+            .unwrap_or_else(|e| panic!("failed to parse SMILES {:?}: {e}", entry.smiles));
 
         let computed = assign_hybridization(&mol);
 

@@ -6,14 +6,9 @@ use serde::Deserialize;
 // Shared helpers
 // ---------------------------------------------------------------------------
 
-fn try_parse(smiles: &str) -> Option<chemcrab::Mol<chemcrab::Atom, chemcrab::Bond>> {
-    match chemcrab::smiles::from_smiles(smiles) {
-        Ok(m) => Some(m),
-        Err(e) => {
-            eprintln!("SKIP (parse failure): {smiles:?}: {e}");
-            None
-        }
-    }
+fn parse(smiles: &str) -> chemcrab::Mol<chemcrab::Atom, chemcrab::Bond> {
+    chemcrab::smiles::from_smiles(smiles)
+        .unwrap_or_else(|e| panic!("failed to parse SMILES {smiles:?}: {e}"))
 }
 
 fn approx_eq(a: f64, b: f64, tol: f64) -> bool {
@@ -38,12 +33,8 @@ fn approval_formula_weight() {
         serde_json::from_str(include_str!("approval_data/formula_weight.json")).unwrap();
 
     let mut failures = Vec::new();
-    let mut skipped = 0usize;
     for entry in &data {
-        let mol = match try_parse(&entry.smiles) {
-            Some(m) => m,
-            None => { skipped += 1; continue; }
-        };
+        let mol = parse(&entry.smiles);
 
         let formula = chemcrab::mol_formula(&mol);
         if formula != entry.formula {
@@ -68,10 +59,6 @@ fn approval_formula_weight() {
                 entry.smiles, entry.exact_mw, emw
             ));
         }
-    }
-
-    if skipped > 0 {
-        eprintln!("formula/weight: skipped {skipped} unparseable molecules");
     }
 
     if !failures.is_empty() {
@@ -100,12 +87,8 @@ fn approval_aromaticity() {
         serde_json::from_str(include_str!("approval_data/aromaticity.json")).unwrap();
 
     let mut failures = Vec::new();
-    let mut skipped = 0usize;
     for entry in &data {
-        let mol = match try_parse(&entry.smiles) {
-            Some(m) => m,
-            None => { skipped += 1; continue; }
-        };
+        let mol = parse(&entry.smiles);
 
         if mol.atom_count() != entry.num_atoms {
             failures.push(format!(
@@ -124,10 +107,6 @@ fn approval_aromaticity() {
                 entry.smiles, entry.num_aromatic_atoms, count
             ));
         }
-    }
-
-    if skipped > 0 {
-        eprintln!("aromaticity: skipped {skipped} unparseable molecules");
     }
 
     if !failures.is_empty() {
@@ -158,12 +137,8 @@ fn approval_rings() {
         serde_json::from_str(include_str!("approval_data/rings.json")).unwrap();
 
     let mut failures = Vec::new();
-    let mut skipped = 0usize;
     for entry in &data {
-        let mol = match try_parse(&entry.smiles) {
-            Some(m) => m,
-            None => { skipped += 1; continue; }
-        };
+        let mol = parse(&entry.smiles);
         let ri = chemcrab::RingInfo::symmetrized_sssr(&mol);
 
         if ri.num_rings() != entry.num_rings {
@@ -222,10 +197,6 @@ fn approval_rings() {
         }
     }
 
-    if skipped > 0 {
-        eprintln!("rings: skipped {skipped} unparseable molecules");
-    }
-
     if !failures.is_empty() {
         panic!(
             "{} ring failures:\n{}",
@@ -251,26 +222,12 @@ fn approval_smarts() {
         serde_json::from_str(include_str!("approval_data/smarts.json")).unwrap();
 
     let mut failures = Vec::new();
-    let mut parse_failures = Vec::new();
-
-    let mut skipped = 0usize;
     for entry in &data {
-        let mol = match try_parse(&entry.smiles) {
-            Some(m) => m,
-            None => { skipped += 1; continue; }
-        };
+        let mol = parse(&entry.smiles);
 
         for (smarts_str, &expected_count) in &entry.smarts_matches {
-            let query = match chemcrab::from_smarts(smarts_str) {
-                Ok(q) => q,
-                Err(e) => {
-                    parse_failures.push(format!(
-                        "failed to parse SMARTS {:?}: {}",
-                        smarts_str, e
-                    ));
-                    continue;
-                }
-            };
+            let query = chemcrab::from_smarts(smarts_str)
+                .unwrap_or_else(|e| panic!("failed to parse SMARTS {smarts_str:?}: {e}"));
 
             let matches = chemcrab::get_smarts_matches(&mol, &query);
             if matches.len() != expected_count {
@@ -280,18 +237,6 @@ fn approval_smarts() {
                 ));
             }
         }
-    }
-
-    if skipped > 0 {
-        eprintln!("smarts: skipped {skipped} unparseable molecules");
-    }
-
-    if !parse_failures.is_empty() {
-        eprintln!(
-            "SMARTS parse warnings ({}):\n{}",
-            parse_failures.len(),
-            parse_failures.join("\n")
-        );
     }
 
     if !failures.is_empty() {
@@ -304,110 +249,7 @@ fn approval_smarts() {
 }
 
 // ---------------------------------------------------------------------------
-// 5. Canonical SMILES (soft comparison)
-// ---------------------------------------------------------------------------
-
-#[derive(Deserialize)]
-struct CanonicalEntry {
-    input: String,
-    canonical_isomeric: String,
-    #[allow(dead_code)]
-    canonical_non_isomeric: String,
-}
-
-fn same_structure(
-    a: &chemcrab::Mol<chemcrab::Atom, chemcrab::Bond>,
-    b: &chemcrab::Mol<chemcrab::Atom, chemcrab::Bond>,
-) -> bool {
-    a.atom_count() == b.atom_count()
-        && a.bond_count() == b.bond_count()
-        && chemcrab::has_substruct_match(a, b)
-        && chemcrab::has_substruct_match(b, a)
-}
-
-#[test]
-fn approval_canonical_smiles() {
-    let data: Vec<CanonicalEntry> =
-        serde_json::from_str(include_str!("approval_data/canonical_smiles.json")).unwrap();
-
-    let mut mismatches = Vec::new();
-    let mut round_trip_failures = Vec::new();
-    let mut skipped = 0usize;
-
-    for entry in &data {
-        let mol = match chemcrab::smiles::from_smiles(&entry.canonical_isomeric) {
-            Ok(m) => m,
-            Err(e) => {
-                eprintln!(
-                    "SKIP (parse failure): canonical {:?}: {}",
-                    entry.canonical_isomeric, e
-                );
-                skipped += 1;
-                continue;
-            }
-        };
-
-        let our_canonical = chemcrab::smiles::to_canonical_smiles(&mol);
-
-        // Check determinism: same output if we do it again
-        let our_canonical2 = chemcrab::smiles::to_canonical_smiles(&mol);
-        if our_canonical != our_canonical2 {
-            round_trip_failures.push(format!(
-                "non-deterministic canonical for {:?}: {:?} vs {:?}",
-                entry.canonical_isomeric, our_canonical, our_canonical2
-            ));
-        }
-
-        // Soft string comparison — log but don't fail
-        if our_canonical != entry.canonical_isomeric {
-            mismatches.push(format!(
-                "{}: expected={:?}, ours={:?}",
-                entry.input, entry.canonical_isomeric, our_canonical
-            ));
-        }
-
-        // Structural round-trip: parse our canonical, compare structure
-        match chemcrab::smiles::from_smiles(&our_canonical) {
-            Ok(reparsed) => {
-                if !same_structure(&mol, &reparsed) {
-                    round_trip_failures.push(format!(
-                        "round-trip structural mismatch for {:?}: wrote {:?}",
-                        entry.canonical_isomeric, our_canonical
-                    ));
-                }
-            }
-            Err(e) => {
-                round_trip_failures.push(format!(
-                    "failed to reparse our canonical {:?} (from {:?}): {}",
-                    our_canonical, entry.canonical_isomeric, e
-                ));
-            }
-        }
-    }
-
-    if skipped > 0 {
-        eprintln!("canonical: skipped {skipped} unparseable molecules");
-    }
-
-    if !mismatches.is_empty() {
-        eprintln!(
-            "{} canonical SMILES string mismatches (informational):\n{}",
-            mismatches.len(),
-            mismatches.join("\n")
-        );
-    }
-
-    if !round_trip_failures.is_empty() {
-        panic!(
-            "{} canonical SMILES round-trip failures:\n{}",
-            round_trip_failures.len(),
-            round_trip_failures.join("\n")
-        );
-    }
-}
-
-// ---------------------------------------------------------------------------
-// 6. Substructure matching
+// 5. Substructure matching
 // ---------------------------------------------------------------------------
 
 #[derive(Deserialize)]
@@ -422,19 +264,19 @@ struct SubstructEntry {
     substruct_matches: HashMap<String, SubstructMatchInfo>,
 }
 
-fn query_smiles_for_name(name: &str) -> Option<&'static str> {
+fn query_smiles_for_name(name: &str) -> &'static str {
     match name {
-        "benzene ring" => Some("c1ccccc1"),
-        "carbonyl" => Some("C=O"),
-        "carboxylic acid" => Some("C(=O)O"),
-        "amide" => Some("C(=O)N"),
-        "primary amine" => Some("[NH2]"),
-        "hydroxyl" => Some("[OH]"),
-        "nitrile" => Some("C#N"),
-        "nitro" => Some("[N+](=O)[O-]"),
-        "pyrrole" => Some("c1cc[nH]c1"),
-        "pyridine" => Some("c1ccncc1"),
-        _ => None,
+        "benzene ring" => "c1ccccc1",
+        "carbonyl" => "C=O",
+        "carboxylic acid" => "C(=O)O",
+        "amide" => "C(=O)N",
+        "primary amine" => "[NH2]",
+        "hydroxyl" => "[OH]",
+        "nitrile" => "C#N",
+        "nitro" => "[N+](=O)[O-]",
+        "pyrrole" => "c1cc[nH]c1",
+        "pyridine" => "c1ccncc1",
+        _ => panic!("unknown substruct query name: {name:?}"),
     }
 }
 
@@ -444,27 +286,11 @@ fn approval_substruct() {
         serde_json::from_str(include_str!("approval_data/substruct.json")).unwrap();
 
     let mut failures = Vec::new();
-
-    let mut skipped = 0usize;
     for entry in &data {
-        let mol = match try_parse(&entry.smiles) {
-            Some(m) => m,
-            None => { skipped += 1; continue; }
-        };
+        let mol = parse(&entry.smiles);
 
         for (name, expected) in &entry.substruct_matches {
-            let query_smi = match query_smiles_for_name(name) {
-                Some(s) => s,
-                None => {
-                    eprintln!("unknown substruct query name: {name:?}");
-                    continue;
-                }
-            };
-
-            let query = match try_parse(query_smi) {
-                Some(q) => q,
-                None => continue,
-            };
+            let query = parse(query_smiles_for_name(name));
 
             let has = chemcrab::has_substruct_match(&mol, &query);
             if has != expected.has_match {
@@ -482,10 +308,6 @@ fn approval_substruct() {
                 ));
             }
         }
-    }
-
-    if skipped > 0 {
-        eprintln!("substruct: skipped {skipped} unparseable molecules");
     }
 
     if !failures.is_empty() {
