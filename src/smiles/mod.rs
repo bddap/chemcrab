@@ -441,6 +441,23 @@ mod tests {
     }
 
     #[test]
+    fn bare_hydrogen() {
+        let mol = parse_smiles("H").unwrap();
+        assert_eq!(mol.atom_count(), 1);
+        assert_eq!(atom(&mol, 0).atomic_num, 1);
+        assert_eq!(atom(&mol, 0).hydrogen_count, 1);
+    }
+
+    #[test]
+    fn bare_hydrogen_bonded() {
+        let mol = parse_smiles("HH").unwrap();
+        assert_eq!(mol.atom_count(), 2);
+        assert_eq!(mol.bond_count(), 1);
+        assert_eq!(atom(&mol, 0).hydrogen_count, 0);
+        assert_eq!(atom(&mol, 1).hydrogen_count, 0);
+    }
+
+    #[test]
     fn explicit_single_bond() {
         let mol = parse_smiles("C-C").unwrap();
         assert_eq!(mol.atom_count(), 2);

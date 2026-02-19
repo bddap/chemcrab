@@ -144,11 +144,13 @@ fn write_bond_symbol(order: BondOrder, from: &Atom, to: &Atom, out: &mut String)
 }
 
 fn write_ring_digit(id: usize, out: &mut String) {
+    assert!(id <= 99, "ring id {id} exceeds SMILES maximum of 99");
     if id <= 9 {
         out.push(char::from(b'0' + id as u8));
     } else {
         out.push('%');
-        out.push_str(&id.to_string());
+        out.push(char::from(b'0' + (id / 10) as u8));
+        out.push(char::from(b'0' + (id % 10) as u8));
     }
 }
 

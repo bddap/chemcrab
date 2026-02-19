@@ -67,7 +67,7 @@ pub fn mol_formula<A: HasAtomicNum + HasHydrogenCount + HasFormalCharge, B>(
         }
         std::cmp::Ordering::Less => {
             if net_charge < -1 {
-                write!(result, "{}−", net_charge.unsigned_abs()).unwrap();
+                write!(result, "{}-", net_charge.unsigned_abs()).unwrap();
             } else {
                 result.push('-');
             }
@@ -186,6 +186,14 @@ mod tests {
     fn h2_formula() {
         let mol = parse_smiles("[HH]").unwrap();
         assert_eq!(mol_formula(&mol), "H2");
+    }
+
+    #[test]
+    fn oxide_dianion_formula() {
+        let mol = parse_smiles("[O-2]").unwrap();
+        let f = mol_formula(&mol);
+        assert_eq!(f, "O2-");
+        assert!(!f.contains('\u{2212}'), "should use ASCII minus, not Unicode minus");
     }
 
     #[test]

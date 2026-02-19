@@ -98,6 +98,10 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, SmilesError> {
                 tokens.push(Token::Atom(bare_atom(Element::F, false, i)));
                 i += 1;
             }
+            'H' => {
+                tokens.push(Token::Atom(bare_atom(Element::H, false, i)));
+                i += 1;
+            }
             'I' => {
                 tokens.push(Token::Atom(bare_atom(Element::I, false, i)));
                 i += 1;
@@ -167,9 +171,10 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, SmilesError> {
                 i += 1;
             }
             '%' => {
-                let (bond_tok, digit, next) = parse_percent_ring(&chars, i, &tokens)?;
+                let pending_bond = try_consume_pending_bond(&mut tokens);
+                let (digit, next) = parse_percent_ring(&chars, i)?;
                 tokens.push(Token::RingClosure {
-                    bond: bond_tok,
+                    bond: pending_bond,
                     digit,
                     pos: i,
                 });
@@ -227,8 +232,7 @@ fn try_consume_pending_bond(tokens: &mut Vec<Token>) -> Option<BondToken> {
 fn parse_percent_ring(
     chars: &[char],
     start: usize,
-    _tokens: &[Token],
-) -> Result<(Option<BondToken>, u16, usize), SmilesError> {
+) -> Result<(u16, usize), SmilesError> {
     let i = start + 1;
     if i + 1 >= chars.len() || !chars[i].is_ascii_digit() || !chars[i + 1].is_ascii_digit() {
         return Err(SmilesError::UnexpectedChar {
@@ -240,7 +244,7 @@ fn parse_percent_ring(
     let d2 = (chars[i + 1] as u16) - b'0' as u16;
     let digit = d1 * 10 + d2;
 
-    Ok((None, digit, i + 2))
+    Ok((digit, i + 2))
 }
 
 fn parse_bracket_atom(chars: &[char], start: usize) -> Result<(AtomToken, usize), SmilesError> {
@@ -524,6 +528,25 @@ mod tests {
             &tokens[1],
             Token::RingClosure { digit: 10, .. }
         ));
+    }
+
+    #[test]
+    fn tokenize_percent_ring_with_bond() {
+        let tokens = tokenize("C=%10CC=%10").unwrap();
+        match &tokens[1] {
+            Token::RingClosure { bond, digit, .. } => {
+                assert_eq!(*digit, 10);
+                assert_eq!(*bond, Some(BondToken::Double));
+            }
+            _ => panic!("expected ring closure"),
+        }
+        match &tokens[4] {
+            Token::RingClosure { bond, digit, .. } => {
+                assert_eq!(*digit, 10);
+                assert_eq!(*bond, Some(BondToken::Double));
+            }
+            _ => panic!("expected ring closure"),
+        }
     }
 
     #[test]
