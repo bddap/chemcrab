@@ -1,0 +1,655 @@
+[
+  {
+    "smiles": "C",
+    "num_rings": 0,
+    "ring_sizes": [],
+    "num_ring_atoms": 0,
+    "num_ring_bonds": 0
+  },
+  {
+    "smiles": "CC",
+    "num_rings": 0,
+    "ring_sizes": [],
+    "num_ring_atoms": 0,
+    "num_ring_bonds": 0
+  },
+  {
+    "smiles": "CCC",
+    "num_rings": 0,
+    "ring_sizes": [],
+    "num_ring_atoms": 0,
+    "num_ring_bonds": 0
+  },
+  {
+    "smiles": "CCCC",
+    "num_rings": 0,
+    "ring_sizes": [],
+    "num_ring_atoms": 0,
+    "num_ring_bonds": 0
+  },
+  {
+    "smiles": "CC(C)C",
+    "num_rings": 0,
+    "ring_sizes": [],
+    "num_ring_atoms": 0,
+    "num_ring_bonds": 0
+  },
+  {
+    "smiles": "C=C",
+    "num_rings": 0,
+    "ring_sizes": [],
+    "num_ring_atoms": 0,
+    "num_ring_bonds": 0
+  },
+  {
+    "smiles": "C#C",
+    "num_rings": 0,
+    "ring_sizes": [],
+    "num_ring_atoms": 0,
+    "num_ring_bonds": 0
+  },
+  {
+    "smiles": "C=CC=C",
+    "num_rings": 0,
+    "ring_sizes": [],
+    "num_ring_atoms": 0,
+    "num_ring_bonds": 0
+  },
+  {
+    "smiles": "CC=CC",
+    "num_rings": 0,
+    "ring_sizes": [],
+    "num_ring_atoms": 0,
+    "num_ring_bonds": 0
+  },
+  {
+    "smiles": "CCO",
+    "num_rings": 0,
+    "ring_sizes": [],
+    "num_ring_atoms": 0,
+    "num_ring_bonds": 0
+  },
+  {
+    "smiles": "CC=O",
+    "num_rings": 0,
+    "ring_sizes": [],
+    "num_ring_atoms": 0,
+    "num_ring_bonds": 0
+  },
+  {
+    "smiles": "CC(=O)O",
+    "num_rings": 0,
+    "ring_sizes": [],
+    "num_ring_atoms": 0,
+    "num_ring_bonds": 0
+  },
+  {
+    "smiles": "COC(C)=O",
+    "num_rings": 0,
+    "ring_sizes": [],
+    "num_ring_atoms": 0,
+    "num_ring_bonds": 0
+  },
+  {
+    "smiles": "CCN",
+    "num_rings": 0,
+    "ring_sizes": [],
+    "num_ring_atoms": 0,
+    "num_ring_bonds": 0
+  },
+  {
+    "smiles": "CC(N)=O",
+    "num_rings": 0,
+    "ring_sizes": [],
+    "num_ring_atoms": 0,
+    "num_ring_bonds": 0
+  },
+  {
+    "smiles": "c1ccccc1",
+    "num_rings": 1,
+    "ring_sizes": [
+      6
+    ],
+    "num_ring_atoms": 6,
+    "num_ring_bonds": 6
+  },
+  {
+    "smiles": "c1ccncc1",
+    "num_rings": 1,
+    "ring_sizes": [
+      6
+    ],
+    "num_ring_atoms": 6,
+    "num_ring_bonds": 6
+  },
+  {
+    "smiles": "c1cc[nH]c1",
+    "num_rings": 1,
+    "ring_sizes": [
+      5
+    ],
+    "num_ring_atoms": 5,
+    "num_ring_bonds": 5
+  },
+  {
+    "smiles": "c1ccoc1",
+    "num_rings": 1,
+    "ring_sizes": [
+      5
+    ],
+    "num_ring_atoms": 5,
+    "num_ring_bonds": 5
+  },
+  {
+    "smiles": "c1ccsc1",
+    "num_rings": 1,
+    "ring_sizes": [
+      5
+    ],
+    "num_ring_atoms": 5,
+    "num_ring_bonds": 5
+  },
+  {
+    "smiles": "c1ccc2ccccc2c1",
+    "num_rings": 2,
+    "ring_sizes": [
+      6,
+      6
+    ],
+    "num_ring_atoms": 10,
+    "num_ring_bonds": 11
+  },
+  {
+    "smiles": "c1ccc2[nH]ccc2c1",
+    "num_rings": 2,
+    "ring_sizes": [
+      5,
+      6
+    ],
+    "num_ring_atoms": 9,
+    "num_ring_bonds": 10
+  },
+  {
+    "smiles": "[NH4+]",
+    "num_rings": 0,
+    "ring_sizes": [],
+    "num_ring_atoms": 0,
+    "num_ring_bonds": 0
+  },
+  {
+    "smiles": "[O-]",
+    "num_rings": 0,
+    "ring_sizes": [],
+    "num_ring_atoms": 0,
+    "num_ring_bonds": 0
+  },
+  {
+    "smiles": "[Cl-].[Na+]",
+    "num_rings": 0,
+    "ring_sizes": [],
+    "num_ring_atoms": 0,
+    "num_ring_bonds": 0
+  },
+  {
+    "smiles": "CC(=O)[O-]",
+    "num_rings": 0,
+    "ring_sizes": [],
+    "num_ring_atoms": 0,
+    "num_ring_bonds": 0
+  },
+  {
+    "smiles": "[NH3+]CC(=O)[O-]",
+    "num_rings": 0,
+    "ring_sizes": [],
+    "num_ring_atoms": 0,
+    "num_ring_bonds": 0
+  },
+  {
+    "smiles": "[2H]C([2H])([2H])[2H]",
+    "num_rings": 0,
+    "ring_sizes": [],
+    "num_ring_atoms": 0,
+    "num_ring_bonds": 0
+  },
+  {
+    "smiles": "[13C]c1ccccc1",
+    "num_rings": 1,
+    "ring_sizes": [
+      6
+    ],
+    "num_ring_atoms": 6,
+    "num_ring_bonds": 6
+  },
+  {
+    "smiles": "F[C@H](Cl)Br",
+    "num_rings": 0,
+    "ring_sizes": [],
+    "num_ring_atoms": 0,
+    "num_ring_bonds": 0
+  },
+  {
+    "smiles": "F[C@@H](Cl)Br",
+    "num_rings": 0,
+    "ring_sizes": [],
+    "num_ring_atoms": 0,
+    "num_ring_bonds": 0
+  },
+  {
+    "smiles": "C[C@@H](N)O",
+    "num_rings": 0,
+    "ring_sizes": [],
+    "num_ring_atoms": 0,
+    "num_ring_bonds": 0
+  },
+  {
+    "smiles": "C[C@H](N)O",
+    "num_rings": 0,
+    "ring_sizes": [],
+    "num_ring_atoms": 0,
+    "num_ring_bonds": 0
+  },
+  {
+    "smiles": "CC[C@@H](C)O",
+    "num_rings": 0,
+    "ring_sizes": [],
+    "num_ring_atoms": 0,
+    "num_ring_bonds": 0
+  },
+  {
+    "smiles": "CC[C@H](C)O",
+    "num_rings": 0,
+    "ring_sizes": [],
+    "num_ring_atoms": 0,
+    "num_ring_bonds": 0
+  },
+  {
+    "smiles": "C[C@H](N)C(=O)O",
+    "num_rings": 0,
+    "ring_sizes": [],
+    "num_ring_atoms": 0,
+    "num_ring_bonds": 0
+  },
+  {
+    "smiles": "C[C@@H](N)C(=O)O",
+    "num_rings": 0,
+    "ring_sizes": [],
+    "num_ring_atoms": 0,
+    "num_ring_bonds": 0
+  },
+  {
+    "smiles": "F/C=C/F",
+    "num_rings": 0,
+    "ring_sizes": [],
+    "num_ring_atoms": 0,
+    "num_ring_bonds": 0
+  },
+  {
+    "smiles": "F/C=C\\F",
+    "num_rings": 0,
+    "ring_sizes": [],
+    "num_ring_atoms": 0,
+    "num_ring_bonds": 0
+  },
+  {
+    "smiles": "CC/C=C/CC",
+    "num_rings": 0,
+    "ring_sizes": [],
+    "num_ring_atoms": 0,
+    "num_ring_bonds": 0
+  },
+  {
+    "smiles": "CC/C=C\\CC",
+    "num_rings": 0,
+    "ring_sizes": [],
+    "num_ring_atoms": 0,
+    "num_ring_bonds": 0
+  },
+  {
+    "smiles": "Cl/C=C/Br",
+    "num_rings": 0,
+    "ring_sizes": [],
+    "num_ring_atoms": 0,
+    "num_ring_bonds": 0
+  },
+  {
+    "smiles": "C1CC1",
+    "num_rings": 1,
+    "ring_sizes": [
+      3
+    ],
+    "num_ring_atoms": 3,
+    "num_ring_bonds": 3
+  },
+  {
+    "smiles": "C1CCC1",
+    "num_rings": 1,
+    "ring_sizes": [
+      4
+    ],
+    "num_ring_atoms": 4,
+    "num_ring_bonds": 4
+  },
+  {
+    "smiles": "C1CCCC1",
+    "num_rings": 1,
+    "ring_sizes": [
+      5
+    ],
+    "num_ring_atoms": 5,
+    "num_ring_bonds": 5
+  },
+  {
+    "smiles": "C1CCCCC1",
+    "num_rings": 1,
+    "ring_sizes": [
+      6
+    ],
+    "num_ring_atoms": 6,
+    "num_ring_bonds": 6
+  },
+  {
+    "smiles": "C1CCCCCC1",
+    "num_rings": 1,
+    "ring_sizes": [
+      7
+    ],
+    "num_ring_atoms": 7,
+    "num_ring_bonds": 7
+  },
+  {
+    "smiles": "C1CCCCCCC1",
+    "num_rings": 1,
+    "ring_sizes": [
+      8
+    ],
+    "num_ring_atoms": 8,
+    "num_ring_bonds": 8
+  },
+  {
+    "smiles": "C1CC2CCC(C1)C2",
+    "num_rings": 2,
+    "ring_sizes": [
+      5,
+      6
+    ],
+    "num_ring_atoms": 8,
+    "num_ring_bonds": 9
+  },
+  {
+    "smiles": "C1CCC2CCCC2C1",
+    "num_rings": 2,
+    "ring_sizes": [
+      5,
+      6
+    ],
+    "num_ring_atoms": 9,
+    "num_ring_bonds": 10
+  },
+  {
+    "smiles": "C1CC2CCC1C2",
+    "num_rings": 2,
+    "ring_sizes": [
+      5,
+      5
+    ],
+    "num_ring_atoms": 7,
+    "num_ring_bonds": 8
+  },
+  {
+    "smiles": "C1CCC2(CC1)CCCC2",
+    "num_rings": 2,
+    "ring_sizes": [
+      5,
+      6
+    ],
+    "num_ring_atoms": 10,
+    "num_ring_bonds": 11
+  },
+  {
+    "smiles": "c1ccc2cc3ccccc3cc2c1",
+    "num_rings": 3,
+    "ring_sizes": [
+      6,
+      6,
+      6
+    ],
+    "num_ring_atoms": 14,
+    "num_ring_bonds": 16
+  },
+  {
+    "smiles": "C12C3C4C1C1C2C3C41",
+    "num_rings": 6,
+    "ring_sizes": [
+      4,
+      4,
+      4,
+      4,
+      4,
+      4
+    ],
+    "num_ring_atoms": 8,
+    "num_ring_bonds": 12
+  },
+  {
+    "smiles": "CC(=O)OC(C)=O",
+    "num_rings": 0,
+    "ring_sizes": [],
+    "num_ring_atoms": 0,
+    "num_ring_bonds": 0
+  },
+  {
+    "smiles": "Oc1ccccc1",
+    "num_rings": 1,
+    "ring_sizes": [
+      6
+    ],
+    "num_ring_atoms": 6,
+    "num_ring_bonds": 6
+  },
+  {
+    "smiles": "Nc1ccccc1",
+    "num_rings": 1,
+    "ring_sizes": [
+      6
+    ],
+    "num_ring_atoms": 6,
+    "num_ring_bonds": 6
+  },
+  {
+    "smiles": "O=C(O)c1ccccc1",
+    "num_rings": 1,
+    "ring_sizes": [
+      6
+    ],
+    "num_ring_atoms": 6,
+    "num_ring_bonds": 6
+  },
+  {
+    "smiles": "N#Cc1ccccc1",
+    "num_rings": 1,
+    "ring_sizes": [
+      6
+    ],
+    "num_ring_atoms": 6,
+    "num_ring_bonds": 6
+  },
+  {
+    "smiles": "Sc1ccccc1",
+    "num_rings": 1,
+    "ring_sizes": [
+      6
+    ],
+    "num_ring_atoms": 6,
+    "num_ring_bonds": 6
+  },
+  {
+    "smiles": "O=[N+]([O-])c1ccccc1",
+    "num_rings": 1,
+    "ring_sizes": [
+      6
+    ],
+    "num_ring_atoms": 6,
+    "num_ring_bonds": 6
+  },
+  {
+    "smiles": "CC(C)(C)c1ccccc1",
+    "num_rings": 1,
+    "ring_sizes": [
+      6
+    ],
+    "num_ring_atoms": 6,
+    "num_ring_bonds": 6
+  },
+  {
+    "smiles": "c1ccc(-c2ccccc2)cc1",
+    "num_rings": 2,
+    "ring_sizes": [
+      6,
+      6
+    ],
+    "num_ring_atoms": 12,
+    "num_ring_bonds": 12
+  },
+  {
+    "smiles": "CC(=O)Oc1ccccc1C(=O)O",
+    "num_rings": 1,
+    "ring_sizes": [
+      6
+    ],
+    "num_ring_atoms": 6,
+    "num_ring_bonds": 6
+  },
+  {
+    "smiles": "CC12CCC3C(CCC4CC(=O)CCC43C)C1CCC2O",
+    "num_rings": 4,
+    "ring_sizes": [
+      5,
+      6,
+      6,
+      6
+    ],
+    "num_ring_atoms": 17,
+    "num_ring_bonds": 20
+  },
+  {
+    "smiles": "Cn1c(=O)c2c(ncn2C)n(C)c1=O",
+    "num_rings": 2,
+    "ring_sizes": [
+      5,
+      6
+    ],
+    "num_ring_atoms": 9,
+    "num_ring_bonds": 10
+  },
+  {
+    "smiles": "CC(C)Cc1ccc(C(C)C(=O)O)cc1",
+    "num_rings": 1,
+    "ring_sizes": [
+      6
+    ],
+    "num_ring_atoms": 6,
+    "num_ring_bonds": 6
+  },
+  {
+    "smiles": "OC[C@H]1OC(O)[C@H](O)[C@@H](O)[C@@H]1O",
+    "num_rings": 1,
+    "ring_sizes": [
+      6
+    ],
+    "num_ring_atoms": 6,
+    "num_ring_bonds": 6
+  },
+  {
+    "smiles": "[CH3]",
+    "num_rings": 0,
+    "ring_sizes": [],
+    "num_ring_atoms": 0,
+    "num_ring_bonds": 0
+  },
+  {
+    "smiles": "[NH2]",
+    "num_rings": 0,
+    "ring_sizes": [],
+    "num_ring_atoms": 0,
+    "num_ring_bonds": 0
+  },
+  {
+    "smiles": "[OH]",
+    "num_rings": 0,
+    "ring_sizes": [],
+    "num_ring_atoms": 0,
+    "num_ring_bonds": 0
+  },
+  {
+    "smiles": "C1CCCCCCCCCCC1",
+    "num_rings": 1,
+    "ring_sizes": [
+      12
+    ],
+    "num_ring_atoms": 12,
+    "num_ring_bonds": 12
+  },
+  {
+    "smiles": "CC.CC",
+    "num_rings": 0,
+    "ring_sizes": [],
+    "num_ring_atoms": 0,
+    "num_ring_bonds": 0
+  },
+  {
+    "smiles": "c1ccccc1.c1ccncc1",
+    "num_rings": 2,
+    "ring_sizes": [
+      6,
+      6
+    ],
+    "num_ring_atoms": 12,
+    "num_ring_bonds": 12
+  },
+  {
+    "smiles": "B",
+    "num_rings": 0,
+    "ring_sizes": [],
+    "num_ring_atoms": 0,
+    "num_ring_bonds": 0
+  },
+  {
+    "smiles": "c1ccc(B2Oc3ccccc3O2)cc1",
+    "num_rings": 3,
+    "ring_sizes": [
+      5,
+      6,
+      6
+    ],
+    "num_ring_atoms": 15,
+    "num_ring_bonds": 16
+  },
+  {
+    "smiles": "P",
+    "num_rings": 0,
+    "ring_sizes": [],
+    "num_ring_atoms": 0,
+    "num_ring_bonds": 0
+  },
+  {
+    "smiles": "S",
+    "num_rings": 0,
+    "ring_sizes": [],
+    "num_ring_atoms": 0,
+    "num_ring_bonds": 0
+  },
+  {
+    "smiles": "CS(C)(=O)=O",
+    "num_rings": 0,
+    "ring_sizes": [],
+    "num_ring_atoms": 0,
+    "num_ring_bonds": 0
+  },
+  {
+    "smiles": "O=P(O)(O)O",
+    "num_rings": 0,
+    "ring_sizes": [],
+    "num_ring_atoms": 0,
+    "num_ring_bonds": 0
+  }
+]

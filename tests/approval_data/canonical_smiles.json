@@ -1,0 +1,407 @@
+[
+  {
+    "input": "C",
+    "canonical_isomeric": "C",
+    "canonical_non_isomeric": "C"
+  },
+  {
+    "input": "CC",
+    "canonical_isomeric": "CC",
+    "canonical_non_isomeric": "CC"
+  },
+  {
+    "input": "CCC",
+    "canonical_isomeric": "CCC",
+    "canonical_non_isomeric": "CCC"
+  },
+  {
+    "input": "CCCC",
+    "canonical_isomeric": "CCCC",
+    "canonical_non_isomeric": "CCCC"
+  },
+  {
+    "input": "C(C)(C)C",
+    "canonical_isomeric": "CC(C)C",
+    "canonical_non_isomeric": "CC(C)C"
+  },
+  {
+    "input": "C=C",
+    "canonical_isomeric": "C=C",
+    "canonical_non_isomeric": "C=C"
+  },
+  {
+    "input": "C#C",
+    "canonical_isomeric": "C#C",
+    "canonical_non_isomeric": "C#C"
+  },
+  {
+    "input": "C=CC=C",
+    "canonical_isomeric": "C=CC=C",
+    "canonical_non_isomeric": "C=CC=C"
+  },
+  {
+    "input": "CC=CC",
+    "canonical_isomeric": "CC=CC",
+    "canonical_non_isomeric": "CC=CC"
+  },
+  {
+    "input": "CCO",
+    "canonical_isomeric": "CCO",
+    "canonical_non_isomeric": "CCO"
+  },
+  {
+    "input": "CC=O",
+    "canonical_isomeric": "CC=O",
+    "canonical_non_isomeric": "CC=O"
+  },
+  {
+    "input": "CC(=O)O",
+    "canonical_isomeric": "CC(=O)O",
+    "canonical_non_isomeric": "CC(=O)O"
+  },
+  {
+    "input": "CC(=O)OC",
+    "canonical_isomeric": "COC(C)=O",
+    "canonical_non_isomeric": "COC(C)=O"
+  },
+  {
+    "input": "CCN",
+    "canonical_isomeric": "CCN",
+    "canonical_non_isomeric": "CCN"
+  },
+  {
+    "input": "CC(=O)N",
+    "canonical_isomeric": "CC(N)=O",
+    "canonical_non_isomeric": "CC(N)=O"
+  },
+  {
+    "input": "c1ccccc1",
+    "canonical_isomeric": "c1ccccc1",
+    "canonical_non_isomeric": "c1ccccc1"
+  },
+  {
+    "input": "c1ccncc1",
+    "canonical_isomeric": "c1ccncc1",
+    "canonical_non_isomeric": "c1ccncc1"
+  },
+  {
+    "input": "c1cc[nH]c1",
+    "canonical_isomeric": "c1cc[nH]c1",
+    "canonical_non_isomeric": "c1cc[nH]c1"
+  },
+  {
+    "input": "c1ccoc1",
+    "canonical_isomeric": "c1ccoc1",
+    "canonical_non_isomeric": "c1ccoc1"
+  },
+  {
+    "input": "c1ccsc1",
+    "canonical_isomeric": "c1ccsc1",
+    "canonical_non_isomeric": "c1ccsc1"
+  },
+  {
+    "input": "c1ccc2ccccc2c1",
+    "canonical_isomeric": "c1ccc2ccccc2c1",
+    "canonical_non_isomeric": "c1ccc2ccccc2c1"
+  },
+  {
+    "input": "c1ccc2[nH]ccc2c1",
+    "canonical_isomeric": "c1ccc2[nH]ccc2c1",
+    "canonical_non_isomeric": "c1ccc2[nH]ccc2c1"
+  },
+  {
+    "input": "c1cccc2ccccc12",
+    "canonical_isomeric": "c1ccc2ccccc2c1",
+    "canonical_non_isomeric": "c1ccc2ccccc2c1"
+  },
+  {
+    "input": "[NH4+]",
+    "canonical_isomeric": "[NH4+]",
+    "canonical_non_isomeric": "[NH4+]"
+  },
+  {
+    "input": "[O-]",
+    "canonical_isomeric": "[O-]",
+    "canonical_non_isomeric": "[O-]"
+  },
+  {
+    "input": "[Na+].[Cl-]",
+    "canonical_isomeric": "[Cl-].[Na+]",
+    "canonical_non_isomeric": "[Cl-].[Na+]"
+  },
+  {
+    "input": "CC(=O)[O-]",
+    "canonical_isomeric": "CC(=O)[O-]",
+    "canonical_non_isomeric": "CC(=O)[O-]"
+  },
+  {
+    "input": "[NH3+]CC(=O)[O-]",
+    "canonical_isomeric": "[NH3+]CC(=O)[O-]",
+    "canonical_non_isomeric": "[NH3+]CC(=O)[O-]"
+  },
+  {
+    "input": "[2H]C([2H])([2H])[2H]",
+    "canonical_isomeric": "[2H]C([2H])([2H])[2H]",
+    "canonical_non_isomeric": "[H]C([H])([H])[H]"
+  },
+  {
+    "input": "[13C]c1ccccc1",
+    "canonical_isomeric": "[13C]c1ccccc1",
+    "canonical_non_isomeric": "[C]c1ccccc1"
+  },
+  {
+    "input": "[C@@H](F)(Cl)Br",
+    "canonical_isomeric": "F[C@H](Cl)Br",
+    "canonical_non_isomeric": "FC(Cl)Br"
+  },
+  {
+    "input": "[C@H](F)(Cl)Br",
+    "canonical_isomeric": "F[C@@H](Cl)Br",
+    "canonical_non_isomeric": "FC(Cl)Br"
+  },
+  {
+    "input": "[C@@H](O)(N)C",
+    "canonical_isomeric": "C[C@@H](N)O",
+    "canonical_non_isomeric": "CC(N)O"
+  },
+  {
+    "input": "[C@H](O)(N)C",
+    "canonical_isomeric": "C[C@H](N)O",
+    "canonical_non_isomeric": "CC(N)O"
+  },
+  {
+    "input": "C[C@@H](O)CC",
+    "canonical_isomeric": "CC[C@@H](C)O",
+    "canonical_non_isomeric": "CCC(C)O"
+  },
+  {
+    "input": "C[C@H](O)CC",
+    "canonical_isomeric": "CC[C@H](C)O",
+    "canonical_non_isomeric": "CCC(C)O"
+  },
+  {
+    "input": "N[C@@H](C)C(=O)O",
+    "canonical_isomeric": "C[C@H](N)C(=O)O",
+    "canonical_non_isomeric": "CC(N)C(=O)O"
+  },
+  {
+    "input": "N[C@H](C)C(=O)O",
+    "canonical_isomeric": "C[C@@H](N)C(=O)O",
+    "canonical_non_isomeric": "CC(N)C(=O)O"
+  },
+  {
+    "input": "F/C=C/F",
+    "canonical_isomeric": "F/C=C/F",
+    "canonical_non_isomeric": "FC=CF"
+  },
+  {
+    "input": "F/C=C\\F",
+    "canonical_isomeric": "F/C=C\\F",
+    "canonical_non_isomeric": "FC=CF"
+  },
+  {
+    "input": "CC/C=C/CC",
+    "canonical_isomeric": "CC/C=C/CC",
+    "canonical_non_isomeric": "CCC=CCC"
+  },
+  {
+    "input": "CC/C=C\\CC",
+    "canonical_isomeric": "CC/C=C\\CC",
+    "canonical_non_isomeric": "CCC=CCC"
+  },
+  {
+    "input": "Cl/C=C/Br",
+    "canonical_isomeric": "Cl/C=C/Br",
+    "canonical_non_isomeric": "ClC=CBr"
+  },
+  {
+    "input": "C1CC1",
+    "canonical_isomeric": "C1CC1",
+    "canonical_non_isomeric": "C1CC1"
+  },
+  {
+    "input": "C1CCC1",
+    "canonical_isomeric": "C1CCC1",
+    "canonical_non_isomeric": "C1CCC1"
+  },
+  {
+    "input": "C1CCCC1",
+    "canonical_isomeric": "C1CCCC1",
+    "canonical_non_isomeric": "C1CCCC1"
+  },
+  {
+    "input": "C1CCCCC1",
+    "canonical_isomeric": "C1CCCCC1",
+    "canonical_non_isomeric": "C1CCCCC1"
+  },
+  {
+    "input": "C1CCCCCC1",
+    "canonical_isomeric": "C1CCCCCC1",
+    "canonical_non_isomeric": "C1CCCCCC1"
+  },
+  {
+    "input": "C1CCCCCCC1",
+    "canonical_isomeric": "C1CCCCCCC1",
+    "canonical_non_isomeric": "C1CCCCCCC1"
+  },
+  {
+    "input": "C1CC2CCCC1C2",
+    "canonical_isomeric": "C1CC2CCC(C1)C2",
+    "canonical_non_isomeric": "C1CC2CCC(C1)C2"
+  },
+  {
+    "input": "C1CC2CCCCC2C1",
+    "canonical_isomeric": "C1CCC2CCCC2C1",
+    "canonical_non_isomeric": "C1CCC2CCCC2C1"
+  },
+  {
+    "input": "C1CC2CC1CC2",
+    "canonical_isomeric": "C1CC2CCC1C2",
+    "canonical_non_isomeric": "C1CC2CCC1C2"
+  },
+  {
+    "input": "C1CCC2(CC1)CCCC2",
+    "canonical_isomeric": "C1CCC2(CC1)CCCC2",
+    "canonical_non_isomeric": "C1CCC2(CC1)CCCC2"
+  },
+  {
+    "input": "c1ccc2cc3ccccc3cc2c1",
+    "canonical_isomeric": "c1ccc2cc3ccccc3cc2c1",
+    "canonical_non_isomeric": "c1ccc2cc3ccccc3cc2c1"
+  },
+  {
+    "input": "C12C3C4C1C5C2C3C45",
+    "canonical_isomeric": "C12C3C4C1C1C2C3C41",
+    "canonical_non_isomeric": "C12C3C4C1C1C2C3C41"
+  },
+  {
+    "input": "CC(=O)OC(C)=O",
+    "canonical_isomeric": "CC(=O)OC(C)=O",
+    "canonical_non_isomeric": "CC(=O)OC(C)=O"
+  },
+  {
+    "input": "c1ccc(O)cc1",
+    "canonical_isomeric": "Oc1ccccc1",
+    "canonical_non_isomeric": "Oc1ccccc1"
+  },
+  {
+    "input": "c1ccc(N)cc1",
+    "canonical_isomeric": "Nc1ccccc1",
+    "canonical_non_isomeric": "Nc1ccccc1"
+  },
+  {
+    "input": "c1ccc(C(=O)O)cc1",
+    "canonical_isomeric": "O=C(O)c1ccccc1",
+    "canonical_non_isomeric": "O=C(O)c1ccccc1"
+  },
+  {
+    "input": "c1ccc(C#N)cc1",
+    "canonical_isomeric": "N#Cc1ccccc1",
+    "canonical_non_isomeric": "N#Cc1ccccc1"
+  },
+  {
+    "input": "c1ccc(S)cc1",
+    "canonical_isomeric": "Sc1ccccc1",
+    "canonical_non_isomeric": "Sc1ccccc1"
+  },
+  {
+    "input": "c1ccc([N+](=O)[O-])cc1",
+    "canonical_isomeric": "O=[N+]([O-])c1ccccc1",
+    "canonical_non_isomeric": "O=[N+]([O-])c1ccccc1"
+  },
+  {
+    "input": "CC(C)(C)c1ccccc1",
+    "canonical_isomeric": "CC(C)(C)c1ccccc1",
+    "canonical_non_isomeric": "CC(C)(C)c1ccccc1"
+  },
+  {
+    "input": "c1ccc(-c2ccccc2)cc1",
+    "canonical_isomeric": "c1ccc(-c2ccccc2)cc1",
+    "canonical_non_isomeric": "c1ccc(-c2ccccc2)cc1"
+  },
+  {
+    "input": "CC(=O)Oc1ccccc1C(=O)O",
+    "canonical_isomeric": "CC(=O)Oc1ccccc1C(=O)O",
+    "canonical_non_isomeric": "CC(=O)Oc1ccccc1C(=O)O"
+  },
+  {
+    "input": "CC12CCC3C(CCC4CC(=O)CCC43C)C1CCC2O",
+    "canonical_isomeric": "CC12CCC3C(CCC4CC(=O)CCC43C)C1CCC2O",
+    "canonical_non_isomeric": "CC12CCC3C(CCC4CC(=O)CCC43C)C1CCC2O"
+  },
+  {
+    "input": "CN1C=NC2=C1C(=O)N(C(=O)N2C)C",
+    "canonical_isomeric": "Cn1c(=O)c2c(ncn2C)n(C)c1=O",
+    "canonical_non_isomeric": "Cn1c(=O)c2c(ncn2C)n(C)c1=O"
+  },
+  {
+    "input": "CC(C)Cc1ccc(C(C)C(=O)O)cc1",
+    "canonical_isomeric": "CC(C)Cc1ccc(C(C)C(=O)O)cc1",
+    "canonical_non_isomeric": "CC(C)Cc1ccc(C(C)C(=O)O)cc1"
+  },
+  {
+    "input": "OC[C@H]1OC(O)[C@H](O)[C@@H](O)[C@@H]1O",
+    "canonical_isomeric": "OC[C@H]1OC(O)[C@H](O)[C@@H](O)[C@@H]1O",
+    "canonical_non_isomeric": "OCC1OC(O)C(O)C(O)C1O"
+  },
+  {
+    "input": "[CH3]",
+    "canonical_isomeric": "[CH3]",
+    "canonical_non_isomeric": "[CH3]"
+  },
+  {
+    "input": "[NH2]",
+    "canonical_isomeric": "[NH2]",
+    "canonical_non_isomeric": "[NH2]"
+  },
+  {
+    "input": "[OH]",
+    "canonical_isomeric": "[OH]",
+    "canonical_non_isomeric": "[OH]"
+  },
+  {
+    "input": "C1CCCCCCCCCCC1",
+    "canonical_isomeric": "C1CCCCCCCCCCC1",
+    "canonical_non_isomeric": "C1CCCCCCCCCCC1"
+  },
+  {
+    "input": "CC.CC",
+    "canonical_isomeric": "CC.CC",
+    "canonical_non_isomeric": "CC.CC"
+  },
+  {
+    "input": "c1ccccc1.c1ccncc1",
+    "canonical_isomeric": "c1ccccc1.c1ccncc1",
+    "canonical_non_isomeric": "c1ccccc1.c1ccncc1"
+  },
+  {
+    "input": "B",
+    "canonical_isomeric": "B",
+    "canonical_non_isomeric": "B"
+  },
+  {
+    "input": "c1cc2c(cc1)OB(O2)c1ccccc1",
+    "canonical_isomeric": "c1ccc(B2Oc3ccccc3O2)cc1",
+    "canonical_non_isomeric": "c1ccc(B2Oc3ccccc3O2)cc1"
+  },
+  {
+    "input": "P",
+    "canonical_isomeric": "P",
+    "canonical_non_isomeric": "P"
+  },
+  {
+    "input": "S",
+    "canonical_isomeric": "S",
+    "canonical_non_isomeric": "S"
+  },
+  {
+    "input": "CS(=O)(=O)C",
+    "canonical_isomeric": "CS(C)(=O)=O",
+    "canonical_non_isomeric": "CS(C)(=O)=O"
+  },
+  {
+    "input": "OP(=O)(O)O",
+    "canonical_isomeric": "O=P(O)(O)O",
+    "canonical_non_isomeric": "O=P(O)(O)O"
+  }
+]
