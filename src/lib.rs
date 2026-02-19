@@ -1,6 +1,7 @@
 pub mod atom;
 pub mod bond;
 pub mod element;
+pub mod formula;
 pub mod kekulize;
 pub mod mol;
 pub mod smiles;
@@ -10,6 +11,7 @@ pub mod wrappers;
 pub use atom::{Atom, Chirality};
 pub use bond::{Bond, BondOrder, BondStereo, SmilesBond, SmilesBondOrder};
 pub use element::Element;
+pub use formula::{average_mol_weight, exact_mol_weight, mol_formula};
 pub use kekulize::{kekulize, KekulizeError};
 pub use mol::Mol;
 pub use smiles::{from_smiles, parse_smiles, SmilesError};
