@@ -4,7 +4,8 @@ pub mod query;
 mod writer;
 
 pub use error::SmartsError;
-pub use query::{AtomExpr, BondExpr};
+pub use query::{AtomExpr, BondExpr, Hybridization, RangeKind};
+pub use query::compute_hybridization;
 pub use writer::to_smarts;
 
 use std::collections::{HashMap, HashSet};
@@ -942,5 +943,393 @@ mod tests {
         let q = smarts("[se]");
         let expr = q.atom(NodeIndex::new(0));
         assert!(matches!(expr, AtomExpr::Element { atomic_num: 34, aromatic: Some(true) }));
+    }
+
+    // ---- Non-H degree (d) ----
+
+    #[test]
+    fn parse_non_h_degree() {
+        let q = smarts("[d2]");
+        assert!(matches!(q.atom(NodeIndex::new(0)), AtomExpr::NonHDegree(2)));
+    }
+
+    #[test]
+    fn parse_non_h_degree_bare() {
+        let q = smarts("[d]");
+        assert!(matches!(q.atom(NodeIndex::new(0)), AtomExpr::NonHDegree(1)));
+    }
+
+    #[test]
+    fn match_non_h_degree_1_on_ccc() {
+        let target = mol("CCC");
+        let query = smarts("[d1]");
+        let matches = get_smarts_matches(&target, &query);
+        assert_eq!(matches.len(), 2);
+    }
+
+    #[test]
+    fn match_non_h_degree_2_on_ccc() {
+        let target = mol("CCC");
+        let query = smarts("[d2]");
+        let matches = get_smarts_matches(&target, &query);
+        assert_eq!(matches.len(), 1);
+    }
+
+    #[test]
+    fn match_non_h_degree_3_branched() {
+        let target = mol("CC(C)C");
+        let query = smarts("[d3]");
+        let matches = get_smarts_matches(&target, &query);
+        assert_eq!(matches.len(), 1);
+    }
+
+    // ---- Heteroatom neighbor count (z) ----
+
+    #[test]
+    fn parse_hetero_neighbor_count() {
+        let q = smarts("[z1]");
+        assert!(matches!(
+            q.atom(NodeIndex::new(0)),
+            AtomExpr::HeteroNeighborCount(1)
+        ));
+    }
+
+    #[test]
+    fn parse_hetero_neighbor_bare() {
+        let q = smarts("[z]");
+        assert!(matches!(
+            q.atom(NodeIndex::new(0)),
+            AtomExpr::HasHeteroNeighbor
+        ));
+    }
+
+    #[test]
+    fn match_z0_all_carbon() {
+        let target = mol("CCC");
+        let query = smarts("[z0]");
+        let matches = get_smarts_matches(&target, &query);
+        assert_eq!(matches.len(), 3);
+    }
+
+    #[test]
+    fn match_z1_on_coc_c_n() {
+        // COC(C)N: atom 0=C(bonded to O), 1=O(bonded to C,C), 2=C(bonded to O,C,N), 3=C(bonded to C), 4=N(bonded to C)
+        let target = mol("COC(C)N");
+        let query = smarts("[z1]");
+        let matches = get_smarts_matches(&target, &query);
+        // C(0): neighbor O → 1 heteroatom = yes
+        // O(1): neighbors C,C → 0 heteroatoms = no
+        // C(2): neighbors O,C,N → 2 heteroatoms = no
+        // C(3): neighbor C → 0 heteroatoms = no
+        // N(4): neighbor C → 0 heteroatoms = no
+        assert_eq!(matches.len(), 1);
+    }
+
+    #[test]
+    fn match_z2_on_coc_c_n() {
+        let target = mol("COC(C)N");
+        let query = smarts("[z2]");
+        let matches = get_smarts_matches(&target, &query);
+        // C(2) has O and N neighbors → 2 heteroatoms
+        assert_eq!(matches.len(), 1);
+    }
+
+    #[test]
+    fn match_bare_z_has_any_hetero() {
+        let target = mol("COC(C)N");
+        let query = smarts("[z]");
+        let matches = get_smarts_matches(&target, &query);
+        // C(0): 1 hetero neighbor (O) → yes
+        // O(1): 0 hetero neighbors (C,C) → no
+        // C(2): 2 hetero neighbors (O,N) → yes
+        // C(3): 0 → no
+        // N(4): 0 → no
+        assert_eq!(matches.len(), 2);
+    }
+
+    // ---- Aliphatic heteroatom neighbor count (Z) ----
+
+    #[test]
+    fn parse_aliphatic_hetero_count() {
+        let q = smarts("[Z1]");
+        assert!(matches!(
+            q.atom(NodeIndex::new(0)),
+            AtomExpr::AliphaticHeteroNeighborCount(1)
+        ));
+    }
+
+    #[test]
+    fn parse_aliphatic_hetero_bare() {
+        let q = smarts("[Z]");
+        assert!(matches!(
+            q.atom(NodeIndex::new(0)),
+            AtomExpr::HasAliphaticHeteroNeighbor
+        ));
+    }
+
+    #[test]
+    fn match_big_z1_on_coc_c_n() {
+        let target = mol("COC(C)N");
+        let query = smarts("[Z1]");
+        let matches = get_smarts_matches(&target, &query);
+        // Same as z1 for all-aliphatic molecules
+        assert_eq!(matches.len(), 1);
+    }
+
+    #[test]
+    fn match_big_z0_aromatic_hetero() {
+        // Pyridine: aromatic nitrogen — neighbors see aromatic N which doesn't count for Z
+        let target = mol("c1ccncc1");
+        let query = smarts("[Z0]");
+        let matches = get_smarts_matches(&target, &query);
+        // All atoms in pyridine: neighbors of aromatic carbons adjacent to N
+        // see aromatic N, which is excluded from Z count.
+        // c(0): neighbors c,c → Z=0
+        // c(1): neighbors c,c → Z=0
+        // c(2): neighbors c,n(aromatic) → Z=0 (n is aromatic, excluded)
+        // n(3): neighbors c,c → Z=0
+        // c(4): neighbors n(aromatic),c → Z=0
+        // c(5): neighbors c,c → Z=0
+        assert_eq!(matches.len(), 6);
+    }
+
+    // ---- Hybridization (^) ----
+
+    #[test]
+    fn parse_hybridization_sp3() {
+        let q = smarts("[^3]");
+        assert!(matches!(
+            q.atom(NodeIndex::new(0)),
+            AtomExpr::Hybridization(Hybridization::SP3)
+        ));
+    }
+
+    #[test]
+    fn parse_hybridization_sp2() {
+        let q = smarts("[^2]");
+        assert!(matches!(
+            q.atom(NodeIndex::new(0)),
+            AtomExpr::Hybridization(Hybridization::SP2)
+        ));
+    }
+
+    #[test]
+    fn parse_hybridization_sp() {
+        let q = smarts("[^1]");
+        assert!(matches!(
+            q.atom(NodeIndex::new(0)),
+            AtomExpr::Hybridization(Hybridization::SP)
+        ));
+    }
+
+    #[test]
+    fn match_sp3_ethane() {
+        let target = mol("CC");
+        let query = smarts("[^3]");
+        let matches = get_smarts_matches(&target, &query);
+        assert_eq!(matches.len(), 2);
+    }
+
+    #[test]
+    fn match_sp2_ethene() {
+        let target = mol("C=C");
+        let query = smarts("[^2]");
+        let matches = get_smarts_matches(&target, &query);
+        assert_eq!(matches.len(), 2);
+    }
+
+    #[test]
+    fn match_sp_ethyne() {
+        let target = mol("C#C");
+        let query = smarts("[^1]");
+        let matches = get_smarts_matches(&target, &query);
+        assert_eq!(matches.len(), 2);
+    }
+
+    #[test]
+    fn match_sp2_benzene() {
+        let target = mol("c1ccccc1");
+        let query = smarts("[^2]");
+        let matches = get_smarts_matches(&target, &query);
+        assert_eq!(matches.len(), 6);
+    }
+
+    #[test]
+    fn no_sp3_in_ethene() {
+        let target = mol("C=C");
+        let query = smarts("[^3]");
+        assert!(!has_smarts_match(&target, &query));
+    }
+
+    // ---- Range syntax ({low-high}) ----
+
+    #[test]
+    fn parse_range_degree() {
+        let q = smarts("[D{2-3}]");
+        assert!(matches!(
+            q.atom(NodeIndex::new(0)),
+            AtomExpr::Range {
+                kind: RangeKind::Degree,
+                low: Some(2),
+                high: Some(3)
+            }
+        ));
+    }
+
+    #[test]
+    fn parse_range_open_high() {
+        let q = smarts("[D{2-}]");
+        assert!(matches!(
+            q.atom(NodeIndex::new(0)),
+            AtomExpr::Range {
+                kind: RangeKind::Degree,
+                low: Some(2),
+                high: None
+            }
+        ));
+    }
+
+    #[test]
+    fn parse_range_open_low() {
+        let q = smarts("[D{-2}]");
+        assert!(matches!(
+            q.atom(NodeIndex::new(0)),
+            AtomExpr::Range {
+                kind: RangeKind::Degree,
+                low: None,
+                high: Some(2)
+            }
+        ));
+    }
+
+    #[test]
+    fn match_range_degree_2_3() {
+        // COC(C)N: degrees: C(0)=1, O(1)=2, C(2)=3, C(3)=1, N(4)=1
+        let target = mol("COC(C)N");
+        let query = smarts("[D{2-3}]");
+        let matches = get_smarts_matches(&target, &query);
+        assert_eq!(matches.len(), 2); // O(D=2) and central C(D=3)
+    }
+
+    #[test]
+    fn match_range_degree_2_up() {
+        let target = mol("COC(C)N");
+        let query = smarts("[D{2-}]");
+        let matches = get_smarts_matches(&target, &query);
+        assert_eq!(matches.len(), 2); // D>=2: O(2) and C(3)
+    }
+
+    #[test]
+    fn match_range_degree_up_to_2() {
+        let target = mol("COC(C)N");
+        let query = smarts("[D{-2}]");
+        let matches = get_smarts_matches(&target, &query);
+        assert_eq!(matches.len(), 4); // D<=2: C(1), O(2), C(1), N(1)
+    }
+
+    #[test]
+    fn match_range_non_h_degree() {
+        let target = mol("CCC");
+        let query = smarts("[d{1-2}]");
+        let matches = get_smarts_matches(&target, &query);
+        assert_eq!(matches.len(), 3); // all: d1, d2, d1
+    }
+
+    #[test]
+    fn match_range_valence() {
+        let target = mol("C=C");
+        let query = smarts("[v{3-4}]");
+        let matches = get_smarts_matches(&target, &query);
+        assert_eq!(matches.len(), 2); // both have valence 4
+    }
+
+    #[test]
+    fn match_range_hetero_neighbor() {
+        let target = mol("COC(C)N");
+        let query = smarts("[z{1-2}]");
+        let matches = get_smarts_matches(&target, &query);
+        // C(0): z=1, C(2): z=2
+        assert_eq!(matches.len(), 2);
+    }
+
+    #[test]
+    fn match_range_positive_charge() {
+        let target = mol("[NH4+]");
+        let query = smarts("[+{1-2}]");
+        let matches = get_smarts_matches(&target, &query);
+        assert_eq!(matches.len(), 1);
+    }
+
+    // ---- Writer round-trips for new primitives ----
+
+    #[test]
+    fn writer_round_trip_non_h_degree() {
+        let cases = ["[d1]", "[d2]", "[d3]"];
+        for s in &cases {
+            let q = smarts(s);
+            let written = to_smarts(&q);
+            let reparsed = smarts(&written);
+            assert_eq!(
+                q.atom(NodeIndex::new(0)),
+                reparsed.atom(NodeIndex::new(0)),
+                "round-trip failed for {s}: wrote {written}"
+            );
+        }
+    }
+
+    #[test]
+    fn writer_round_trip_hetero_neighbor() {
+        for s in &["[z0]", "[z1]", "[z2]", "[z]"] {
+            let q = smarts(s);
+            let written = to_smarts(&q);
+            let reparsed = smarts(&written);
+            assert_eq!(
+                q.atom(NodeIndex::new(0)),
+                reparsed.atom(NodeIndex::new(0)),
+                "round-trip failed for {s}: wrote {written}"
+            );
+        }
+    }
+
+    #[test]
+    fn writer_round_trip_aliphatic_hetero() {
+        for s in &["[Z0]", "[Z1]", "[Z]"] {
+            let q = smarts(s);
+            let written = to_smarts(&q);
+            let reparsed = smarts(&written);
+            assert_eq!(
+                q.atom(NodeIndex::new(0)),
+                reparsed.atom(NodeIndex::new(0)),
+                "round-trip failed for {s}: wrote {written}"
+            );
+        }
+    }
+
+    #[test]
+    fn writer_round_trip_hybridization() {
+        for s in &["[^0]", "[^1]", "[^2]", "[^3]", "[^4]", "[^5]"] {
+            let q = smarts(s);
+            let written = to_smarts(&q);
+            let reparsed = smarts(&written);
+            assert_eq!(
+                q.atom(NodeIndex::new(0)),
+                reparsed.atom(NodeIndex::new(0)),
+                "round-trip failed for {s}: wrote {written}"
+            );
+        }
+    }
+
+    #[test]
+    fn writer_round_trip_range() {
+        for s in &["[D{2-3}]", "[D{2-}]", "[D{-2}]", "[d{1-3}]", "[z{0-1}]", "[v{3-4}]"] {
+            let q = smarts(s);
+            let written = to_smarts(&q);
+            let reparsed = smarts(&written);
+            assert_eq!(
+                q.atom(NodeIndex::new(0)),
+                reparsed.atom(NodeIndex::new(0)),
+                "round-trip failed for {s}: wrote {written}"
+            );
+        }
     }
 }

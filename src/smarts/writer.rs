@@ -3,7 +3,7 @@ use petgraph::graph::NodeIndex;
 use crate::element::Element;
 use crate::mol::Mol;
 
-use super::query::{AtomExpr, BondExpr};
+use super::query::{AtomExpr, BondExpr, Hybridization, RangeKind};
 
 pub fn to_smarts(mol: &Mol<AtomExpr, BondExpr>) -> String {
     if mol.atom_count() == 0 {
@@ -282,6 +282,10 @@ fn write_atom_expr_inner(expr: &AtomExpr, out: &mut String) {
             out.push('D');
             out.push_str(&d.to_string());
         }
+        AtomExpr::NonHDegree(d) => {
+            out.push('d');
+            out.push_str(&d.to_string());
+        }
         AtomExpr::Valence(v) => {
             out.push('v');
             out.push_str(&v.to_string());
@@ -318,6 +322,54 @@ fn write_atom_expr_inner(expr: &AtomExpr, out: &mut String) {
                 out.push('-');
                 out.push_str(&c.abs().to_string());
             }
+        }
+        AtomExpr::HeteroNeighborCount(n) => {
+            out.push('z');
+            out.push_str(&n.to_string());
+        }
+        AtomExpr::AliphaticHeteroNeighborCount(n) => {
+            out.push('Z');
+            out.push_str(&n.to_string());
+        }
+        AtomExpr::HasHeteroNeighbor => out.push('z'),
+        AtomExpr::HasAliphaticHeteroNeighbor => out.push('Z'),
+        AtomExpr::Hybridization(h) => {
+            out.push('^');
+            let n = match h {
+                Hybridization::S => 0,
+                Hybridization::SP => 1,
+                Hybridization::SP2 => 2,
+                Hybridization::SP3 => 3,
+                Hybridization::SP3D => 4,
+                Hybridization::SP3D2 => 5,
+            };
+            out.push_str(&n.to_string());
+        }
+        AtomExpr::Range { kind, low, high } => {
+            let ch = match kind {
+                RangeKind::Degree => 'D',
+                RangeKind::NonHDegree => 'd',
+                RangeKind::ImplicitHCount => 'h',
+                RangeKind::SmallestRingSize => 'r',
+                RangeKind::RingMembership => 'R',
+                RangeKind::Valence => 'v',
+                RangeKind::RingBondCount => 'x',
+                RangeKind::Connectivity => 'X',
+                RangeKind::HeteroNeighborCount => 'z',
+                RangeKind::AliphaticHeteroNeighborCount => 'Z',
+                RangeKind::PositiveCharge => '+',
+                RangeKind::NegativeCharge => '-',
+            };
+            out.push(ch);
+            out.push('{');
+            if let Some(lo) = low {
+                out.push_str(&lo.to_string());
+            }
+            out.push('-');
+            if let Some(hi) = high {
+                out.push_str(&hi.to_string());
+            }
+            out.push('}');
         }
         AtomExpr::InRing => out.push('R'),
         AtomExpr::NotInRing => {

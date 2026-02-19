@@ -2,7 +2,7 @@ use crate::element::Element;
 use crate::mol::Mol;
 
 use super::error::SmartsError;
-use super::query::{AtomExpr, BondExpr};
+use super::query::{AtomExpr, BondExpr, Hybridization, RangeKind};
 
 struct Parser<'a> {
     chars: Vec<char>,
@@ -388,16 +388,33 @@ impl<'a> Parser<'a> {
             }
             'D' => {
                 self.pos += 1;
+                if self.peek_is_range() {
+                    return self.parse_range(RangeKind::Degree);
+                }
                 let n = self.parse_number().unwrap_or(1);
                 Ok(AtomExpr::Degree(n as u8))
             }
+            'd' => {
+                self.pos += 1;
+                if self.peek_is_range() {
+                    return self.parse_range(RangeKind::NonHDegree);
+                }
+                let n = self.parse_number().unwrap_or(1);
+                Ok(AtomExpr::NonHDegree(n as u8))
+            }
             'v' => {
                 self.pos += 1;
+                if self.peek_is_range() {
+                    return self.parse_range(RangeKind::Valence);
+                }
                 let n = self.parse_number().unwrap_or(1);
                 Ok(AtomExpr::Valence(n as u8))
             }
             'X' => {
                 self.pos += 1;
+                if self.peek_is_range() {
+                    return self.parse_range(RangeKind::Connectivity);
+                }
                 let n = self.parse_number().unwrap_or(1);
                 Ok(AtomExpr::Connectivity(n as u8))
             }
@@ -406,17 +423,26 @@ impl<'a> Parser<'a> {
                     self.parse_bracket_element()
                 } else {
                     self.pos += 1;
+                    if self.peek_is_range() {
+                        return self.parse_range(RangeKind::ImplicitHCount);
+                    }
                     let n = self.parse_number().unwrap_or(1);
                     Ok(AtomExpr::TotalHCount(n as u8))
                 }
             }
             'h' => {
                 self.pos += 1;
+                if self.peek_is_range() {
+                    return self.parse_range(RangeKind::ImplicitHCount);
+                }
                 let n = self.parse_number().unwrap_or(1);
                 Ok(AtomExpr::ImplicitHCount(n as u8))
             }
             'R' => {
                 self.pos += 1;
+                if self.peek_is_range() {
+                    return self.parse_range(RangeKind::RingMembership);
+                }
                 if self.pos < self.chars.len() && self.chars[self.pos].is_ascii_digit() {
                     let n = self.parse_number().unwrap();
                     if n == 0 {
@@ -430,6 +456,9 @@ impl<'a> Parser<'a> {
             }
             'r' => {
                 self.pos += 1;
+                if self.peek_is_range() {
+                    return self.parse_range(RangeKind::SmallestRingSize);
+                }
                 if self.pos < self.chars.len() && self.chars[self.pos].is_ascii_digit() {
                     let n = self.parse_number().unwrap();
                     Ok(AtomExpr::SmallestRingSize(n as u8))
@@ -439,16 +468,71 @@ impl<'a> Parser<'a> {
             }
             'x' => {
                 self.pos += 1;
+                if self.peek_is_range() {
+                    return self.parse_range(RangeKind::RingBondCount);
+                }
                 let n = self.parse_number().unwrap_or(1);
                 Ok(AtomExpr::RingBondCount(n as u8))
             }
+            'z' => {
+                self.pos += 1;
+                if self.peek_is_range() {
+                    return self.parse_range(RangeKind::HeteroNeighborCount);
+                }
+                if self.pos < self.chars.len() && self.chars[self.pos].is_ascii_digit() {
+                    let n = self.parse_number().unwrap();
+                    Ok(AtomExpr::HeteroNeighborCount(n as u8))
+                } else {
+                    Ok(AtomExpr::HasHeteroNeighbor)
+                }
+            }
+            'Z' => {
+                self.pos += 1;
+                if self.peek_is_range() {
+                    return self.parse_range(RangeKind::AliphaticHeteroNeighborCount);
+                }
+                if self.pos < self.chars.len() && self.chars[self.pos].is_ascii_digit() {
+                    let n = self.parse_number().unwrap();
+                    Ok(AtomExpr::AliphaticHeteroNeighborCount(n as u8))
+                } else {
+                    Ok(AtomExpr::HasAliphaticHeteroNeighbor)
+                }
+            }
+            '^' => {
+                self.pos += 1;
+                let n = self.parse_number().ok_or(SmartsError::InvalidSmarts {
+                    pos: self.pos,
+                    msg: "expected hybridization value 0-5 after '^'".into(),
+                })?;
+                let hyb = match n {
+                    0 => Hybridization::S,
+                    1 => Hybridization::SP,
+                    2 => Hybridization::SP2,
+                    3 => Hybridization::SP3,
+                    4 => Hybridization::SP3D,
+                    5 => Hybridization::SP3D2,
+                    _ => {
+                        return Err(SmartsError::InvalidSmarts {
+                            pos: self.pos,
+                            msg: format!("invalid hybridization value {n}, expected 0-5"),
+                        })
+                    }
+                };
+                Ok(AtomExpr::Hybridization(hyb))
+            }
             '+' => {
                 self.pos += 1;
+                if self.peek_is_range() {
+                    return self.parse_range(RangeKind::PositiveCharge);
+                }
                 let n = self.parse_number().unwrap_or(1);
                 Ok(AtomExpr::Charge(n as i8))
             }
             '-' => {
                 self.pos += 1;
+                if self.peek_is_range() {
+                    return self.parse_range(RangeKind::NegativeCharge);
+                }
                 let n = self.parse_number().unwrap_or(1);
                 Ok(AtomExpr::Charge(-(n as i8)))
             }
@@ -574,6 +658,39 @@ impl<'a> Parser<'a> {
             }
         }
         true
+    }
+
+    fn peek_is_range(&self) -> bool {
+        self.pos < self.chars.len() && self.chars[self.pos] == '{'
+    }
+
+    fn parse_range(&mut self, kind: RangeKind) -> Result<AtomExpr, SmartsError> {
+        self.expect('{')?;
+        let low = if self.pos < self.chars.len() && self.chars[self.pos].is_ascii_digit() {
+            Some(self.parse_number().unwrap() as u8)
+        } else {
+            None
+        };
+        if self.pos >= self.chars.len() || self.chars[self.pos] != '-' {
+            return Err(SmartsError::InvalidSmarts {
+                pos: self.pos,
+                msg: "expected '-' in range".into(),
+            });
+        }
+        self.pos += 1; // skip '-'
+        let high = if self.pos < self.chars.len() && self.chars[self.pos].is_ascii_digit() {
+            Some(self.parse_number().unwrap() as u8)
+        } else {
+            None
+        };
+        if self.pos >= self.chars.len() || self.chars[self.pos] != '}' {
+            return Err(SmartsError::InvalidSmarts {
+                pos: self.pos,
+                msg: "expected '}' closing range".into(),
+            });
+        }
+        self.pos += 1; // skip '}'
+        Ok(AtomExpr::Range { kind, low, high })
     }
 
     fn extract_balanced_parens(&mut self, _start: usize) -> Result<&str, SmartsError> {
