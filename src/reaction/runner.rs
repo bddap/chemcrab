@@ -44,7 +44,7 @@ impl Reaction {
 
         let mut results = Vec::new();
         for combo in &combinations {
-            let products = self.generate_products(combo, reactants);
+            let products = self.generate_products(combo, reactants)?;
             results.push(products);
         }
 
@@ -55,17 +55,17 @@ impl Reaction {
         &self,
         match_combo: &[&HashMap<NodeIndex, NodeIndex>],
         reactants: &[&Mol<Atom, Bond>],
-    ) -> Vec<Mol<Atom, Bond>> {
+    ) -> Result<Vec<Mol<Atom, Bond>>, ReactionError> {
         let reactant_atom_map = build_reactant_atom_map(
             &self.reactant_templates,
             match_combo,
-        );
+        )?;
 
         let matched_target_atoms = collect_matched_atoms(match_combo);
 
         let reactant_template_bonds = collect_template_bonds(&self.reactant_templates);
 
-        self.product_templates
+        Ok(self.product_templates
             .iter()
             .map(|product_tmpl| {
                 generate_single_product(
@@ -76,26 +76,29 @@ impl Reaction {
                     reactants,
                 )
             })
-            .collect()
+            .collect())
     }
 }
 
 fn build_reactant_atom_map(
     reactant_templates: &[Mol<AtomExpr, BondExpr>],
     match_combo: &[&HashMap<NodeIndex, NodeIndex>],
-) -> HashMap<u16, (usize, NodeIndex)> {
+) -> Result<HashMap<u16, (usize, NodeIndex)>, ReactionError> {
     let mut map = HashMap::new();
     for (ri, tmpl) in reactant_templates.iter().enumerate() {
         let mapping = match_combo[ri];
         for q_idx in tmpl.atoms() {
             if let Some(map_num) = extract_atom_map_num(tmpl.atom(q_idx)) {
                 if let Some(&t_idx) = mapping.get(&q_idx) {
+                    if map.contains_key(&map_num) {
+                        return Err(ReactionError::DuplicateAtomMap { map_num });
+                    }
                     map.insert(map_num, (ri, t_idx));
                 }
             }
         }
     }
-    map
+    Ok(map)
 }
 
 fn collect_matched_atoms(
@@ -369,11 +372,20 @@ fn apply_expr_to_atom(atom: &mut Atom, expr: &AtomExpr) {
 }
 
 fn bond_from_expr(expr: &BondExpr) -> Bond {
+    // Aromatic bonds in product templates are written as single bonds here;
+    // proper kekulization of aromatic products is not yet implemented.
     let order = match expr {
         BondExpr::Single | BondExpr::SingleOrAromatic => BondOrder::Single,
         BondExpr::Double => BondOrder::Double,
         BondExpr::Triple => BondOrder::Triple,
-        _ => BondOrder::Single,
+        BondExpr::Aromatic => BondOrder::Single,
+        BondExpr::And(_)
+        | BondExpr::Or(_)
+        | BondExpr::Not(_)
+        | BondExpr::Ring
+        | BondExpr::True
+        | BondExpr::Up
+        | BondExpr::Down => BondOrder::Single,
     };
     Bond {
         order,
@@ -383,6 +395,7 @@ fn bond_from_expr(expr: &BondExpr) -> Bond {
 
 pub fn extract_atom_map_num(expr: &AtomExpr) -> Option<u16> {
     match expr {
+        AtomExpr::AtomMapClass(0) => None,
         AtomExpr::AtomMapClass(n) => Some(*n),
         AtomExpr::And(parts) => parts.iter().find_map(extract_atom_map_num),
         _ => None,

@@ -31,6 +31,7 @@ impl std::error::Error for ReactionSmartsError {}
 pub enum ReactionError {
     WrongReactantCount { expected: usize, got: usize },
     TooManyCombinations,
+    DuplicateAtomMap { map_num: u16 },
 }
 
 impl fmt::Display for ReactionError {
@@ -41,6 +42,9 @@ impl fmt::Display for ReactionError {
             }
             Self::TooManyCombinations => {
                 write!(f, "match combination count exceeds limit")
+            }
+            Self::DuplicateAtomMap { map_num } => {
+                write!(f, "duplicate atom map number {map_num} in reactant templates")
             }
         }
     }

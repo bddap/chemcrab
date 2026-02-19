@@ -290,6 +290,12 @@ impl<'a> Parser<'a> {
                 pos: self.pos,
                 msg: "expected number after ':' for atom map class".into(),
             })?;
+            if map_num > u16::MAX as u32 {
+                return Err(SmartsError::InvalidSmarts {
+                    pos: self.pos,
+                    msg: "atom map class too large".into(),
+                });
+            }
             let map_expr = AtomExpr::AtomMapClass(map_num as u16);
             let combined = match expr {
                 AtomExpr::And(mut parts) => {

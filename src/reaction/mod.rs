@@ -1,6 +1,6 @@
 pub mod error;
 mod parser;
-pub mod runner;
+mod runner;
 mod writer;
 
 pub use error::{ReactionError, ReactionSmartsError};
@@ -275,5 +275,14 @@ mod tests {
         let r = mol("BrCCBr");
         let products = rxn.run(&[&r]).unwrap();
         assert!(products.len() >= 2, "two C-Br bonds should give at least 2 match results");
+    }
+
+    #[test]
+    fn aromatic_substitution() {
+        let rxn = from_reaction_smarts("[c:1][Br:2].[OH-:3]>>[c:1][O:3].[Br-:2]").unwrap();
+        let reactant1 = mol("c1ccc(Br)cc1");
+        let reactant2 = mol("[OH-]");
+        let products = rxn.run(&[&reactant1, &reactant2]).unwrap();
+        assert!(!products.is_empty());
     }
 }
