@@ -1,10 +1,12 @@
 pub mod atom;
 pub mod bond;
+pub mod element;
 pub mod mol;
 pub mod traits;
 pub mod wrappers;
 
 pub use atom::{Atom, Chirality};
+pub use element::Element;
 pub use bond::{Bond, BondOrder, BondStereo, SmilesBond, SmilesBondOrder};
 pub use mol::Mol;
 pub use traits::{
