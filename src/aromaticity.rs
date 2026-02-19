@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use petgraph::graph::NodeIndex;
 
 use crate::bond::BondOrder;
@@ -54,8 +56,9 @@ where
     let mut aromatic = vec![false; n];
 
     let ring_info = RingInfo::sssr(mol);
+    let rings = ring_info.rings();
 
-    for ring in ring_info.rings() {
+    for ring in rings {
         if is_aromatic_ring(mol, ring) {
             for &atom_idx in ring {
                 aromatic[atom_idx.index()] = true;
@@ -63,7 +66,213 @@ where
         }
     }
 
+    for system in fused_ring_systems(rings) {
+        if system.len() < 2 {
+            continue;
+        }
+        let atoms: Vec<NodeIndex> = system
+            .iter()
+            .flat_map(|&ri| rings[ri].iter().copied())
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .collect();
+        if is_aromatic_fused_system(mol, &atoms) {
+            for &atom_idx in &atoms {
+                aromatic[atom_idx.index()] = true;
+            }
+        }
+    }
+
     aromatic
+}
+
+fn fused_ring_systems(rings: &[Vec<NodeIndex>]) -> Vec<Vec<usize>> {
+    let n = rings.len();
+    let mut adj = vec![vec![false; n]; n];
+    for i in 0..n {
+        let set_i: HashSet<NodeIndex> = rings[i].iter().copied().collect();
+        for j in (i + 1)..n {
+            let shared = rings[j].iter().filter(|a| set_i.contains(a)).count();
+            if shared >= 2 {
+                adj[i][j] = true;
+                adj[j][i] = true;
+            }
+        }
+    }
+
+    let mut visited = vec![false; n];
+    let mut components = Vec::new();
+    for i in 0..n {
+        if visited[i] {
+            continue;
+        }
+        let mut component = Vec::new();
+        let mut stack = vec![i];
+        while let Some(cur) = stack.pop() {
+            if visited[cur] {
+                continue;
+            }
+            visited[cur] = true;
+            component.push(cur);
+            for j in 0..n {
+                if adj[cur][j] && !visited[j] {
+                    stack.push(j);
+                }
+            }
+        }
+        components.push(component);
+    }
+    components
+}
+
+fn is_aromatic_fused_system<A, B>(mol: &Mol<A, B>, atoms: &[NodeIndex]) -> bool
+where
+    A: HasAtomicNum + HasFormalCharge + HasHydrogenCount,
+    B: HasBondOrder,
+{
+    let atom_set: HashSet<NodeIndex> = atoms.iter().copied().collect();
+
+    for &atom_idx in atoms {
+        if !SP2_CAPABLE.contains(&mol.atom(atom_idx).atomic_num()) {
+            return false;
+        }
+    }
+
+    for &atom_idx in atoms {
+        for neighbor in mol.neighbors(atom_idx) {
+            if !atom_set.contains(&neighbor) {
+                continue;
+            }
+            if let Some(edge) = mol.bond_between(atom_idx, neighbor) {
+                if mol.bond(edge).bond_order() == BondOrder::Triple {
+                    return false;
+                }
+            }
+        }
+    }
+
+    let mut pi_total: u8 = 0;
+    for &atom_idx in atoms {
+        match pi_electrons_in_system(mol, atom_idx, &atom_set) {
+            Some(e) => pi_total = pi_total.saturating_add(e),
+            None => return false,
+        }
+    }
+
+    is_huckel(pi_total)
+}
+
+fn pi_electrons_in_system<A, B>(
+    mol: &Mol<A, B>,
+    atom_idx: NodeIndex,
+    system: &HashSet<NodeIndex>,
+) -> Option<u8>
+where
+    A: HasAtomicNum + HasFormalCharge + HasHydrogenCount,
+    B: HasBondOrder,
+{
+    let atom = mol.atom(atom_idx);
+    let anum = atom.atomic_num();
+    let charge = atom.formal_charge();
+
+    let has_double = has_any_double_bond(mol, atom_idx);
+    let has_double_in_system = has_double_to_system_neighbor(mol, atom_idx, system);
+
+    let total_degree = mol.neighbors(atom_idx).count() as u8 + atom.hydrogen_count();
+
+    let system_degree = mol
+        .neighbors(atom_idx)
+        .filter(|n| system.contains(n))
+        .count() as u8;
+
+    match anum {
+        6 => match charge {
+            0 => {
+                if has_double_in_system {
+                    Some(1)
+                } else if has_double {
+                    Some(0)
+                } else {
+                    None
+                }
+            }
+            -1 => Some(2),
+            1 => {
+                if has_double {
+                    Some(1)
+                } else {
+                    Some(0)
+                }
+            }
+            _ => None,
+        },
+        7 => match charge {
+            0 => {
+                if has_double {
+                    Some(1)
+                } else if system_degree == 2 && total_degree <= 3 {
+                    Some(2)
+                } else {
+                    None
+                }
+            }
+            1 => {
+                if has_double_in_system {
+                    Some(1)
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        },
+        8 | 16 | 34 | 52 => {
+            if has_double_in_system {
+                Some(1)
+            } else if system_degree == 2 {
+                Some(2)
+            } else {
+                None
+            }
+        }
+        5 => {
+            if has_double {
+                Some(1)
+            } else {
+                None
+            }
+        }
+        15 | 33 => {
+            if has_double {
+                Some(1)
+            } else if system_degree == 2 && total_degree <= 3 {
+                Some(2)
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
+}
+
+fn has_double_to_system_neighbor<A, B>(
+    mol: &Mol<A, B>,
+    atom_idx: NodeIndex,
+    system: &HashSet<NodeIndex>,
+) -> bool
+where
+    B: HasBondOrder,
+{
+    for neighbor in mol.neighbors(atom_idx) {
+        if !system.contains(&neighbor) {
+            continue;
+        }
+        if let Some(edge) = mol.bond_between(atom_idx, neighbor) {
+            if mol.bond(edge).bond_order() == BondOrder::Double {
+                return true;
+            }
+        }
+    }
+    false
 }
 
 fn is_aromatic_ring<A, B>(mol: &Mol<A, B>, ring: &[NodeIndex]) -> bool
@@ -125,7 +334,7 @@ where
     match anum {
         6 => match charge {
             0 => {
-                if has_double {
+                if has_double_in_ring {
                     Some(1)
                 } else {
                     None
@@ -368,6 +577,31 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn caffeine_fused_system_aromatic() {
+        let mol = from_smiles("Cn1c(=O)c2c(ncn2C)n(C)c1=O").unwrap();
+        let arom = find_aromatic_atoms(&mol);
+        let aromatic_count = arom.iter().filter(|&&a| a).count();
+        assert_eq!(
+            aromatic_count, 9,
+            "caffeine purine-like fused system should have 9 aromatic atoms, got {}",
+            aromatic_count
+        );
+    }
+
+    #[test]
+    fn boronic_ester_phenyl_rings_only() {
+        let mol = from_smiles("c1ccc(B2Oc3ccccc3O2)cc1").unwrap();
+        let arom = find_aromatic_atoms(&mol);
+        let aromatic_count = arom.iter().filter(|&&a| a).count();
+        assert_eq!(
+            aromatic_count, 12,
+            "boronic ester should have 12 aromatic atoms (two phenyl rings), got {}",
+            aromatic_count
+        );
+    }
+
 
     #[test]
     fn huckel_rule() {
