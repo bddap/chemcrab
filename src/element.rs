@@ -209,6 +209,10 @@ impl Element {
         }
     }
 
+    pub fn isotope_exact_mass(self, mass_number: u16) -> Option<f64> {
+        isotope_exact_mass(self.atomic_num(), mass_number)
+    }
+
     pub fn is_organic_subset(self) -> bool {
         matches!(
             self,
@@ -913,6 +917,38 @@ static ELECTRONEGATIVITIES: [f64; 118] = [
     -1.0,  // Og
 ];
 
+pub fn isotope_exact_mass(atomic_num: u8, mass_number: u16) -> Option<f64> {
+    let key = (atomic_num as u32) << 16 | mass_number as u32;
+    let idx = ISOTOPE_TABLE
+        .binary_search_by_key(&key, |&(z, a, _)| (z as u32) << 16 | a as u32)
+        .ok()?;
+    Some(ISOTOPE_TABLE[idx].2)
+}
+
+static ISOTOPE_TABLE: &[(u8, u16, f64)] = &[
+    (1,   1, 1.00782503207),
+    (1,   2, 2.01410177812),
+    (1,   3, 3.01604928199),
+    (6,  12, 12.0),
+    (6,  13, 13.00335483507),
+    (7,  14, 14.00307400443),
+    (7,  15, 15.00010889888),
+    (8,  16, 15.99491461957),
+    (8,  17, 16.99913175650),
+    (8,  18, 17.99915961286),
+    (9,  19, 18.99840320500),
+    (15, 31, 30.97376199800),
+    (16, 32, 31.97207117400),
+    (16, 33, 32.97145890982),
+    (16, 34, 33.96786700450),
+    (16, 36, 35.96708070573),
+    (17, 35, 34.96885268200),
+    (17, 37, 36.96590260200),
+    (35, 79, 78.91833710400),
+    (35, 81, 80.91628970400),
+    (53, 127, 126.90447190000),
+];
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1093,5 +1129,26 @@ mod tests {
         for n in 1u8..=118 {
             assert!(Element::from_atomic_num(n).unwrap().exact_mass() > 0.0);
         }
+    }
+
+    #[test]
+    fn isotope_exact_mass_known() {
+        assert!((isotope_exact_mass(1, 2).unwrap() - 2.01410177812).abs() < 1e-9);
+        assert!((isotope_exact_mass(6, 13).unwrap() - 13.00335483507).abs() < 1e-9);
+        assert!((isotope_exact_mass(8, 18).unwrap() - 17.99915961286).abs() < 1e-9);
+        assert!((isotope_exact_mass(17, 37).unwrap() - 36.96590260200).abs() < 1e-9);
+    }
+
+    #[test]
+    fn isotope_exact_mass_unknown() {
+        assert!(isotope_exact_mass(1, 99).is_none());
+        assert!(isotope_exact_mass(0, 0).is_none());
+        assert!(isotope_exact_mass(6, 14).is_none());
+    }
+
+    #[test]
+    fn element_isotope_exact_mass_method() {
+        assert!((Element::H.isotope_exact_mass(3).unwrap() - 3.01604928199).abs() < 1e-9);
+        assert!(Element::C.isotope_exact_mass(99).is_none());
     }
 }

@@ -3,25 +3,44 @@ use std::fmt::Write;
 
 use crate::element::Element;
 use crate::mol::Mol;
-use crate::traits::{HasAtomicNum, HasFormalCharge, HasHydrogenCount};
+use crate::element::isotope_exact_mass;
+use crate::traits::{HasAtomicNum, HasFormalCharge, HasHydrogenCount, HasIsotope};
 
-pub fn average_mol_weight<A: HasAtomicNum + HasHydrogenCount, B>(mol: &Mol<A, B>) -> f64 {
+pub fn average_mol_weight<A: HasAtomicNum + HasHydrogenCount + HasIsotope, B>(
+    mol: &Mol<A, B>,
+) -> f64 {
     let h_weight = Element::H.atomic_weight();
     mol.atoms().fold(0.0, |acc, idx| {
         let a = mol.atom(idx);
-        let elem_weight = Element::from_atomic_num(a.atomic_num())
-            .map_or(0.0, |e| e.atomic_weight());
-        acc + elem_weight + a.hydrogen_count() as f64 * h_weight
+        let elem = Element::from_atomic_num(a.atomic_num());
+        let iso = a.isotope();
+        let mass = if iso > 0 {
+            isotope_exact_mass(a.atomic_num(), iso)
+                .or_else(|| elem.map(|e| e.atomic_weight()))
+                .unwrap_or(0.0)
+        } else {
+            elem.map_or(0.0, |e| e.atomic_weight())
+        };
+        acc + mass + a.hydrogen_count() as f64 * h_weight
     })
 }
 
-pub fn exact_mol_weight<A: HasAtomicNum + HasHydrogenCount, B>(mol: &Mol<A, B>) -> f64 {
+pub fn exact_mol_weight<A: HasAtomicNum + HasHydrogenCount + HasIsotope, B>(
+    mol: &Mol<A, B>,
+) -> f64 {
     let h_mass = Element::H.exact_mass();
     mol.atoms().fold(0.0, |acc, idx| {
         let a = mol.atom(idx);
-        let elem_mass = Element::from_atomic_num(a.atomic_num())
-            .map_or(0.0, |e| e.exact_mass());
-        acc + elem_mass + a.hydrogen_count() as f64 * h_mass
+        let elem = Element::from_atomic_num(a.atomic_num());
+        let iso = a.isotope();
+        let mass = if iso > 0 {
+            isotope_exact_mass(a.atomic_num(), iso)
+                .or_else(|| elem.map(|e| e.exact_mass()))
+                .unwrap_or(0.0)
+        } else {
+            elem.map_or(0.0, |e| e.exact_mass())
+        };
+        acc + mass + a.hydrogen_count() as f64 * h_mass
     })
 }
 
@@ -200,5 +219,47 @@ mod tests {
     fn iron_amw() {
         let mol = parse_smiles("[Fe]").unwrap();
         assert_approx(average_mol_weight(&mol), 55.845, 0.01);
+    }
+
+    #[test]
+    fn deuterated_methane_exact() {
+        let mol = parse_smiles("[2H]C([2H])([2H])[2H]").unwrap();
+        let expected = 12.0 + 4.0 * 2.01410177812;
+        assert_approx(exact_mol_weight(&mol), expected, 1e-6);
+    }
+
+    #[test]
+    fn deuterated_methane_amw() {
+        let mol = parse_smiles("[2H]C([2H])([2H])[2H]").unwrap();
+        let expected = 12.011 + 4.0 * 2.01410177812;
+        assert_approx(average_mol_weight(&mol), expected, 1e-6);
+    }
+
+    #[test]
+    fn c13_toluene_exact() {
+        // [13C]c1ccccc1 = C13-CH bonded to benzene ring: 7 carbons, 5 ring H + 0 on [13C]
+        let mol = parse_smiles("[13C]c1ccccc1").unwrap();
+        let expected = 13.00335483507 + 6.0 * 12.0 + 5.0 * 1.00782503207;
+        assert_approx(exact_mol_weight(&mol), expected, 1e-6);
+    }
+
+    #[test]
+    fn c13_toluene_amw() {
+        let mol = parse_smiles("[13C]c1ccccc1").unwrap();
+        let expected = 13.00335483507 + 6.0 * 12.011 + 5.0 * 1.008;
+        assert_approx(average_mol_weight(&mol), expected, 1e-4);
+    }
+
+    #[test]
+    fn non_isotopic_unchanged() {
+        let mol = parse_smiles("CCO").unwrap();
+        let amw = average_mol_weight(&mol);
+        let exact = exact_mol_weight(&mol);
+        assert_approx(amw, 2.0 * 12.011 + 6.0 * 1.008 + 15.999, 0.01);
+        assert_approx(
+            exact,
+            2.0 * 12.0 + 6.0 * 1.00782503207 + 15.99491461957,
+            1e-4,
+        );
     }
 }
