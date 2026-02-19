@@ -54,7 +54,7 @@ fn mol_bond_between_and_endpoints() {
     assert_eq!(mol.bond_between(a, b), Some(e));
     assert_eq!(mol.bond_between(a, c), None);
 
-    let (src, dst) = mol.bond_endpoints(e);
+    let (src, dst) = mol.bond_endpoints(e).unwrap();
     assert!((src == a && dst == b) || (src == b && dst == a));
 }
 

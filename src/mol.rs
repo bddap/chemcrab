@@ -68,10 +68,8 @@ impl<A, B> Mol<A, B> {
         self.graph.find_edge(a, b)
     }
 
-    pub fn bond_endpoints(&self, idx: EdgeIndex) -> (NodeIndex, NodeIndex) {
-        self.graph
-            .edge_endpoints(idx)
-            .expect("invalid edge index")
+    pub fn bond_endpoints(&self, idx: EdgeIndex) -> Option<(NodeIndex, NodeIndex)> {
+        self.graph.edge_endpoints(idx)
     }
 }
 

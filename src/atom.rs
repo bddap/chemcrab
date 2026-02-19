@@ -10,8 +10,16 @@ pub enum Chirality {
 pub struct Atom {
     pub atomic_num: u8,
     pub formal_charge: i8,
+    /// 0 means natural abundance.
     pub isotope: u16,
     pub chirality: Chirality,
+    /// Virtual hydrogen count: the total number of suppressed (non-graph-node)
+    /// hydrogens on this atom. Single source of truth — no implicit hydrogen
+    /// rules are consulted at read time; the parser resolves hydrogen counts at
+    /// parse time and stores the result.
+    ///
+    /// Credit to Richard L. Apodaca for articulating this model:
+    /// <https://depth-first.com/articles/2019/11/06/virtual-hydrogens/>
     pub hydrogen_count: u8,
     pub is_aromatic: bool,
 }

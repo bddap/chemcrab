@@ -1,0 +1,1 @@
+/workdir/feature/core-types/crabchem/target/debug/libcrabchem.rlib: /workdir/feature/core-types/crabchem/src/atom.rs /workdir/feature/core-types/crabchem/src/bond.rs /workdir/feature/core-types/crabchem/src/lib.rs /workdir/feature/core-types/crabchem/src/mol.rs /workdir/feature/core-types/crabchem/src/traits.rs /workdir/feature/core-types/crabchem/src/wrappers.rs
