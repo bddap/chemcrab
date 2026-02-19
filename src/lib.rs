@@ -1,6 +1,7 @@
 pub mod aromaticity;
 pub mod atom;
 pub mod bond;
+pub mod canonical;
 pub mod element;
 pub mod formula;
 pub mod graph_ops;
@@ -15,6 +16,7 @@ pub mod wrappers;
 
 pub use aromaticity::{find_aromatic_atoms, set_aromaticity, AromaticityModel};
 pub use atom::{Atom, Chirality};
+pub use canonical::canonical_ordering;
 pub use bond::{Bond, BondOrder, BondStereo, SmilesBond, SmilesBondOrder};
 pub use element::Element;
 pub use formula::{average_mol_weight, exact_mol_weight, mol_formula};
@@ -26,7 +28,7 @@ pub use hydrogen::{add_hs, remove_hs};
 pub use kekulize::{kekulize, KekulizeError};
 pub use mol::Mol;
 pub use rings::RingInfo;
-pub use smiles::{from_smiles, parse_smiles, to_smiles, SmilesError};
+pub use smiles::{from_smiles, parse_smiles, to_canonical_smiles, to_smiles, SmilesError};
 pub use traits::{
     HasAromaticity, HasAtomicNum, HasBondOrder, HasBondStereo, HasChirality, HasFormalCharge,
     HasHybridization, HasHydrogenCount, HasIsotope, HasPosition2D, HasPosition3D, HasValence,

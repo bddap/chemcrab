@@ -4,6 +4,7 @@ use petgraph::graph::NodeIndex;
 
 use crate::atom::{Atom, Chirality};
 use crate::bond::{Bond, BondOrder, BondStereo};
+use crate::canonical::canonical_ordering;
 use crate::element::Element;
 use crate::graph_ops::connected_components;
 use crate::mol::Mol;
@@ -12,7 +13,17 @@ pub fn to_smiles(mol: &Mol<Atom, Bond>) -> String {
     let components = connected_components(mol);
     let mut parts = Vec::with_capacity(components.len());
     for component in &components {
-        parts.push(write_fragment(mol, component));
+        parts.push(write_fragment(mol, component, None));
+    }
+    parts.join(".")
+}
+
+pub fn to_canonical_smiles(mol: &Mol<Atom, Bond>) -> String {
+    let ranks = canonical_ordering(mol);
+    let components = connected_components(mol);
+    let mut parts = Vec::with_capacity(components.len());
+    for component in &components {
+        parts.push(write_fragment(mol, component, Some(&ranks)));
     }
     parts.join(".")
 }
@@ -136,9 +147,12 @@ fn set_bond_dir(
     }
 }
 
-fn write_fragment(mol: &Mol<Atom, Bond>, component: &[NodeIndex]) -> String {
+fn write_fragment(mol: &Mol<Atom, Bond>, component: &[NodeIndex], ranks: Option<&[usize]>) -> String {
     let n = mol.atom_count();
-    let start = component[0];
+    let start = match ranks {
+        Some(r) => *component.iter().min_by_key(|&&node| r[node.index()]).unwrap(),
+        None => component[0],
+    };
 
     let mut visited = vec![false; n];
     let mut parent = vec![None::<NodeIndex>; n];
@@ -147,8 +161,15 @@ fn write_fragment(mol: &Mol<Atom, Bond>, component: &[NodeIndex]) -> String {
     let mut next_ring_id: usize = 1;
     let mut children: Vec<Vec<NodeIndex>> = (0..n).map(|_| Vec::new()).collect();
 
-    let neighbor_lists: Vec<Vec<NodeIndex>> =
-        (0..n).map(|i| mol.neighbors(NodeIndex::new(i)).collect()).collect();
+    let neighbor_lists: Vec<Vec<NodeIndex>> = (0..n)
+        .map(|i| {
+            let mut neighbors: Vec<NodeIndex> = mol.neighbors(NodeIndex::new(i)).collect();
+            if let Some(r) = ranks {
+                neighbors.sort_by_key(|nb| r[nb.index()]);
+            }
+            neighbors
+        })
+        .collect();
 
     let mut stack: Vec<(NodeIndex, usize)> = Vec::new();
     visited[start.index()] = true;
@@ -796,5 +817,216 @@ mod tests {
         let is_trans1 = find_double_bond_stereo(&m1).expect("m1 should have E/Z stereo");
         let is_trans2 = find_double_bond_stereo(&m2).expect("m2 should have E/Z stereo");
         assert_eq!(is_trans1, is_trans2);
+    }
+
+    fn canonical(smiles: &str) -> String {
+        let mol = from_smiles(smiles).unwrap();
+        to_canonical_smiles(&mol)
+    }
+
+    fn canonical_round_trip(smiles: &str) -> (Mol<Atom, Bond>, Mol<Atom, Bond>, String) {
+        let mol1 = from_smiles(smiles).unwrap();
+        let written = to_canonical_smiles(&mol1);
+        let mol2 = from_smiles(&written).unwrap_or_else(|e| {
+            panic!("Failed to re-parse canonical '{written}' (from '{smiles}'): {e}");
+        });
+        (mol1, mol2, written)
+    }
+
+    // -- Determinism: same molecule from different SMILES -> same canonical SMILES --
+
+    #[test]
+    fn canonical_ethanol_determinism() {
+        assert_eq!(canonical("OCC"), canonical("CCO"));
+    }
+
+    #[test]
+    fn canonical_benzene_determinism() {
+        let c1 = canonical("c1ccccc1");
+        let c2 = canonical("c1ccccc1");
+        assert_eq!(c1, c2);
+    }
+
+    #[test]
+    fn canonical_acetic_acid_determinism() {
+        assert_eq!(canonical("C(=O)(O)CC"), canonical("CCC(O)=O"));
+    }
+
+    #[test]
+    fn canonical_propanol_orderings() {
+        let a = canonical("CCCO");
+        let b = canonical("OCCC");
+        let c = canonical("C(CC)O");
+        assert_eq!(a, b);
+        assert_eq!(b, c);
+    }
+
+    #[test]
+    fn canonical_methanol_orderings() {
+        assert_eq!(canonical("CO"), canonical("OC"));
+    }
+
+    #[test]
+    fn canonical_phenol_orderings() {
+        let a = canonical("Oc1ccccc1");
+        let b = canonical("c1ccccc1O");
+        let c = canonical("c1ccc(O)cc1");
+        assert_eq!(a, b);
+        assert_eq!(b, c);
+    }
+
+    // -- Uniqueness: different molecules -> different canonical SMILES --
+
+    #[test]
+    fn canonical_ethanol_vs_methanol() {
+        assert_ne!(canonical("CCO"), canonical("CO"));
+    }
+
+    #[test]
+    fn canonical_benzene_vs_cyclohexane() {
+        assert_ne!(canonical("c1ccccc1"), canonical("C1CCCCC1"));
+    }
+
+    #[test]
+    fn canonical_methane_vs_ethane() {
+        assert_ne!(canonical("C"), canonical("CC"));
+    }
+
+    // -- Stereochemistry: canonical SMILES preserves stereo --
+
+    #[test]
+    fn canonical_tetrahedral_round_trip() {
+        let (m1, m2, s) = canonical_round_trip("[C@@H](F)(Cl)Br");
+        assert_same_structure(&m1, &m2, "canonical_tetrahedral");
+        assert!(s.contains('@'), "expected chirality in canonical '{s}'");
+        assert!(has_chiral_atom(&m2));
+        assert_same_chirality(&m1, &m2, "canonical_tetrahedral");
+    }
+
+    #[test]
+    fn canonical_ez_trans_round_trip() {
+        let (m1, m2, s) = canonical_round_trip("F/C=C/F");
+        assert_same_structure(&m1, &m2, "canonical_ez_trans");
+        assert!(
+            s.contains('/') || s.contains('\\'),
+            "expected stereo bonds in canonical '{s}'"
+        );
+        let t1 = find_double_bond_stereo(&m1).expect("m1 E/Z");
+        let t2 = find_double_bond_stereo(&m2).expect("m2 E/Z");
+        assert_eq!(t1, t2);
+    }
+
+    #[test]
+    fn canonical_ez_cis_round_trip() {
+        let (m1, m2, s) = canonical_round_trip(r"F/C=C\F");
+        assert_same_structure(&m1, &m2, "canonical_ez_cis");
+        assert!(
+            s.contains('/') || s.contains('\\'),
+            "expected stereo bonds in canonical '{s}'"
+        );
+        let t1 = find_double_bond_stereo(&m1).expect("m1 E/Z");
+        let t2 = find_double_bond_stereo(&m2).expect("m2 E/Z");
+        assert_eq!(t1, t2);
+    }
+
+    // -- Edge cases --
+
+    #[test]
+    fn canonical_single_atom_c() {
+        let s = canonical("C");
+        assert_eq!(s, "C");
+    }
+
+    #[test]
+    fn canonical_single_atom_na() {
+        let s = canonical("[Na+]");
+        assert!(s.contains("Na"));
+        assert!(s.contains('+'));
+    }
+
+    #[test]
+    fn canonical_disconnected() {
+        let s = canonical("[Na+].[Cl-]");
+        assert!(s.contains('.'));
+        let mol = from_smiles(&s).unwrap();
+        assert_eq!(mol.atom_count(), 2);
+        assert_eq!(mol.bond_count(), 0);
+    }
+
+    #[test]
+    fn canonical_symmetric_benzene() {
+        let s = canonical("c1ccccc1");
+        let mol = from_smiles(&s).unwrap();
+        assert_eq!(mol.atom_count(), 6);
+        assert_eq!(mol.bond_count(), 6);
+    }
+
+    #[test]
+    fn canonical_charged_atoms() {
+        let s = canonical("[NH4+]");
+        let mol = from_smiles(&s).unwrap();
+        assert_eq!(mol.atom(NodeIndex::new(0)).formal_charge, 1);
+    }
+
+    #[test]
+    fn canonical_isotope() {
+        let s = canonical("[13C]");
+        assert!(s.contains("13"));
+        let mol = from_smiles(&s).unwrap();
+        assert_eq!(mol.atom(NodeIndex::new(0)).isotope, 13);
+    }
+
+    #[test]
+    fn canonical_empty_mol() {
+        let mol = Mol::<Atom, Bond>::new();
+        assert_eq!(to_canonical_smiles(&mol), "");
+    }
+
+    #[test]
+    fn canonical_round_trip_structure_preservation() {
+        let cases = [
+            "CC", "C=C", "C#C", "C1CCCCC1", "c1ccccc1", "CC(=O)O",
+            "c1ccncc1", "c1ccc2ccccc2c1", "[Fe]", "[Na+].[Cl-]",
+        ];
+        for smiles in &cases {
+            let (m1, m2, _) = canonical_round_trip(smiles);
+            assert_same_structure(&m1, &m2, smiles);
+        }
+    }
+
+    #[test]
+    fn canonical_idempotent() {
+        let cases = [
+            "CCO", "c1ccccc1", "CC(=O)O", "[Na+].[Cl-]", "c1ccncc1",
+        ];
+        for smiles in &cases {
+            let first = canonical(smiles);
+            let second = canonical(&first);
+            assert_eq!(first, second, "canonical not idempotent for {smiles}");
+        }
+    }
+
+    #[test]
+    fn canonical_three_fragments_determinism() {
+        let s = canonical("[Na+].[Cl-].O");
+        assert_eq!(s.matches('.').count(), 2);
+        let mol = from_smiles(&s).unwrap();
+        assert_eq!(mol.atom_count(), 3);
+    }
+
+    #[test]
+    fn canonical_naphthalene_determinism() {
+        let a = canonical("c1ccc2ccccc2c1");
+        let b = canonical("c1cccc2ccccc12");
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn canonical_toluene_orderings() {
+        let a = canonical("Cc1ccccc1");
+        let b = canonical("c1ccccc1C");
+        let c = canonical("c1ccc(C)cc1");
+        assert_eq!(a, b);
+        assert_eq!(b, c);
     }
 }

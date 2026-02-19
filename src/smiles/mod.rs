@@ -9,7 +9,7 @@ use crate::bond::{Bond, SmilesBond};
 use crate::kekulize;
 use crate::mol::Mol;
 pub use error::SmilesError;
-pub use writer::to_smiles;
+pub use writer::{to_canonical_smiles, to_smiles};
 
 pub fn parse_smiles(s: &str) -> Result<Mol<Atom, SmilesBond>, SmilesError> {
     let trimmed = s.trim();
