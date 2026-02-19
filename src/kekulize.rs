@@ -480,6 +480,15 @@ mod tests {
     }
 
     #[test]
+    fn pyridinium() {
+        let smiles_mol = parse_smiles("[n+]1ccccc1").unwrap();
+        let mol = kekulize(smiles_mol).unwrap();
+        assert_eq!(mol.atom_count(), 6);
+        assert_eq!(count_double_bonds(&mol), 3);
+        assert!(is_valid_kekulization(&mol));
+    }
+
+    #[test]
     fn odd_ring_unkekulizable() {
         let smiles_mol = parse_smiles("c1cccc1").unwrap();
         let result = kekulize(smiles_mol);
