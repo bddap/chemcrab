@@ -476,7 +476,7 @@ fn approval_substruct() {
                 ));
             }
 
-            let matches = chemcrab::get_substruct_matches(&mol, &query);
+            let matches = chemcrab::get_substruct_matches_unique(&mol, &query);
             if matches.len() != expected.num_matches {
                 failures.push(format!(
                     "[num_matches] {} / {}: expected {}, got {}",

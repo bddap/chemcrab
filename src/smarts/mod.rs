@@ -19,7 +19,7 @@ use crate::rings::RingInfo;
 use crate::atom::Chirality;
 use crate::substruct::{
     get_substruct_match_with, get_substruct_match_with_filter, get_substruct_matches_with,
-    get_substruct_matches_with_filter, AtomMapping,
+    get_substruct_matches_with_filter, uniquify_atom_mappings, AtomMapping,
 };
 
 use query::MatchContext;
@@ -84,7 +84,7 @@ pub fn get_smarts_matches(
         recursive_matches,
     };
 
-    get_substruct_matches_with(
+    let all = get_substruct_matches_with(
         target,
         query,
         |t_atom: &Atom, q_expr: &AtomExpr| {
@@ -105,7 +105,8 @@ pub fn get_smarts_matches(
                 .unwrap();
             q_bond.matches_with_ring_info(t_bond, t_endpoints, &ring_info, (t_a, t_b))
         },
-    )
+    );
+    uniquify_atom_mappings(&all)
 }
 
 pub fn has_smarts_match_chiral(target: &Mol<Atom, Bond>, query: &Mol<AtomExpr, BondExpr>) -> bool {
@@ -167,7 +168,7 @@ pub fn get_smarts_matches_chiral(
 
     let chiral_query_atoms = collect_chiral_query_atoms(query);
 
-    get_substruct_matches_with_filter(
+    let all = get_substruct_matches_with_filter(
         target,
         query,
         |t_atom: &Atom, q_expr: &AtomExpr| {
@@ -189,7 +190,8 @@ pub fn get_smarts_matches_chiral(
             q_bond.matches_with_ring_info(t_bond, t_endpoints, &ring_info, (t_a, t_b))
         },
         |mapping: &AtomMapping| validate_chirality(mapping, target, query, &chiral_query_atoms),
-    )
+    );
+    uniquify_atom_mappings(&all)
 }
 
 struct ChiralQueryAtom {

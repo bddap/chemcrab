@@ -1,13 +1,28 @@
+use std::collections::HashSet;
+
 use petgraph::graph::NodeIndex;
 
 use crate::mol::Mol;
-use crate::traits::{HasAromaticity, HasAtomicNum, HasBondOrder};
+use crate::traits::{HasAromaticity, HasAtomicNum, HasBondOrder, HasFormalCharge};
 
 pub type AtomMapping = Vec<(NodeIndex, NodeIndex)>;
 
+pub fn uniquify_atom_mappings(mappings: &[AtomMapping]) -> Vec<AtomMapping> {
+    let mut seen = HashSet::new();
+    mappings
+        .iter()
+        .filter(|mapping| {
+            let mut target_atoms: Vec<usize> = mapping.iter().map(|(_, t)| t.index()).collect();
+            target_atoms.sort();
+            seen.insert(target_atoms)
+        })
+        .cloned()
+        .collect()
+}
+
 pub fn has_substruct_match<A, B>(target: &Mol<A, B>, query: &Mol<A, B>) -> bool
 where
-    A: HasAtomicNum + HasAromaticity,
+    A: HasAtomicNum + HasAromaticity + HasFormalCharge,
     B: HasBondOrder,
 {
     get_substruct_match(target, query).is_some()
@@ -15,7 +30,7 @@ where
 
 pub fn get_substruct_match<A, B>(target: &Mol<A, B>, query: &Mol<A, B>) -> Option<AtomMapping>
 where
-    A: HasAtomicNum + HasAromaticity,
+    A: HasAtomicNum + HasAromaticity + HasFormalCharge,
     B: HasBondOrder,
 {
     Vf2::new(target, query, default_atom_match, default_bond_match).find_first()
@@ -23,10 +38,32 @@ where
 
 pub fn get_substruct_matches<A, B>(target: &Mol<A, B>, query: &Mol<A, B>) -> Vec<AtomMapping>
 where
-    A: HasAtomicNum + HasAromaticity,
+    A: HasAtomicNum + HasAromaticity + HasFormalCharge,
     B: HasBondOrder,
 {
     Vf2::new(target, query, default_atom_match, default_bond_match).find_all()
+}
+
+pub fn get_substruct_matches_unique<A, B>(
+    target: &Mol<A, B>,
+    query: &Mol<A, B>,
+) -> Vec<AtomMapping>
+where
+    A: HasAtomicNum + HasAromaticity + HasFormalCharge,
+    B: HasBondOrder,
+{
+    uniquify_atom_mappings(&get_substruct_matches(target, query))
+}
+
+pub fn get_substruct_matches_with_unique<A1, B1, A2, B2>(
+    target: &Mol<A1, B1>,
+    query: &Mol<A2, B2>,
+    atom_match: impl Fn(&A1, &A2) -> bool,
+    bond_match: impl Fn(&B1, &B2, (&A1, &A1), (&A2, &A2)) -> bool,
+) -> Vec<AtomMapping> {
+    uniquify_atom_mappings(&get_substruct_matches_with(
+        target, query, atom_match, bond_match,
+    ))
 }
 
 pub fn has_substruct_match_with<A1, B1, A2, B2>(
@@ -76,11 +113,17 @@ pub fn get_substruct_matches_with_filter<A1, B1, A2, B2>(
     Vf2WithFilter::new(target, query, atom_match, bond_match, filter).find_all()
 }
 
-fn default_atom_match<A: HasAtomicNum + HasAromaticity>(target: &A, query: &A) -> bool {
+fn default_atom_match<A: HasAtomicNum + HasAromaticity + HasFormalCharge>(
+    target: &A,
+    query: &A,
+) -> bool {
     if target.atomic_num() != query.atomic_num() {
         return false;
     }
     if query.is_aromatic() && !target.is_aromatic() {
+        return false;
+    }
+    if target.formal_charge() != query.formal_charge() {
         return false;
     }
     true
@@ -639,5 +682,47 @@ mod tests {
                 "matched atoms must be bonded"
             );
         }
+    }
+
+    #[test]
+    fn benzene_on_benzene_raw_gives_12() {
+        let target = mol("c1ccccc1");
+        let query = mol("c1ccccc1");
+        assert_eq!(get_substruct_matches(&target, &query).len(), 12);
+    }
+
+    #[test]
+    fn benzene_on_benzene_unique_gives_1() {
+        let target = mol("c1ccccc1");
+        let query = mol("c1ccccc1");
+        assert_eq!(get_substruct_matches_unique(&target, &query).len(), 1);
+    }
+
+    #[test]
+    fn naphthalene_benzene_unique_gives_2() {
+        let target = mol("c1ccc2ccccc2c1");
+        let query = mol("c1ccccc1");
+        assert_eq!(get_substruct_matches_unique(&target, &query).len(), 2);
+    }
+
+    #[test]
+    fn charged_oxygen_does_not_match_neutral() {
+        let target = mol("CCO");
+        let query = mol("[O-]");
+        assert!(!has_substruct_match(&target, &query));
+    }
+
+    #[test]
+    fn nitro_group_matches_nitrobenzene() {
+        let target = mol("[O-][N+](=O)c1ccccc1");
+        let query = mol("[N+](=O)[O-]");
+        assert!(has_substruct_match(&target, &query));
+    }
+
+    #[test]
+    fn neutral_oxygen_does_not_match_charged_query() {
+        let target = mol("CCO");
+        let query = mol("[O-]");
+        assert!(get_substruct_match(&target, &query).is_none());
     }
 }
