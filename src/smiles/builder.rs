@@ -88,7 +88,7 @@ fn resolve_chirality(mol: &mut Mol<Atom, SmilesBond>, tree: &ParseTree, indices:
         let graph_neighbor_order: Vec<NodeIndex> = mol.neighbors(indices[i]).collect();
         let graph_neighbor_indices: Vec<usize> = graph_neighbor_order
             .iter()
-            .map(|ni| indices.iter().position(|&x| x == *ni).unwrap())
+            .map(|ni| indices.iter().position(|&x| x == *ni).expect("graph neighbor must be in index map"))
             .collect();
 
         let parity = parity_of_permutation(&smiles_neighbor_order, &graph_neighbor_indices);
@@ -123,7 +123,7 @@ fn parity_of_permutation(from: &[usize], to: &[usize]) -> bool {
     let n = from.len();
     let perm: Vec<usize> = from
         .iter()
-        .map(|&f| to.iter().position(|&t| t == f).unwrap_or(0))
+        .map(|&f| to.iter().position(|&t| t == f).expect("permutation elements must match"))
         .collect();
 
     let mut visited = vec![false; n];
@@ -300,20 +300,8 @@ fn adjust_valences_for_charge(
     _element: Element,
     charge: i8,
 ) -> Vec<u8> {
-    if charge == 0 {
-        return valences.to_vec();
-    }
-    valences
-        .iter()
-        .filter_map(|&v| {
-            let adjusted = v as i16 - charge.abs() as i16;
-            if adjusted > 0 {
-                Some(adjusted as u8)
-            } else {
-                None
-            }
-        })
-        .collect()
+    debug_assert_eq!(charge, 0, "bare atoms in SMILES never carry charge");
+    valences.to_vec()
 }
 
 #[cfg(test)]

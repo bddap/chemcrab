@@ -71,6 +71,22 @@ impl<A, B> Mol<A, B> {
     pub fn bond_endpoints(&self, idx: EdgeIndex) -> Option<(NodeIndex, NodeIndex)> {
         self.graph.edge_endpoints(idx)
     }
+
+    pub fn swap_remove_atom(&mut self, idx: NodeIndex) -> A {
+        self.graph.remove_node(idx).expect("node index out of bounds")
+    }
+
+    pub fn swap_remove_bond(&mut self, idx: EdgeIndex) -> B {
+        self.graph.remove_edge(idx).expect("edge index out of bounds")
+    }
+}
+
+impl<A: Clone, B: Clone> Clone for Mol<A, B> {
+    fn clone(&self) -> Self {
+        Self {
+            graph: self.graph.clone(),
+        }
+    }
 }
 
 impl<A, B> Default for Mol<A, B> {

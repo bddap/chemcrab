@@ -56,11 +56,19 @@ where
         .atoms()
         .filter_map(|idx| {
             let atom = mol.atom(idx);
-            if atom.formal_charge() != 0 {
+            let elem = Element::from_atomic_num(atom.atomic_num())?;
+            let base = elem.default_valences();
+            if base.is_empty() {
                 return None;
             }
-            let elem = Element::from_atomic_num(atom.atomic_num())?;
-            let allowed = elem.default_valences();
+            let charge = atom.formal_charge() as i16;
+            let allowed: Vec<u8> = base
+                .iter()
+                .filter_map(|&v| {
+                    let adjusted = v as i16 + charge;
+                    if adjusted > 0 { Some(adjusted as u8) } else { None }
+                })
+                .collect();
             if allowed.is_empty() {
                 return None;
             }
@@ -72,7 +80,7 @@ where
                 atom_idx: idx,
                 atomic_num: atom.atomic_num(),
                 actual_valence: v,
-                allowed_valences: allowed.to_vec(),
+                allowed_valences: allowed,
             })
         })
         .collect();
@@ -139,8 +147,30 @@ mod tests {
     }
 
     #[test]
-    fn charged_ammonium_skipped() {
+    fn charged_ammonium_valid() {
         let mol = from_smiles("[NH4+]").unwrap();
+        assert!(check_valence(&mol).is_ok());
+    }
+
+    #[test]
+    fn hexavalent_charged_carbon_invalid() {
+        use crate::atom::Atom;
+        use crate::bond::Bond;
+        use crate::mol::Mol;
+
+        let mut mol = Mol::<Atom, Bond>::new();
+        mol.add_atom(Atom {
+            atomic_num: 6,
+            formal_charge: 1,
+            hydrogen_count: 6,
+            ..Default::default()
+        });
+        assert!(check_valence(&mol).is_err());
+    }
+
+    #[test]
+    fn oxide_anion_valid() {
+        let mol = from_smiles("[OH-]").unwrap();
         assert!(check_valence(&mol).is_ok());
     }
 
