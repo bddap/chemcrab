@@ -62,6 +62,7 @@ pub enum AtomExpr {
     Recursive(Mol<AtomExpr, BondExpr>),
     And(Vec<AtomExpr>),
     Or(Vec<AtomExpr>),
+    Chirality(crate::atom::Chirality),
     Not(Box<AtomExpr>),
 }
 
@@ -261,6 +262,13 @@ impl AtomExpr {
             }
             AtomExpr::InRing => ctx.ring_info.is_ring_atom(idx),
             AtomExpr::NotInRing => !ctx.ring_info.is_ring_atom(idx),
+            AtomExpr::Chirality(q_chiral) => {
+                use crate::atom::Chirality;
+                match q_chiral {
+                    Chirality::None => true,
+                    Chirality::Cw | Chirality::Ccw => atom.chirality != Chirality::None,
+                }
+            }
             AtomExpr::Recursive(ref _inner) => {
                 unreachable!("Recursive SMARTS should be pre-evaluated")
             }

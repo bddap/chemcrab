@@ -31,13 +31,15 @@ pub use kekulize::{kekulize, KekulizeError};
 pub use mol::Mol;
 pub use rings::RingInfo;
 pub use smarts::{
-    from_smarts, get_smarts_match, get_smarts_matches, has_smarts_match, to_smarts, AtomExpr,
+    from_smarts, get_smarts_match, get_smarts_match_chiral, get_smarts_matches,
+    get_smarts_matches_chiral, has_smarts_match, has_smarts_match_chiral, to_smarts, AtomExpr,
     BondExpr, SmartsError,
 };
 pub use smiles::{from_smiles, parse_smiles, to_canonical_smiles, to_smiles, SmilesError};
 pub use substruct::{
-    get_substruct_match, get_substruct_match_with, get_substruct_matches,
-    get_substruct_matches_with, has_substruct_match, has_substruct_match_with, AtomMapping,
+    get_substruct_match, get_substruct_match_with, get_substruct_match_with_filter,
+    get_substruct_matches, get_substruct_matches_with, get_substruct_matches_with_filter,
+    has_substruct_match, has_substruct_match_with, AtomMapping,
 };
 pub use traits::{
     HasAromaticity, HasAtomicNum, HasBondOrder, HasBondStereo, HasChirality, HasFormalCharge,
