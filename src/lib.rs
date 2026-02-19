@@ -9,6 +9,7 @@ pub mod mol;
 pub mod rings;
 pub mod smiles;
 pub mod traits;
+pub mod valence;
 pub mod wrappers;
 
 pub use atom::{Atom, Chirality};
@@ -24,6 +25,7 @@ pub use kekulize::{kekulize, KekulizeError};
 pub use mol::Mol;
 pub use rings::RingInfo;
 pub use smiles::{from_smiles, parse_smiles, SmilesError};
+pub use valence::{check_valence, total_valence, ValenceError};
 pub use traits::{
     HasAromaticity, HasAtomicNum, HasBondOrder, HasBondStereo, HasChirality, HasFormalCharge,
     HasHybridization, HasHydrogenCount, HasIsotope, HasPosition2D, HasPosition3D, HasValence,
