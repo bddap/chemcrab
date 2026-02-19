@@ -1,5 +1,6 @@
 use std::fmt;
 
+use crate::kekulize::KekulizeError;
 use crate::smarts::SmartsError;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -32,6 +33,7 @@ pub enum ReactionError {
     WrongReactantCount { expected: usize, got: usize },
     TooManyCombinations,
     DuplicateAtomMap { map_num: u16 },
+    Kekulize(KekulizeError),
 }
 
 impl fmt::Display for ReactionError {
@@ -46,8 +48,22 @@ impl fmt::Display for ReactionError {
             Self::DuplicateAtomMap { map_num } => {
                 write!(f, "duplicate atom map number {map_num} in reactant templates")
             }
+            Self::Kekulize(e) => write!(f, "product kekulization failed: {e}"),
         }
     }
 }
 
-impl std::error::Error for ReactionError {}
+impl std::error::Error for ReactionError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Kekulize(e) => Some(e),
+            _ => None,
+        }
+    }
+}
+
+impl From<KekulizeError> for ReactionError {
+    fn from(e: KekulizeError) -> Self {
+        Self::Kekulize(e)
+    }
+}

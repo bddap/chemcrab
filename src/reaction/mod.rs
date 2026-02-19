@@ -285,4 +285,47 @@ mod tests {
         let products = rxn.run(&[&reactant1, &reactant2]).unwrap();
         assert!(!products.is_empty());
     }
+
+    #[test]
+    fn aromatic_substitution_kekulized_bonds() {
+        let rxn = from_reaction_smarts(
+            "[c:1][Br:2].[OH-:3]>>[c:1][O:3].[Br-:2]",
+        )
+        .unwrap();
+        let reactant = mol("c1ccc(Br)cc1");
+        let hydroxide = mol("[OH-]");
+        let products = rxn.run(&[&reactant, &hydroxide]).unwrap();
+        assert!(!products.is_empty());
+        let phenol = &products[0][0];
+        let double_count = phenol
+            .bonds()
+            .filter(|&e| phenol.bond(e).order == crate::bond::BondOrder::Double)
+            .count();
+        assert_eq!(
+            double_count, 3,
+            "phenol product ring should have 3 double bonds, not all single"
+        );
+    }
+
+    #[test]
+    fn aromatic_product_all_bonds_kekulized() {
+        use crate::bond::BondOrder;
+        let rxn = from_reaction_smarts("[c:1][Br:2].[OH-:3]>>[c:1][O:3].[Br-:2]").unwrap();
+        let reactant = mol("c1ccc(Br)cc1");
+        let hydroxide = mol("[OH-]");
+        let products = rxn.run(&[&reactant, &hydroxide]).unwrap();
+        assert!(!products.is_empty());
+        let phenol = &products[0][0];
+        for edge in phenol.bonds() {
+            let order = phenol.bond(edge).order;
+            assert!(
+                order == BondOrder::Single || order == BondOrder::Double || order == BondOrder::Triple,
+                "no bond should remain un-kekulized"
+            );
+        }
+        let single_count = phenol.bonds().filter(|&e| phenol.bond(e).order == BondOrder::Single).count();
+        let double_count = phenol.bonds().filter(|&e| phenol.bond(e).order == BondOrder::Double).count();
+        assert!(double_count >= 3, "ring should have at least 3 double bonds, got {double_count}");
+        assert!(single_count >= 1, "should have at least 1 single bond (C-O), got {single_count}");
+    }
 }

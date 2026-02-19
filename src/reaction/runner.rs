@@ -3,7 +3,8 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use petgraph::graph::NodeIndex;
 
 use crate::atom::Atom;
-use crate::bond::{Bond, BondOrder};
+use crate::bond::{Bond, BondOrder, BondStereo, SmilesBond, SmilesBondOrder};
+use crate::kekulize::kekulize;
 use crate::mol::Mol;
 use crate::smarts::{get_smarts_matches, AtomExpr, BondExpr};
 
@@ -65,7 +66,7 @@ impl Reaction {
 
         let reactant_template_bonds = collect_template_bonds(&self.reactant_templates);
 
-        Ok(self.product_templates
+        self.product_templates
             .iter()
             .map(|product_tmpl| {
                 generate_single_product(
@@ -76,7 +77,7 @@ impl Reaction {
                     reactants,
                 )
             })
-            .collect())
+            .collect()
     }
 }
 
@@ -132,14 +133,25 @@ fn collect_template_bonds(
         .collect()
 }
 
+fn bond_to_smiles_bond(bond: &Bond) -> SmilesBond {
+    SmilesBond {
+        order: match bond.order {
+            BondOrder::Single => SmilesBondOrder::Single,
+            BondOrder::Double => SmilesBondOrder::Double,
+            BondOrder::Triple => SmilesBondOrder::Triple,
+        },
+        stereo: bond.stereo,
+    }
+}
+
 fn generate_single_product(
     product_tmpl: &Mol<AtomExpr, BondExpr>,
     reactant_atom_map: &HashMap<u16, (usize, NodeIndex)>,
     matched_target_atoms: &[HashSet<NodeIndex>],
     reactant_template_bonds: &[HashSet<(u16, u16)>],
     reactants: &[&Mol<Atom, Bond>],
-) -> Mol<Atom, Bond> {
-    let mut product = Mol::new();
+) -> Result<Mol<Atom, Bond>, ReactionError> {
+    let mut product: Mol<Atom, SmilesBond> = Mol::new();
 
     let mut product_node_map: HashMap<NodeIndex, NodeIndex> = HashMap::new();
     let mut map_num_to_product_node: HashMap<u16, NodeIndex> = HashMap::new();
@@ -169,7 +181,7 @@ fn generate_single_product(
     for edge in product_tmpl.bonds() {
         if let Some((a, b)) = product_tmpl.bond_endpoints(edge) {
             let bond_expr = product_tmpl.bond(edge);
-            let bond = bond_from_expr(bond_expr);
+            let bond = smiles_bond_from_expr(bond_expr);
             let pa = product_node_map[&a];
             let pb = product_node_map[&b];
             product.add_bond(pa, pb, bond);
@@ -208,7 +220,6 @@ fn generate_single_product(
                     let in_product_template = product_template_mapped_pairs.contains(&pair);
 
                     if in_reactant_template && !in_product_template {
-                        // Bond broken by reaction
                         continue;
                     }
 
@@ -216,7 +227,7 @@ fn generate_single_product(
                         if let Some(&neighbor_product_node) = map_num_to_product_node.get(&n_mn) {
                             if product.bond_between(product_node, neighbor_product_node).is_none() {
                                 if let Some(edge) = reactant_mol.bond_between(t_idx, neighbor) {
-                                    let bond = reactant_mol.bond(edge).clone();
+                                    let bond = bond_to_smiles_bond(reactant_mol.bond(edge));
                                     product.add_bond(product_node, neighbor_product_node, bond);
                                 }
                             }
@@ -239,12 +250,12 @@ fn generate_single_product(
         }
     }
 
-    product
+    Ok(kekulize(product)?)
 }
 
 #[allow(clippy::too_many_arguments)]
 fn carry_substituents(
-    product: &mut Mol<Atom, Bond>,
+    product: &mut Mol<Atom, SmilesBond>,
     reactant_mol: &Mol<Atom, Bond>,
     matched: &HashSet<NodeIndex>,
     anchor: NodeIndex,
@@ -260,7 +271,7 @@ fn carry_substituents(
         let carried_node = carried_atom_map[&key];
         if product.bond_between(product_anchor, carried_node).is_none() {
             if let Some(edge) = reactant_mol.bond_between(anchor, start_neighbor) {
-                product.add_bond(product_anchor, carried_node, reactant_mol.bond(edge).clone());
+                product.add_bond(product_anchor, carried_node, bond_to_smiles_bond(reactant_mol.bond(edge)));
             }
         }
         return;
@@ -270,7 +281,7 @@ fn carry_substituents(
     carried_atom_map.insert(key, new_node);
 
     if let Some(edge) = reactant_mol.bond_between(anchor, start_neighbor) {
-        product.add_bond(product_anchor, new_node, reactant_mol.bond(edge).clone());
+        product.add_bond(product_anchor, new_node, bond_to_smiles_bond(reactant_mol.bond(edge)));
     }
 
     queue.push_back((start_neighbor, new_node));
@@ -289,7 +300,7 @@ fn carry_substituents(
             carried_atom_map.insert(nb_key, nb_product);
 
             if let Some(edge) = reactant_mol.bond_between(r_node, nb) {
-                product.add_bond(p_node, nb_product, reactant_mol.bond(edge).clone());
+                product.add_bond(p_node, nb_product, bond_to_smiles_bond(reactant_mol.bond(edge)));
             }
 
             queue.push_back((nb, nb_product));
@@ -371,25 +382,23 @@ fn apply_expr_to_atom(atom: &mut Atom, expr: &AtomExpr) {
     }
 }
 
-fn bond_from_expr(expr: &BondExpr) -> Bond {
-    // Aromatic bonds in product templates are written as single bonds here;
-    // proper kekulization of aromatic products is not yet implemented.
+fn smiles_bond_from_expr(expr: &BondExpr) -> SmilesBond {
     let order = match expr {
-        BondExpr::Single | BondExpr::SingleOrAromatic => BondOrder::Single,
-        BondExpr::Double => BondOrder::Double,
-        BondExpr::Triple => BondOrder::Triple,
-        BondExpr::Aromatic => BondOrder::Single,
+        BondExpr::Single | BondExpr::SingleOrAromatic => SmilesBondOrder::Single,
+        BondExpr::Double => SmilesBondOrder::Double,
+        BondExpr::Triple => SmilesBondOrder::Triple,
+        BondExpr::Aromatic => SmilesBondOrder::Aromatic,
         BondExpr::And(_)
         | BondExpr::Or(_)
         | BondExpr::Not(_)
         | BondExpr::Ring
         | BondExpr::True
         | BondExpr::Up
-        | BondExpr::Down => BondOrder::Single,
+        | BondExpr::Down => SmilesBondOrder::Single,
     };
-    Bond {
+    SmilesBond {
         order,
-        stereo: crate::bond::BondStereo::None,
+        stereo: BondStereo::None,
     }
 }
 
