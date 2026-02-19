@@ -1,5 +1,7 @@
 use std::fmt;
 
+use crate::kekulize::KekulizeError;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SmilesError {
     UnexpectedEnd,
@@ -12,6 +14,7 @@ pub enum SmilesError {
     InvalidRingBond { digit: u16, pos: usize },
     EmptyInput,
     RingBondConflict { digit: u16 },
+    Kekulize(KekulizeError),
 }
 
 impl fmt::Display for SmilesError {
@@ -41,8 +44,22 @@ impl fmt::Display for SmilesError {
             Self::RingBondConflict { digit } => {
                 write!(f, "conflicting bond types on ring closure {}", digit)
             }
+            Self::Kekulize(e) => write!(f, "{}", e),
         }
     }
 }
 
-impl std::error::Error for SmilesError {}
+impl std::error::Error for SmilesError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Kekulize(e) => Some(e),
+            _ => None,
+        }
+    }
+}
+
+impl From<KekulizeError> for SmilesError {
+    fn from(e: KekulizeError) -> Self {
+        Self::Kekulize(e)
+    }
+}

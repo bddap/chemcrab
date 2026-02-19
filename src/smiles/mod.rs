@@ -4,7 +4,8 @@ mod parse_tree;
 mod tokenizer;
 
 use crate::atom::Atom;
-use crate::bond::SmilesBond;
+use crate::bond::{Bond, SmilesBond};
+use crate::kekulize;
 use crate::mol::Mol;
 pub use error::SmilesError;
 
@@ -19,6 +20,11 @@ pub fn parse_smiles(s: &str) -> Result<Mol<Atom, SmilesBond>, SmilesError> {
     }
     let tree = parse_tree::build_parse_tree(&tokens)?;
     Ok(builder::build_mol(&tree))
+}
+
+pub fn from_smiles(s: &str) -> Result<Mol<Atom, Bond>, SmilesError> {
+    let mol = parse_smiles(s)?;
+    Ok(kekulize::kekulize(mol)?)
 }
 
 #[cfg(test)]
