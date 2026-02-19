@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use petgraph::graph::NodeIndex;
 
+use crate::aromaticity::{set_aromaticity, AromaticityModel};
 use crate::atom::{Atom, Chirality};
 use crate::bond::{Bond, BondOrder, BondStereo};
 use crate::canonical::canonical_ordering;
@@ -19,12 +20,15 @@ pub fn to_smiles(mol: &Mol<Atom, Bond>) -> String {
 }
 
 pub fn to_canonical_smiles(mol: &Mol<Atom, Bond>) -> String {
-    let ranks = canonical_ordering(mol);
-    let components = connected_components(mol);
-    let mut parts = Vec::with_capacity(components.len());
-    for component in &components {
-        parts.push(write_fragment(mol, component, Some(&ranks)));
-    }
+    let mut mol = mol.clone();
+    set_aromaticity(&mut mol, AromaticityModel::Huckel);
+    let ranks = canonical_ordering(&mol);
+    let components = connected_components(&mol);
+    let mut parts: Vec<String> = components
+        .iter()
+        .map(|component| write_fragment(&mol, component, Some(&ranks)))
+        .collect();
+    parts.sort();
     parts.join(".")
 }
 
@@ -76,18 +80,29 @@ fn compute_bond_directions(
             BondStereo::None => continue,
         };
 
-        let (left, right) = mol.bond_endpoints(edge).unwrap();
+        let (ep_a, ep_b) = mol.bond_endpoints(edge).unwrap();
+
+        let (left, right, ref_l, ref_r) =
+            if parent[ep_b.index()] == Some(ep_a) {
+                (ep_a, ep_b, ref_left, ref_right)
+            } else if parent[ep_a.index()] == Some(ep_b) {
+                (ep_b, ep_a, ref_right, ref_left)
+            } else if ep_a.index() < ep_b.index() {
+                (ep_a, ep_b, ref_left, ref_right)
+            } else {
+                (ep_b, ep_a, ref_right, ref_left)
+            };
 
         let left_write_dir =
-            write_direction(left, ref_left, parent, children, ring_opens, ring_closes);
+            write_direction(left, ref_l, parent, children, ring_opens, ring_closes);
         let right_write_dir =
-            write_direction(right, ref_right, parent, children, ring_opens, ring_closes);
+            write_direction(right, ref_r, parent, children, ring_opens, ring_closes);
 
         let left_char = Direction::Up;
         let right_char = if is_trans { left_char } else { left_char.flip() };
 
-        set_bond_dir(&mut dirs, left, ref_left, left_char, left_write_dir);
-        set_bond_dir(&mut dirs, right, ref_right, right_char, right_write_dir);
+        set_bond_dir(&mut dirs, left, ref_l, left_char, left_write_dir);
+        set_bond_dir(&mut dirs, right, ref_r, right_char, right_write_dir);
     }
 
     dirs
@@ -303,10 +318,30 @@ fn resolve_chirality_for_smiles(
         return Chirality::None;
     }
 
-    let graph_neighbors: Vec<NodeIndex> = mol.neighbors(node).collect();
-    let smiles_neighbors = ctx.smiles_neighbor_order(node);
+    let h_sentinel = NodeIndex::new(usize::MAX);
+    let has_h = atom.hydrogen_count > 0;
+    let has_parent = ctx.parent[node.index()].is_some();
 
-    let even = parity_of_permutation(&graph_neighbors, &smiles_neighbors);
+    let mut graph_neighbors: Vec<NodeIndex> = mol.neighbors(node).collect();
+    let smiles_explicit = ctx.smiles_neighbor_order(node);
+
+    let even = if has_h {
+        graph_neighbors.insert(0, h_sentinel);
+
+        let mut smiles_with_h = Vec::with_capacity(smiles_explicit.len() + 1);
+        if has_parent {
+            smiles_with_h.push(smiles_explicit[0]);
+            smiles_with_h.push(h_sentinel);
+            smiles_with_h.extend_from_slice(&smiles_explicit[1..]);
+        } else {
+            smiles_with_h.push(h_sentinel);
+            smiles_with_h.extend_from_slice(&smiles_explicit);
+        }
+
+        parity_of_permutation(&graph_neighbors, &smiles_with_h)
+    } else {
+        parity_of_permutation(&graph_neighbors, &smiles_explicit)
+    };
 
     if even {
         atom.chirality

@@ -1802,7 +1802,7 @@ mod tests {
 
     #[test]
     fn chiral_match_two_centers() {
-        let target = mol("[C@H](F)(Cl)[C@@H](Br)(I)O");
+        let target = mol("[C@H](F)(Cl)[C@@](Br)(I)O");
         let query = smarts("[C@](F)(Cl)[C@@](Br)(I)O");
         assert!(has_smarts_match_chiral(&target, &query));
 
