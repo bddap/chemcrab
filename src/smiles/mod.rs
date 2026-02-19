@@ -580,4 +580,42 @@ mod tests {
             assert_eq!(atom(&mol, i).hydrogen_count, 1);
         }
     }
+
+    // ---- Explicit bonds at branch start ----
+
+    #[test]
+    fn biphenyl_explicit_single_in_aromatic_branch() {
+        let mol = parse_smiles("c1ccc(-c2ccccc2)cc1").unwrap();
+        assert_eq!(mol.atom_count(), 12);
+        assert_eq!(mol.bond_count(), 13);
+        let inter_ring = mol.bond_between(n(3), n(4)).unwrap();
+        assert_eq!(mol.bond(inter_ring).order, SmilesBondOrder::Single);
+    }
+
+    #[test]
+    fn biphenyl_implicit_bond_in_aromatic_branch() {
+        let mol = parse_smiles("c1ccc(c2ccccc2)cc1").unwrap();
+        assert_eq!(mol.atom_count(), 12);
+        assert_eq!(mol.bond_count(), 13);
+        let inter_ring = mol.bond_between(n(3), n(4)).unwrap();
+        assert_eq!(mol.bond(inter_ring).order, SmilesBondOrder::Aromatic);
+    }
+
+    #[test]
+    fn explicit_double_bond_in_aromatic_branch() {
+        let mol = parse_smiles("c1ccc(=O)cc1").unwrap();
+        assert_eq!(mol.atom_count(), 7);
+        let bond_c_o = mol.bond_between(n(3), n(4)).unwrap();
+        assert_eq!(mol.bond(bond_c_o).order, SmilesBondOrder::Double);
+        assert_eq!(atom(&mol, 4).atomic_num, 8);
+    }
+
+    #[test]
+    fn kekule_biphenyl_explicit_single() {
+        let mol = parse_smiles("C1=CC=C(-C2=CC=CC=C2)C=C1").unwrap();
+        assert_eq!(mol.atom_count(), 12);
+        assert_eq!(mol.bond_count(), 13);
+        let inter_ring = mol.bond_between(n(3), n(4)).unwrap();
+        assert_eq!(mol.bond(inter_ring).order, SmilesBondOrder::Single);
+    }
 }

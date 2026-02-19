@@ -216,6 +216,7 @@ fn looks_like_bond(tokens: &[Token]) -> bool {
         Some(Token::Atom(_))
             | Some(Token::RingClosure { .. })
             | Some(Token::CloseParen(_))
+            | Some(Token::OpenParen(_))
             | None
     )
 }
@@ -618,6 +619,14 @@ mod tests {
             Token::Atom(a) => assert_eq!(a.atom_class, 1),
             _ => panic!("expected atom"),
         }
+    }
+
+    #[test]
+    fn tokenize_bond_after_open_paren() {
+        let tokens = tokenize("c(-c)").unwrap();
+        assert!(matches!(&tokens[1], Token::OpenParen(_)));
+        assert!(matches!(&tokens[2], Token::Bond(BondToken::Single)));
+        assert!(matches!(&tokens[3], Token::Atom(_)));
     }
 
     #[test]
