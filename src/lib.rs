@@ -52,8 +52,9 @@ pub use smiles::{from_smiles, parse_smiles, to_canonical_smiles, to_smiles, Smil
 pub use strip::{strip_bond_stereo, strip_chirality, strip_isotope};
 pub use substruct::{
     get_substruct_match, get_substruct_match_with, get_substruct_match_with_filter,
-    get_substruct_matches, get_substruct_matches_with, get_substruct_matches_with_filter,
-    has_substruct_match, has_substruct_match_with, AtomMapping,
+    get_substruct_matches, get_substruct_matches_unique, get_substruct_matches_with,
+    get_substruct_matches_with_filter, get_substruct_matches_with_unique, has_substruct_match,
+    has_substruct_match_with, uniquify_atom_mappings, AtomMapping,
 };
 pub use traits::{
     HasAromaticity, HasAtomicNum, HasBondOrder, HasBondStereo, HasBondStereoMut, HasChirality,
