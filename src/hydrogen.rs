@@ -2,6 +2,14 @@ use crate::atom::{Atom, Chirality};
 use crate::bond::{Bond, BondOrder, BondStereo};
 use crate::mol::Mol;
 
+fn flip_chirality(c: Chirality) -> Chirality {
+    match c {
+        Chirality::Cw => Chirality::Ccw,
+        Chirality::Ccw => Chirality::Cw,
+        Chirality::None => Chirality::None,
+    }
+}
+
 pub fn add_hs(mol: &Mol<Atom, Bond>) -> Mol<Atom, Bond> {
     let mut result = Mol::new();
     let mut index_map = Vec::new();
@@ -9,7 +17,6 @@ pub fn add_hs(mol: &Mol<Atom, Bond>) -> Mol<Atom, Bond> {
     for idx in mol.atoms() {
         let atom = mol.atom(idx);
         let new_idx = result.add_atom(Atom {
-            chirality: Chirality::None,
             hydrogen_count: 0,
             ..*atom
         });
@@ -23,7 +30,9 @@ pub fn add_hs(mol: &Mol<Atom, Bond>) -> Mol<Atom, Bond> {
     }
 
     for (idx, &parent) in index_map.iter().enumerate() {
-        let h_count = mol.atom(petgraph::graph::NodeIndex::new(idx)).hydrogen_count;
+        let orig_idx = petgraph::graph::NodeIndex::new(idx);
+        let atom = mol.atom(orig_idx);
+        let h_count = atom.hydrogen_count as usize;
         for _ in 0..h_count {
             let h = result.add_atom(Atom {
                 atomic_num: 1,
@@ -37,6 +46,12 @@ pub fn add_hs(mol: &Mol<Atom, Bond>) -> Mol<Atom, Bond> {
                     stereo: BondStereo::None,
                 },
             );
+        }
+        if matches!(atom.chirality, Chirality::Cw | Chirality::Ccw) && h_count > 0 {
+            let graph_neighbor_count = mol.neighbors(orig_idx).count();
+            if (h_count * graph_neighbor_count) % 2 == 1 {
+                result.atom_mut(parent).chirality = flip_chirality(atom.chirality);
+            }
         }
     }
 
@@ -70,8 +85,30 @@ pub fn remove_hs(mol: &Mol<Atom, Bond>) -> Mol<Atom, Bond> {
             continue;
         }
         let atom = mol.atom(idx);
+        let chirality = match atom.chirality {
+            Chirality::Cw | Chirality::Ccw => {
+                let neighbors: Vec<_> = mol.neighbors(idx).collect();
+                let removable_after_count: usize = neighbors
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, n)| removable[n.index()])
+                    .map(|(pos, _)| {
+                        neighbors[pos + 1..]
+                            .iter()
+                            .filter(|n| !removable[n.index()])
+                            .count()
+                    })
+                    .sum();
+                if removable_after_count % 2 == 1 {
+                    flip_chirality(atom.chirality)
+                } else {
+                    atom.chirality
+                }
+            }
+            Chirality::None => Chirality::None,
+        };
         let new_idx = result.add_atom(Atom {
-            chirality: Chirality::None,
+            chirality,
             hydrogen_count: atom.hydrogen_count + extra_h[idx.index()],
             ..*atom
         });
@@ -170,16 +207,108 @@ mod tests {
     }
 
     #[test]
-    fn add_hs_clears_chirality() {
+    fn add_hs_preserves_chirality_no_virtual_h() {
         let mut mol = Mol::new();
-        mol.add_atom(Atom {
+        let c = mol.add_atom(Atom {
+            atomic_num: 6,
+            chirality: Chirality::Cw,
+            hydrogen_count: 0,
+            ..Atom::default()
+        });
+        for _ in 0..4 {
+            let n = mol.add_atom(Atom {
+                atomic_num: 7,
+                ..Atom::default()
+            });
+            mol.add_bond(c, n, Bond::default());
+        }
+        let explicit = add_hs(&mol);
+        assert_eq!(explicit.atom(n(0)).chirality, Chirality::Cw);
+    }
+
+    #[test]
+    fn add_hs_remaps_chirality_with_virtual_h() {
+        let mut mol = Mol::new();
+        let c = mol.add_atom(Atom {
+            atomic_num: 6,
+            chirality: Chirality::Ccw,
+            hydrogen_count: 1,
+            ..Atom::default()
+        });
+        for _ in 0..3 {
+            let n = mol.add_atom(Atom {
+                atomic_num: 7,
+                ..Atom::default()
+            });
+            mol.add_bond(c, n, Bond::default());
+        }
+        let explicit = add_hs(&mol);
+        assert_eq!(explicit.atom(n(0)).chirality, Chirality::Cw);
+    }
+
+    #[test]
+    fn remove_hs_preserves_chirality_no_removable_h_neighbor() {
+        let mut mol = Mol::new();
+        let c = mol.add_atom(Atom {
+            atomic_num: 6,
+            chirality: Chirality::Cw,
+            hydrogen_count: 0,
+            ..Atom::default()
+        });
+        for _ in 0..4 {
+            let n = mol.add_atom(Atom {
+                atomic_num: 7,
+                ..Atom::default()
+            });
+            mol.add_bond(c, n, Bond::default());
+        }
+        let result = remove_hs(&mol);
+        assert_eq!(result.atom(n(0)).chirality, Chirality::Cw);
+    }
+
+    #[test]
+    fn chirality_round_trip_no_h_on_center() {
+        let mut mol = Mol::new();
+        let c = mol.add_atom(Atom {
+            atomic_num: 6,
+            chirality: Chirality::Ccw,
+            hydrogen_count: 0,
+            ..Atom::default()
+        });
+        for _ in 0..4 {
+            let n = mol.add_atom(Atom {
+                atomic_num: 7,
+                ..Atom::default()
+            });
+            mol.add_bond(c, n, Bond::default());
+        }
+        let explicit = add_hs(&mol);
+        assert_eq!(explicit.atom(n(0)).chirality, Chirality::Ccw);
+        let collapsed = remove_hs(&explicit);
+        assert_eq!(collapsed.atom(n(0)).chirality, Chirality::Ccw);
+    }
+
+    #[test]
+    fn chirality_round_trip_with_h_on_center() {
+        let mut mol = Mol::new();
+        let c = mol.add_atom(Atom {
             atomic_num: 6,
             chirality: Chirality::Cw,
             hydrogen_count: 1,
             ..Atom::default()
         });
+        for _ in 0..3 {
+            let nn = mol.add_atom(Atom {
+                atomic_num: 7,
+                ..Atom::default()
+            });
+            mol.add_bond(c, nn, Bond::default());
+        }
         let explicit = add_hs(&mol);
-        assert_eq!(explicit.atom(n(0)).chirality, Chirality::None);
+        assert_eq!(explicit.atom(n(0)).chirality, Chirality::Ccw);
+        let collapsed = remove_hs(&explicit);
+        assert_eq!(collapsed.atom(n(0)).chirality, Chirality::Cw);
+        assert_eq!(collapsed.atom(n(0)).hydrogen_count, 1);
     }
 
     #[test]
