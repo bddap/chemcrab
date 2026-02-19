@@ -307,8 +307,8 @@ mod tests {
         let arom = find_aromatic_atoms(&mol);
         assert_eq!(arom.len(), 7);
         assert!(!arom[0]);
-        for i in 1..7 {
-            assert!(arom[i], "ring atom {} should be aromatic", i);
+        for (i, &is_arom) in arom.iter().enumerate().take(7).skip(1) {
+            assert!(is_arom, "ring atom {} should be aromatic", i);
         }
     }
 

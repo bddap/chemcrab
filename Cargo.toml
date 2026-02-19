@@ -7,3 +7,7 @@ description = "A cheminformatics library for Rust"
 
 [dependencies]
 petgraph = "0.8.3"
+
+[dev-dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

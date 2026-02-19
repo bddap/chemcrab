@@ -547,8 +547,8 @@ mod tests {
         assert!(adj[1][0]);
         assert!(adj[2][1]);
         assert!(adj[2][0]);
-        for i in 0..3 {
-            assert!(!adj[i][i]);
+        for (i, row) in adj.iter().enumerate().take(3) {
+            assert!(!row[i]);
         }
     }
 

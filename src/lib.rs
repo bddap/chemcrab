@@ -14,6 +14,10 @@ pub mod smarts;
 pub mod smiles;
 pub mod substruct;
 pub mod traits;
+pub mod chirality;
+pub mod conjugation;
+pub mod hybridization;
+pub mod radical;
 pub mod valence;
 pub mod wrappers;
 
@@ -21,6 +25,9 @@ pub use aromaticity::{find_aromatic_atoms, set_aromaticity, AromaticityModel};
 pub use atom::{Atom, Chirality};
 pub use canonical::canonical_ordering;
 pub use bond::{Bond, BondOrder, BondStereo, SmilesBond, SmilesBondOrder};
+pub use chirality::cleanup_chirality;
+pub use conjugation::assign_conjugation;
+pub use hybridization::assign_hybridization;
 pub use element::Element;
 pub use formula::{average_mol_weight, exact_mol_weight, mol_formula};
 pub use graph_ops::{
@@ -50,6 +57,7 @@ pub use traits::{
     HasAromaticity, HasAtomicNum, HasBondOrder, HasBondStereo, HasChirality, HasFormalCharge,
     HasHybridization, HasHydrogenCount, HasIsotope, HasPosition2D, HasPosition3D, HasValence,
 };
+pub use radical::num_radical_electrons;
 pub use valence::{check_valence, total_valence, ValenceError};
 pub use wrappers::{Hybridization, WithHybridization, WithPosition2D, WithPosition3D, WithValence};
 
