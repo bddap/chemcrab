@@ -18,7 +18,7 @@ where
     A: HasAtomicNum + HasAromaticity,
     B: HasBondOrder,
 {
-    DefaultVf2::new(target, query).find_first()
+    Vf2::new(target, query, default_atom_match, default_bond_match).find_first()
 }
 
 pub fn get_substruct_matches<A, B>(target: &Mol<A, B>, query: &Mol<A, B>) -> Vec<AtomMapping>
@@ -26,14 +26,14 @@ where
     A: HasAtomicNum + HasAromaticity,
     B: HasBondOrder,
 {
-    DefaultVf2::new(target, query).find_all()
+    Vf2::new(target, query, default_atom_match, default_bond_match).find_all()
 }
 
 pub fn has_substruct_match_with<A1, B1, A2, B2>(
     target: &Mol<A1, B1>,
     query: &Mol<A2, B2>,
     atom_match: impl Fn(&A1, &A2) -> bool,
-    bond_match: impl Fn(&B1, &B2) -> bool,
+    bond_match: impl Fn(&B1, &B2, (&A1, &A1), (&A2, &A2)) -> bool,
 ) -> bool {
     get_substruct_match_with(target, query, atom_match, bond_match).is_some()
 }
@@ -42,7 +42,7 @@ pub fn get_substruct_match_with<A1, B1, A2, B2>(
     target: &Mol<A1, B1>,
     query: &Mol<A2, B2>,
     atom_match: impl Fn(&A1, &A2) -> bool,
-    bond_match: impl Fn(&B1, &B2) -> bool,
+    bond_match: impl Fn(&B1, &B2, (&A1, &A1), (&A2, &A2)) -> bool,
 ) -> Option<AtomMapping> {
     Vf2::new(target, query, atom_match, bond_match).find_first()
 }
@@ -51,7 +51,7 @@ pub fn get_substruct_matches_with<A1, B1, A2, B2>(
     target: &Mol<A1, B1>,
     query: &Mol<A2, B2>,
     atom_match: impl Fn(&A1, &A2) -> bool,
-    bond_match: impl Fn(&B1, &B2) -> bool,
+    bond_match: impl Fn(&B1, &B2, (&A1, &A1), (&A2, &A2)) -> bool,
 ) -> Vec<AtomMapping> {
     Vf2::new(target, query, atom_match, bond_match).find_all()
 }
@@ -66,121 +66,18 @@ fn default_atom_match<A: HasAtomicNum + HasAromaticity>(target: &A, query: &A) -
     true
 }
 
-struct DefaultVf2<'a, A, B> {
-    target: &'a Mol<A, B>,
-    query: &'a Mol<A, B>,
-    query_order: Vec<NodeIndex>,
-    query_map: Vec<Option<NodeIndex>>,
-    target_used: Vec<bool>,
-}
-
-impl<'a, A: HasAtomicNum + HasAromaticity, B: HasBondOrder> DefaultVf2<'a, A, B> {
-    fn new(target: &'a Mol<A, B>, query: &'a Mol<A, B>) -> Self {
-        let mut query_order: Vec<NodeIndex> = query.atoms().collect();
-        query_order.sort_by(|&a, &b| {
-            query.neighbors(b).count().cmp(&query.neighbors(a).count())
-        });
-        Self {
-            target,
-            query,
-            query_order,
-            query_map: vec![None; query.atom_count()],
-            target_used: vec![false; target.atom_count()],
-        }
+fn default_bond_match<A: HasAromaticity, B: HasBondOrder>(
+    target: &B,
+    query: &B,
+    target_endpoints: (&A, &A),
+    query_endpoints: (&A, &A),
+) -> bool {
+    let both_target_aromatic = target_endpoints.0.is_aromatic() && target_endpoints.1.is_aromatic();
+    let both_query_aromatic = query_endpoints.0.is_aromatic() && query_endpoints.1.is_aromatic();
+    if both_query_aromatic && both_target_aromatic {
+        return true;
     }
-
-    fn find_first(&mut self) -> Option<AtomMapping> {
-        let mut results = Vec::new();
-        self.recurse(0, &mut results, true);
-        results.into_iter().next()
-    }
-
-    fn find_all(&mut self) -> Vec<AtomMapping> {
-        let mut results = Vec::new();
-        self.recurse(0, &mut results, false);
-        results
-    }
-
-    fn recurse(
-        &mut self,
-        depth: usize,
-        results: &mut Vec<AtomMapping>,
-        first_only: bool,
-    ) {
-        if depth == self.query_order.len() {
-            let mapping = self
-                .query_order
-                .iter()
-                .map(|&qn| (qn, self.query_map[qn.index()].unwrap()))
-                .collect();
-            results.push(mapping);
-            return;
-        }
-
-        if first_only && !results.is_empty() {
-            return;
-        }
-
-        let query_node = self.query_order[depth];
-
-        for t_idx in 0..self.target_used.len() {
-            if self.target_used[t_idx] {
-                continue;
-            }
-
-            let target_node = NodeIndex::new(t_idx);
-
-            if !self.is_feasible(query_node, target_node) {
-                continue;
-            }
-
-            self.query_map[query_node.index()] = Some(target_node);
-            self.target_used[t_idx] = true;
-
-            self.recurse(depth + 1, results, first_only);
-
-            if first_only && !results.is_empty() {
-                return;
-            }
-
-            self.query_map[query_node.index()] = None;
-            self.target_used[t_idx] = false;
-        }
-    }
-
-    fn is_feasible(&self, query_node: NodeIndex, target_node: NodeIndex) -> bool {
-        if !default_atom_match(self.target.atom(target_node), self.query.atom(query_node)) {
-            return false;
-        }
-
-        for q_neighbor in self.query.neighbors(query_node) {
-            if let Some(t_mapped) = self.query_map[q_neighbor.index()] {
-                let q_bond_idx = self
-                    .query
-                    .bond_between(query_node, q_neighbor)
-                    .expect("bond must exist between neighbors");
-                match self.target.bond_between(target_node, t_mapped) {
-                    Some(t_bond_idx) => {
-                        let both_query_aromatic = self.query.atom(query_node).is_aromatic()
-                            && self.query.atom(q_neighbor).is_aromatic();
-                        let both_target_aromatic = self.target.atom(target_node).is_aromatic()
-                            && self.target.atom(t_mapped).is_aromatic();
-                        if both_query_aromatic && both_target_aromatic {
-                            continue;
-                        }
-                        if self.target.bond(t_bond_idx).bond_order()
-                            != self.query.bond(q_bond_idx).bond_order()
-                        {
-                            return false;
-                        }
-                    }
-                    None => return false,
-                }
-            }
-        }
-
-        true
-    }
+    target.bond_order() == query.bond_order()
 }
 
 struct Vf2<'a, A1, B1, A2, B2, FA, FB> {
@@ -196,7 +93,7 @@ struct Vf2<'a, A1, B1, A2, B2, FA, FB> {
 impl<'a, A1, B1, A2, B2, FA, FB> Vf2<'a, A1, B1, A2, B2, FA, FB>
 where
     FA: Fn(&A1, &A2) -> bool,
-    FB: Fn(&B1, &B2) -> bool,
+    FB: Fn(&B1, &B2, (&A1, &A1), (&A2, &A2)) -> bool,
 {
     fn new(
         target: &'a Mol<A1, B1>,
@@ -291,7 +188,20 @@ where
                     .expect("bond must exist between neighbors");
                 match self.target.bond_between(target_node, t_mapped) {
                     Some(t_bond) => {
-                        if !(self.bond_match)(self.target.bond(t_bond), self.query.bond(q_bond)) {
+                        let target_endpoints = (
+                            self.target.atom(target_node),
+                            self.target.atom(t_mapped),
+                        );
+                        let query_endpoints = (
+                            self.query.atom(query_node),
+                            self.query.atom(q_neighbor),
+                        );
+                        if !(self.bond_match)(
+                            self.target.bond(t_bond),
+                            self.query.bond(q_bond),
+                            target_endpoints,
+                            query_endpoints,
+                        ) {
                             return false;
                         }
                     }
@@ -439,7 +349,7 @@ mod tests {
             &target,
             &query,
             |t: &crate::Atom, q: &crate::Atom| t.atomic_num == q.atomic_num,
-            |t: &crate::Bond, _q: &crate::Bond| t.order == crate::BondOrder::Single,
+            |t: &crate::Bond, _q, _, _| t.order == crate::BondOrder::Single,
         );
         assert!(!matches.is_empty());
     }
@@ -452,7 +362,7 @@ mod tests {
             &target,
             &query,
             |t: &crate::Atom, q: &crate::Atom| t.atomic_num == q.atomic_num,
-            |_t: &crate::Bond, _q: &crate::Bond| true,
+            |_t: &crate::Bond, _q, _, _| true,
         );
         assert_eq!(matches.len(), 2);
     }
@@ -465,7 +375,7 @@ mod tests {
             &target,
             &query,
             |t: &crate::Atom, q: &crate::Atom| t.atomic_num == q.atomic_num,
-            |_t: &crate::Bond, _q: &crate::Bond| true,
+            |_t: &crate::Bond, _q, _, _| true,
         );
         assert_eq!(matches.len(), 1);
     }
