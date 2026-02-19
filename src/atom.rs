@@ -72,3 +72,9 @@ impl crate::traits::HasAromaticity for Atom {
         self.is_aromatic
     }
 }
+
+impl AsMut<Chirality> for Atom {
+    fn as_mut(&mut self) -> &mut Chirality {
+        &mut self.chirality
+    }
+}

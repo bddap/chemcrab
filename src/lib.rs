@@ -25,7 +25,7 @@ pub use element::Element;
 pub use formula::{average_mol_weight, exact_mol_weight, mol_formula};
 pub use graph_ops::{
     adjacency_matrix, connected_components, distance_matrix, get_fragments, num_components,
-    shortest_path,
+    renumber_atoms, renumber_atoms_canonical, shortest_path, RenumberError,
 };
 pub use hydrogen::{add_hs, remove_hs};
 pub use kekulize::{kekulize, KekulizeError};

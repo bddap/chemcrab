@@ -43,6 +43,12 @@ impl crate::traits::HasBondStereo for Bond {
     }
 }
 
+impl AsMut<BondStereo> for Bond {
+    fn as_mut(&mut self) -> &mut BondStereo {
+        &mut self.stereo
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum SmilesBondOrder {
     Single,
@@ -71,5 +77,11 @@ impl Default for SmilesBond {
 impl crate::traits::HasBondStereo for SmilesBond {
     fn bond_stereo(&self) -> BondStereo {
         self.stereo
+    }
+}
+
+impl AsMut<BondStereo> for SmilesBond {
+    fn as_mut(&mut self) -> &mut BondStereo {
+        &mut self.stereo
     }
 }
