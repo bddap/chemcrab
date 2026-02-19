@@ -1,6 +1,7 @@
 pub mod atom;
 pub mod bond;
 pub mod element;
+pub mod hydrogen;
 pub mod mol;
 pub mod smiles;
 pub mod traits;
@@ -8,6 +9,7 @@ pub mod wrappers;
 
 pub use atom::{Atom, Chirality};
 pub use bond::{Bond, BondOrder, BondStereo, SmilesBond, SmilesBondOrder};
+pub use hydrogen::{add_hs, remove_hs};
 pub use element::Element;
 pub use mol::Mol;
 pub use smiles::{parse_smiles, SmilesError};
