@@ -2,6 +2,7 @@ pub mod atom;
 pub mod bond;
 pub mod element;
 pub mod formula;
+pub mod graph_ops;
 pub mod hydrogen;
 pub mod kekulize;
 pub mod mol;
@@ -14,6 +15,10 @@ pub use atom::{Atom, Chirality};
 pub use bond::{Bond, BondOrder, BondStereo, SmilesBond, SmilesBondOrder};
 pub use element::Element;
 pub use formula::{average_mol_weight, exact_mol_weight, mol_formula};
+pub use graph_ops::{
+    adjacency_matrix, connected_components, distance_matrix, get_fragments, num_components,
+    shortest_path,
+};
 pub use hydrogen::{add_hs, remove_hs};
 pub use kekulize::{kekulize, KekulizeError};
 pub use mol::Mol;
