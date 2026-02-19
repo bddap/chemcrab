@@ -674,15 +674,12 @@ fn normalize_chirality(
                 continue;
             };
             let graph_order: Vec<petgraph::graph::NodeIndex> = mol.neighbors(idx).collect();
-            eprintln!("[normalize_chirality] atom {}: input_order={:?}, graph_order={:?}, parity_even={}", 
-                idx.index(), input_order, graph_order, parity_even(input_order, &graph_order));
             if input_order.len() != graph_order.len() || input_order.len() < 2 {
                 continue;
             }
             !parity_even(input_order, &graph_order)
         };
         if needs_flip {
-            eprintln!("[normalize_chirality] flipping atom {}", idx.index());
             flip_chirality(mol.atom_mut(idx));
         }
     }

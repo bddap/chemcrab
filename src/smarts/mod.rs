@@ -223,16 +223,6 @@ fn extract_chirality_and_h(expr: &AtomExpr) -> Option<(Chirality, bool)> {
                 match p {
                     AtomExpr::Chirality(c) => chiral = Some(*c),
                     AtomExpr::TotalHCount(n) if *n > 0 => has_h = true,
-                    AtomExpr::And(inner) => {
-                        if let Some((c, h)) = extract_chirality_and_h(&AtomExpr::And(inner.clone())) {
-                            if c != Chirality::None {
-                                chiral = Some(c);
-                            }
-                            if h {
-                                has_h = true;
-                            }
-                        }
-                    }
                     _ => {}
                 }
             }
@@ -343,7 +333,6 @@ fn match_atom_expr(expr: &AtomExpr, atom: &Atom, ctx: &MatchContext, idx: NodeIn
         AtomExpr::Or(exprs) => exprs
             .iter()
             .any(|e| match_atom_expr(e, atom, ctx, idx)),
-        AtomExpr::Chirality(_) => expr.matches(atom, ctx, idx),
         AtomExpr::Not(inner) => !match_atom_expr(inner, atom, ctx, idx),
         _ => expr.matches(atom, ctx, idx),
     }
@@ -1374,6 +1363,23 @@ mod tests {
         let l_ala = mol("[C@@H](N)(C(=O)O)C");
         let query = smarts("[C@H](N)(C)C");
         assert!(has_smarts_match_chiral(&l_ala, &query));
+    }
+
+    #[test]
+    fn chiral_match_ring_atom() {
+        let target = mol("[C@@H]1(C)CCCC[C@H]1C");
+        let query = smarts("[C@@H](C)C");
+        assert!(has_smarts_match_chiral(&target, &query));
+    }
+
+    #[test]
+    fn chiral_match_two_centers() {
+        let target = mol("[C@H](F)(Cl)[C@@H](Br)(I)O");
+        let query = smarts("[C@](F)(Cl)[C@@](Br)(I)O");
+        assert!(has_smarts_match_chiral(&target, &query));
+
+        let query_wrong = smarts("[C@@](F)(Cl)[C@@](Br)(I)O");
+        assert!(!has_smarts_match_chiral(&target, &query_wrong));
     }
 
     #[test]
