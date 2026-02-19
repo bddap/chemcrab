@@ -349,6 +349,7 @@ fn write_atom_expr_inner(expr: &AtomExpr, out: &mut String) {
             let ch = match kind {
                 RangeKind::Degree => 'D',
                 RangeKind::NonHDegree => 'd',
+                RangeKind::TotalHCount => 'H',
                 RangeKind::ImplicitHCount => 'h',
                 RangeKind::SmallestRingSize => 'r',
                 RangeKind::RingMembership => 'R',

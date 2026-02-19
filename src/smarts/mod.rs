@@ -1253,6 +1253,47 @@ mod tests {
     }
 
     #[test]
+    fn parse_range_total_h_count() {
+        let q = smarts("[H{1-2}]");
+        assert!(matches!(
+            q.atom(NodeIndex::new(0)),
+            AtomExpr::Range {
+                kind: RangeKind::TotalHCount,
+                low: Some(1),
+                high: Some(2)
+            }
+        ));
+    }
+
+    #[test]
+    fn match_range_total_h_count() {
+        // methane CH4 has hydrogen_count=4, ethane C2H6 each C has hydrogen_count=3
+        let target = mol("CC");
+        let query = smarts("[H{2-3}]");
+        let matches = get_smarts_matches(&target, &query);
+        // Each carbon in ethane has 3 implicit H → both match H{2-3}
+        assert_eq!(matches.len(), 2);
+
+        let query_no_match = smarts("[H{0-0}]");
+        let matches_none = get_smarts_matches(&target, &query_no_match);
+        assert_eq!(matches_none.len(), 0);
+    }
+
+    #[test]
+    fn range_h_vs_implicit_h_are_distinct() {
+        let q_total = smarts("[H{1-2}]");
+        let q_implicit = smarts("[h{1-2}]");
+        assert!(matches!(
+            q_total.atom(NodeIndex::new(0)),
+            AtomExpr::Range { kind: RangeKind::TotalHCount, .. }
+        ));
+        assert!(matches!(
+            q_implicit.atom(NodeIndex::new(0)),
+            AtomExpr::Range { kind: RangeKind::ImplicitHCount, .. }
+        ));
+    }
+
+    #[test]
     fn match_range_positive_charge() {
         let target = mol("[NH4+]");
         let query = smarts("[+{1-2}]");
@@ -1321,7 +1362,7 @@ mod tests {
 
     #[test]
     fn writer_round_trip_range() {
-        for s in &["[D{2-3}]", "[D{2-}]", "[D{-2}]", "[d{1-3}]", "[z{0-1}]", "[v{3-4}]"] {
+        for s in &["[D{2-3}]", "[D{2-}]", "[D{-2}]", "[d{1-3}]", "[z{0-1}]", "[v{3-4}]", "[H{1-2}]", "[h{1-2}]"] {
             let q = smarts(s);
             let written = to_smarts(&q);
             let reparsed = smarts(&written);

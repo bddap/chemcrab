@@ -424,7 +424,7 @@ impl<'a> Parser<'a> {
                 } else {
                     self.pos += 1;
                     if self.peek_is_range() {
-                        return self.parse_range(RangeKind::ImplicitHCount);
+                        return self.parse_range(RangeKind::TotalHCount);
                     }
                     let n = self.parse_number().unwrap_or(1);
                     Ok(AtomExpr::TotalHCount(n as u8))

@@ -21,6 +21,7 @@ pub enum Hybridization {
 pub enum RangeKind {
     Degree,
     NonHDegree,
+    TotalHCount,
     ImplicitHCount,
     SmallestRingSize,
     RingMembership,
@@ -147,6 +148,7 @@ fn range_value(kind: RangeKind, atom: &Atom, ctx: &MatchContext, idx: NodeIndex)
     match kind {
         RangeKind::Degree => ctx.mol.neighbors(idx).count() as u8,
         RangeKind::NonHDegree => non_h_degree(ctx.mol, idx),
+        RangeKind::TotalHCount => atom.hydrogen_count,
         RangeKind::ImplicitHCount => atom.hydrogen_count,
         RangeKind::SmallestRingSize => ctx
             .ring_info
