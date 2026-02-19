@@ -6,8 +6,6 @@ use serde::Deserialize;
 // Shared helpers
 // ---------------------------------------------------------------------------
 
-// Known parser limitation: `c1ccc(-c2ccccc2)cc1` (biphenyl) fails because
-// the explicit `-` single bond inside an aromatic branch context is not yet handled.
 fn try_parse(smiles: &str) -> Option<chemcrab::Mol<chemcrab::Atom, chemcrab::Bond>> {
     match chemcrab::smiles::from_smiles(smiles) {
         Ok(m) => Some(m),
@@ -166,7 +164,7 @@ fn approval_rings() {
             Some(m) => m,
             None => { skipped += 1; continue; }
         };
-        let ri = chemcrab::RingInfo::sssr(&mol);
+        let ri = chemcrab::RingInfo::symmetrized_sssr(&mol);
 
         if ri.num_rings() != entry.num_rings {
             failures.push(format!(

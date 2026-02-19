@@ -51,8 +51,19 @@ impl RingInfo {
 
         let mut result_bvs: Vec<Vec<u64>> = sssr_bvs.clone();
 
-        // Include Horton candidates that lie in the cycle space.
+        let sssr_sizes: std::collections::HashSet<usize> = candidates
+            .iter()
+            .filter(|ring| {
+                let bv = ring_to_edge_bitvector(ring, num_edges, mol);
+                sssr_bvs.contains(&bv)
+            })
+            .map(|ring| ring.len())
+            .collect();
+
         for ring in &candidates {
+            if !sssr_sizes.contains(&ring.len()) {
+                continue;
+            }
             let bv = ring_to_edge_bitvector(ring, num_edges, mol);
             if bv.iter().all(|&w| w == 0) {
                 continue;
@@ -581,15 +592,15 @@ mod tests {
         let ri = RingInfo::symmetrized_sssr(&mol);
         let mut sizes: Vec<usize> = ri.rings().iter().map(|r| r.len()).collect();
         sizes.sort();
-        assert_eq!(ri.num_rings(), 3);
-        assert_eq!(sizes, vec![6, 6, 10]);
+        assert_eq!(ri.num_rings(), 2);
+        assert_eq!(sizes, vec![6, 6]);
     }
 
     #[test]
     fn sym_sssr_norbornane() {
         let mol = from_smiles("C1CC2CC1CC2").unwrap();
         let ri = RingInfo::symmetrized_sssr(&mol);
-        assert_eq!(ri.num_rings(), 3);
+        assert_eq!(ri.num_rings(), 2);
     }
 
     #[test]
@@ -605,15 +616,18 @@ mod tests {
         let ri = RingInfo::symmetrized_sssr(&mol);
         let mut sizes: Vec<usize> = ri.rings().iter().map(|r| r.len()).collect();
         sizes.sort();
-        assert_eq!(ri.num_rings(), 3);
-        assert_eq!(sizes, vec![6, 6, 10]);
+        assert_eq!(ri.num_rings(), 2);
+        assert_eq!(sizes, vec![6, 6]);
     }
 
     #[test]
     fn sym_sssr_anthracene() {
         let mol = from_smiles("c1ccc2cc3ccccc3cc2c1").unwrap();
         let ri = RingInfo::symmetrized_sssr(&mol);
-        assert!(ri.num_rings() > 3);
+        assert_eq!(ri.num_rings(), 3);
+        let mut sizes: Vec<usize> = ri.rings().iter().map(|r| r.len()).collect();
+        sizes.sort();
+        assert_eq!(sizes, vec![6, 6, 6]);
     }
 
     #[test]
