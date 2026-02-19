@@ -2,12 +2,14 @@ mod builder;
 pub mod error;
 mod parse_tree;
 mod tokenizer;
+mod writer;
 
 use crate::atom::Atom;
 use crate::bond::{Bond, SmilesBond};
 use crate::kekulize;
 use crate::mol::Mol;
 pub use error::SmilesError;
+pub use writer::to_smiles;
 
 pub fn parse_smiles(s: &str) -> Result<Mol<Atom, SmilesBond>, SmilesError> {
     let trimmed = s.trim();
