@@ -1,0 +1,946 @@
+mod error;
+mod parser;
+pub mod query;
+mod writer;
+
+pub use error::SmartsError;
+pub use query::{AtomExpr, BondExpr};
+pub use writer::to_smarts;
+
+use std::collections::{HashMap, HashSet};
+
+use petgraph::graph::NodeIndex;
+
+use crate::atom::Atom;
+use crate::bond::Bond;
+use crate::mol::Mol;
+use crate::rings::RingInfo;
+use crate::substruct::{get_substruct_match_with, get_substruct_matches_with, AtomMapping};
+
+use query::MatchContext;
+
+type RecursiveRef<'a> = (*const Mol<AtomExpr, BondExpr>, &'a Mol<AtomExpr, BondExpr>);
+
+pub fn from_smarts(s: &str) -> Result<Mol<AtomExpr, BondExpr>, SmartsError> {
+    parser::parse(s)
+}
+
+pub fn has_smarts_match(target: &Mol<Atom, Bond>, query: &Mol<AtomExpr, BondExpr>) -> bool {
+    get_smarts_match(target, query).is_some()
+}
+
+pub fn get_smarts_match(
+    target: &Mol<Atom, Bond>,
+    query: &Mol<AtomExpr, BondExpr>,
+) -> Option<AtomMapping> {
+    let ring_info = RingInfo::sssr(target);
+    let recursive_matches = pre_evaluate_recursive(target, query, &ring_info);
+
+    let ctx = MatchContext {
+        mol: target,
+        ring_info: &ring_info,
+        recursive_matches,
+    };
+
+    get_substruct_match_with(
+        target,
+        query,
+        |t_atom: &Atom, q_expr: &AtomExpr| {
+            let idx = target
+                .atoms()
+                .find(|&i| std::ptr::eq(target.atom(i), t_atom))
+                .unwrap();
+            match_atom_expr(q_expr, t_atom, &ctx, idx)
+        },
+        |t_bond: &Bond, q_bond: &BondExpr, t_endpoints: (&Atom, &Atom), _q_endpoints| {
+            let t_a = target
+                .atoms()
+                .find(|&i| std::ptr::eq(target.atom(i), t_endpoints.0))
+                .unwrap();
+            let t_b = target
+                .atoms()
+                .find(|&i| std::ptr::eq(target.atom(i), t_endpoints.1))
+                .unwrap();
+            q_bond.matches_with_ring_info(t_bond, t_endpoints, &ring_info, (t_a, t_b))
+        },
+    )
+}
+
+pub fn get_smarts_matches(
+    target: &Mol<Atom, Bond>,
+    query: &Mol<AtomExpr, BondExpr>,
+) -> Vec<AtomMapping> {
+    let ring_info = RingInfo::sssr(target);
+    let recursive_matches = pre_evaluate_recursive(target, query, &ring_info);
+
+    let ctx = MatchContext {
+        mol: target,
+        ring_info: &ring_info,
+        recursive_matches,
+    };
+
+    get_substruct_matches_with(
+        target,
+        query,
+        |t_atom: &Atom, q_expr: &AtomExpr| {
+            let idx = target
+                .atoms()
+                .find(|&i| std::ptr::eq(target.atom(i), t_atom))
+                .unwrap();
+            match_atom_expr(q_expr, t_atom, &ctx, idx)
+        },
+        |t_bond: &Bond, q_bond: &BondExpr, t_endpoints: (&Atom, &Atom), _q_endpoints| {
+            let t_a = target
+                .atoms()
+                .find(|&i| std::ptr::eq(target.atom(i), t_endpoints.0))
+                .unwrap();
+            let t_b = target
+                .atoms()
+                .find(|&i| std::ptr::eq(target.atom(i), t_endpoints.1))
+                .unwrap();
+            q_bond.matches_with_ring_info(t_bond, t_endpoints, &ring_info, (t_a, t_b))
+        },
+    )
+}
+
+fn match_atom_expr(expr: &AtomExpr, atom: &Atom, ctx: &MatchContext, idx: NodeIndex) -> bool {
+    match expr {
+        AtomExpr::Recursive(inner) => {
+            let ptr = inner as *const Mol<AtomExpr, BondExpr> as usize;
+            ctx.recursive_matches
+                .get(&ptr)
+                .is_some_and(|set| set.contains(&idx))
+        }
+        AtomExpr::And(exprs) => exprs
+            .iter()
+            .all(|e| match_atom_expr(e, atom, ctx, idx)),
+        AtomExpr::Or(exprs) => exprs
+            .iter()
+            .any(|e| match_atom_expr(e, atom, ctx, idx)),
+        AtomExpr::Not(inner) => !match_atom_expr(inner, atom, ctx, idx),
+        _ => expr.matches(atom, ctx, idx),
+    }
+}
+
+fn pre_evaluate_recursive(
+    target: &Mol<Atom, Bond>,
+    query: &Mol<AtomExpr, BondExpr>,
+    ring_info: &RingInfo,
+) -> HashMap<usize, HashSet<NodeIndex>> {
+    let mut recursive_ptrs: Vec<RecursiveRef> = Vec::new();
+    for atom_idx in query.atoms() {
+        collect_recursive_refs(query.atom(atom_idx), &mut recursive_ptrs);
+    }
+
+    let mut results = HashMap::new();
+    for &(ptr, inner_query) in &recursive_ptrs {
+        let key = ptr as usize;
+        if results.contains_key(&key) {
+            continue;
+        }
+
+        let inner_recursive = pre_evaluate_recursive(target, inner_query, ring_info);
+        let inner_ctx = MatchContext {
+            mol: target,
+            ring_info,
+            recursive_matches: inner_recursive,
+        };
+
+        let mut matching_atoms = HashSet::new();
+        let matches = get_substruct_matches_with(
+            target,
+            inner_query,
+            |t_atom: &Atom, q_expr: &AtomExpr| {
+                let idx = target
+                    .atoms()
+                    .find(|&i| std::ptr::eq(target.atom(i), t_atom))
+                    .unwrap();
+                match_atom_expr(q_expr, t_atom, &inner_ctx, idx)
+            },
+            |t_bond: &Bond, q_bond: &BondExpr, t_endpoints: (&Atom, &Atom), _q_endpoints| {
+                let t_a = target
+                    .atoms()
+                    .find(|&i| std::ptr::eq(target.atom(i), t_endpoints.0))
+                    .unwrap();
+                let t_b = target
+                    .atoms()
+                    .find(|&i| std::ptr::eq(target.atom(i), t_endpoints.1))
+                    .unwrap();
+                q_bond.matches_with_ring_info(t_bond, t_endpoints, ring_info, (t_a, t_b))
+            },
+        );
+
+        for mapping in &matches {
+            if let Some(&(_q_first, t_first)) = mapping.first() {
+                matching_atoms.insert(t_first);
+            }
+        }
+        results.insert(key, matching_atoms);
+    }
+
+    results
+}
+
+fn collect_recursive_refs<'a>(
+    expr: &'a AtomExpr,
+    ptrs: &mut Vec<RecursiveRef<'a>>,
+) {
+    match expr {
+        AtomExpr::Recursive(inner) => {
+            ptrs.push((inner as *const Mol<AtomExpr, BondExpr>, inner));
+        }
+        AtomExpr::And(exprs) | AtomExpr::Or(exprs) => {
+            for e in exprs {
+                collect_recursive_refs(e, ptrs);
+            }
+        }
+        AtomExpr::Not(inner) => {
+            collect_recursive_refs(inner, ptrs);
+        }
+        _ => {}
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn mol(smiles: &str) -> Mol<Atom, Bond> {
+        crate::smiles::from_smiles(smiles).unwrap_or_else(|e| panic!("bad SMILES {smiles:?}: {e}"))
+    }
+
+    fn smarts(s: &str) -> Mol<AtomExpr, BondExpr> {
+        from_smarts(s).unwrap_or_else(|e| panic!("bad SMARTS {s:?}: {e}"))
+    }
+
+    // ---- Parser tests ----
+
+    #[test]
+    fn parse_atomic_num() {
+        let q = smarts("[#6]");
+        assert_eq!(q.atom_count(), 1);
+        let expr = q.atom(NodeIndex::new(0));
+        assert!(matches!(expr, AtomExpr::Element { atomic_num: 6, aromatic: None }));
+    }
+
+    #[test]
+    fn parse_aliphatic_carbon() {
+        let q = smarts("[C]");
+        let expr = q.atom(NodeIndex::new(0));
+        assert!(matches!(expr, AtomExpr::Element { atomic_num: 6, aromatic: Some(false) }));
+    }
+
+    #[test]
+    fn parse_aromatic_carbon() {
+        let q = smarts("[c]");
+        let expr = q.atom(NodeIndex::new(0));
+        assert!(matches!(expr, AtomExpr::Element { atomic_num: 6, aromatic: Some(true) }));
+    }
+
+    #[test]
+    fn parse_wildcard_bare() {
+        let q = smarts("*");
+        assert_eq!(q.atom_count(), 1);
+        assert!(matches!(q.atom(NodeIndex::new(0)), AtomExpr::True));
+    }
+
+    #[test]
+    fn parse_wildcard_bracket() {
+        let q = smarts("[*]");
+        assert!(matches!(q.atom(NodeIndex::new(0)), AtomExpr::True));
+    }
+
+    #[test]
+    fn parse_or() {
+        let q = smarts("[C,N]");
+        let expr = q.atom(NodeIndex::new(0));
+        match expr {
+            AtomExpr::Or(parts) => {
+                assert_eq!(parts.len(), 2);
+                assert!(matches!(parts[0], AtomExpr::Element { atomic_num: 6, aromatic: Some(false) }));
+                assert!(matches!(parts[1], AtomExpr::Element { atomic_num: 7, aromatic: Some(false) }));
+            }
+            _ => panic!("expected Or, got {expr:?}"),
+        }
+    }
+
+    #[test]
+    fn parse_semicolon_and() {
+        let q = smarts("[C;R]");
+        let expr = q.atom(NodeIndex::new(0));
+        match expr {
+            AtomExpr::And(parts) => {
+                assert_eq!(parts.len(), 2);
+                assert!(matches!(parts[0], AtomExpr::Element { atomic_num: 6, aromatic: Some(false) }));
+                assert!(matches!(parts[1], AtomExpr::InRing));
+            }
+            _ => panic!("expected And, got {expr:?}"),
+        }
+    }
+
+    #[test]
+    fn parse_not() {
+        let q = smarts("[!C]");
+        let expr = q.atom(NodeIndex::new(0));
+        match expr {
+            AtomExpr::Not(inner) => {
+                assert!(matches!(**inner, AtomExpr::Element { atomic_num: 6, aromatic: Some(false) }));
+            }
+            _ => panic!("expected Not, got {expr:?}"),
+        }
+    }
+
+    #[test]
+    fn parse_precedence_comma_semicolon() {
+        let q = smarts("[C,N;H1]");
+        let expr = q.atom(NodeIndex::new(0));
+        match expr {
+            AtomExpr::And(parts) => {
+                assert_eq!(parts.len(), 2);
+                match &parts[0] {
+                    AtomExpr::Or(or_parts) => {
+                        assert_eq!(or_parts.len(), 2);
+                    }
+                    _ => panic!("expected Or in first part"),
+                }
+                assert!(matches!(parts[1], AtomExpr::TotalHCount(1)));
+            }
+            _ => panic!("expected And, got {expr:?}"),
+        }
+    }
+
+    #[test]
+    fn parse_degree() {
+        let q = smarts("[D2]");
+        assert!(matches!(q.atom(NodeIndex::new(0)), AtomExpr::Degree(2)));
+    }
+
+    #[test]
+    fn parse_valence() {
+        let q = smarts("[v4]");
+        assert!(matches!(q.atom(NodeIndex::new(0)), AtomExpr::Valence(4)));
+    }
+
+    #[test]
+    fn parse_connectivity() {
+        let q = smarts("[X4]");
+        assert!(matches!(q.atom(NodeIndex::new(0)), AtomExpr::Connectivity(4)));
+    }
+
+    #[test]
+    fn parse_total_h_count() {
+        let q = smarts("[H1]");
+        assert!(matches!(q.atom(NodeIndex::new(0)), AtomExpr::TotalHCount(1)));
+    }
+
+    #[test]
+    fn parse_implicit_h_count() {
+        let q = smarts("[h1]");
+        assert!(matches!(q.atom(NodeIndex::new(0)), AtomExpr::ImplicitHCount(1)));
+    }
+
+    #[test]
+    fn parse_in_ring() {
+        let q = smarts("[R]");
+        assert!(matches!(q.atom(NodeIndex::new(0)), AtomExpr::InRing));
+    }
+
+    #[test]
+    fn parse_not_in_ring() {
+        let q = smarts("[R0]");
+        assert!(matches!(q.atom(NodeIndex::new(0)), AtomExpr::NotInRing));
+    }
+
+    #[test]
+    fn parse_ring_membership() {
+        let q = smarts("[R2]");
+        assert!(matches!(q.atom(NodeIndex::new(0)), AtomExpr::RingMembership(2)));
+    }
+
+    #[test]
+    fn parse_smallest_ring_size() {
+        let q = smarts("[r6]");
+        assert!(matches!(q.atom(NodeIndex::new(0)), AtomExpr::SmallestRingSize(6)));
+    }
+
+    #[test]
+    fn parse_ring_bond_count() {
+        let q = smarts("[x2]");
+        assert!(matches!(q.atom(NodeIndex::new(0)), AtomExpr::RingBondCount(2)));
+    }
+
+    #[test]
+    fn parse_positive_charge() {
+        let q = smarts("[+1]");
+        assert!(matches!(q.atom(NodeIndex::new(0)), AtomExpr::Charge(1)));
+    }
+
+    #[test]
+    fn parse_negative_charge() {
+        let q = smarts("[-1]");
+        assert!(matches!(q.atom(NodeIndex::new(0)), AtomExpr::Charge(-1)));
+    }
+
+    #[test]
+    fn parse_default_bond() {
+        let q = smarts("CC");
+        assert_eq!(q.atom_count(), 2);
+        assert_eq!(q.bond_count(), 1);
+        let edge = q.bond_between(NodeIndex::new(0), NodeIndex::new(1)).unwrap();
+        assert!(matches!(q.bond(edge), BondExpr::SingleOrAromatic));
+    }
+
+    #[test]
+    fn parse_double_bond() {
+        let q = smarts("C=C");
+        let edge = q.bond_between(NodeIndex::new(0), NodeIndex::new(1)).unwrap();
+        assert!(matches!(q.bond(edge), BondExpr::Double));
+    }
+
+    #[test]
+    fn parse_triple_bond() {
+        let q = smarts("C#C");
+        let edge = q.bond_between(NodeIndex::new(0), NodeIndex::new(1)).unwrap();
+        assert!(matches!(q.bond(edge), BondExpr::Triple));
+    }
+
+    #[test]
+    fn parse_any_bond() {
+        let q = smarts("C~C");
+        let edge = q.bond_between(NodeIndex::new(0), NodeIndex::new(1)).unwrap();
+        assert!(matches!(q.bond(edge), BondExpr::True));
+    }
+
+    #[test]
+    fn parse_aromatic_bond() {
+        let q = smarts("C:C");
+        let edge = q.bond_between(NodeIndex::new(0), NodeIndex::new(1)).unwrap();
+        assert!(matches!(q.bond(edge), BondExpr::Aromatic));
+    }
+
+    // ---- Matching tests ----
+
+    #[test]
+    fn match_carbon_in_ethane() {
+        let target = mol("CC");
+        let query = smarts("[#6]");
+        assert!(has_smarts_match(&target, &query));
+        let matches = get_smarts_matches(&target, &query);
+        assert_eq!(matches.len(), 2);
+    }
+
+    #[test]
+    fn match_carbon_not_oxygen() {
+        let target = mol("CCO");
+        let query = smarts("[#6]");
+        let matches = get_smarts_matches(&target, &query);
+        assert_eq!(matches.len(), 2);
+    }
+
+    #[test]
+    fn match_nitrogen_in_pyridine() {
+        let target = mol("c1ccncc1");
+        let query = smarts("[#7]");
+        assert!(has_smarts_match(&target, &query));
+        let matches = get_smarts_matches(&target, &query);
+        assert_eq!(matches.len(), 1);
+    }
+
+    #[test]
+    fn match_aromatic_in_benzene() {
+        let target = mol("c1ccccc1");
+        let query = smarts("[a]");
+        let matches = get_smarts_matches(&target, &query);
+        assert_eq!(matches.len(), 6);
+    }
+
+    #[test]
+    fn match_aromatic_not_in_cyclohexane() {
+        let target = mol("C1CCCCC1");
+        let query = smarts("[a]");
+        assert!(!has_smarts_match(&target, &query));
+    }
+
+    #[test]
+    fn match_aliphatic() {
+        let target = mol("C1CCCCC1");
+        let query = smarts("[A]");
+        let matches = get_smarts_matches(&target, &query);
+        assert_eq!(matches.len(), 6);
+    }
+
+    #[test]
+    fn match_wildcard() {
+        let target = mol("CCO");
+        let query = smarts("*");
+        let matches = get_smarts_matches(&target, &query);
+        assert_eq!(matches.len(), 3);
+    }
+
+    #[test]
+    fn match_degree_2() {
+        let target = mol("CCC");
+        let query = smarts("[D2]");
+        let matches = get_smarts_matches(&target, &query);
+        assert_eq!(matches.len(), 1);
+    }
+
+    #[test]
+    fn match_degree_1() {
+        let target = mol("CCC");
+        let query = smarts("[D1]");
+        let matches = get_smarts_matches(&target, &query);
+        assert_eq!(matches.len(), 2);
+    }
+
+    #[test]
+    fn match_valence_4() {
+        let target = mol("C");
+        let query = smarts("[v4]");
+        assert!(has_smarts_match(&target, &query));
+    }
+
+    #[test]
+    fn match_connectivity_4() {
+        let target = mol("C");
+        let query = smarts("[X4]");
+        assert!(has_smarts_match(&target, &query));
+    }
+
+    #[test]
+    fn match_h_count_1() {
+        let target = mol("CCO");
+        let query = smarts("[H1]");
+        let matches = get_smarts_matches(&target, &query);
+        assert!(!matches.is_empty());
+    }
+
+    #[test]
+    fn match_in_ring() {
+        let target = mol("C1CCCCC1");
+        let query = smarts("[R]");
+        let matches = get_smarts_matches(&target, &query);
+        assert_eq!(matches.len(), 6);
+    }
+
+    #[test]
+    fn match_not_in_ring() {
+        let target = mol("CC1CCCCC1");
+        let query = smarts("[R0]");
+        let matches = get_smarts_matches(&target, &query);
+        assert_eq!(matches.len(), 1);
+    }
+
+    #[test]
+    fn match_ring_size_6() {
+        let target = mol("C1CCCCC1");
+        let query = smarts("[r6]");
+        let matches = get_smarts_matches(&target, &query);
+        assert_eq!(matches.len(), 6);
+    }
+
+    #[test]
+    fn match_ring_membership_2() {
+        let target = mol("c1ccc2ccccc2c1");
+        let query = smarts("[R2]");
+        let matches = get_smarts_matches(&target, &query);
+        assert_eq!(matches.len(), 2);
+    }
+
+    #[test]
+    fn match_positive_charge() {
+        let target = mol("[Na+]");
+        let query = smarts("[+1]");
+        assert!(has_smarts_match(&target, &query));
+    }
+
+    #[test]
+    fn match_negative_charge() {
+        let target = mol("[Cl-]");
+        let query = smarts("[-1]");
+        assert!(has_smarts_match(&target, &query));
+    }
+
+    #[test]
+    fn match_or_c_n() {
+        let target = mol("CN");
+        let query = smarts("[C,N]");
+        let matches = get_smarts_matches(&target, &query);
+        assert_eq!(matches.len(), 2);
+    }
+
+    #[test]
+    fn match_not_carbon() {
+        let target = mol("CCO");
+        let query = smarts("[!C]");
+        let matches = get_smarts_matches(&target, &query);
+        assert_eq!(matches.len(), 1);
+    }
+
+    #[test]
+    fn match_carbon_in_ring() {
+        let target = mol("CC1CCCCC1");
+        let query = smarts("[C;R]");
+        let matches = get_smarts_matches(&target, &query);
+        assert_eq!(matches.len(), 6);
+    }
+
+    #[test]
+    fn match_aromatic_bond() {
+        let target = mol("c1ccccc1");
+        let query = smarts("c:c");
+        assert!(has_smarts_match(&target, &query));
+    }
+
+    #[test]
+    fn match_any_bond() {
+        let target = mol("CC");
+        let query = smarts("C~C");
+        assert!(has_smarts_match(&target, &query));
+    }
+
+    #[test]
+    fn match_single_or_aromatic_default() {
+        let target = mol("CC");
+        let query = smarts("CC");
+        assert!(has_smarts_match(&target, &query));
+    }
+
+    #[test]
+    fn match_single_or_aromatic_aromatic() {
+        let target = mol("c1ccccc1");
+        let query = smarts("cc");
+        assert!(has_smarts_match(&target, &query));
+    }
+
+    #[test]
+    fn match_explicit_single_only() {
+        let target = mol("c1ccccc1");
+        let query = smarts("c-c");
+        assert!(!has_smarts_match(&target, &query));
+    }
+
+    #[test]
+    fn match_explicit_single_on_single() {
+        let target = mol("CC");
+        let query = smarts("C-C");
+        assert!(has_smarts_match(&target, &query));
+    }
+
+    #[test]
+    fn match_recursive_oh() {
+        let target = mol("Oc1ccccc1");
+        let query = smarts("[$([OH])]");
+        assert!(has_smarts_match(&target, &query));
+    }
+
+    #[test]
+    fn match_recursive_aromatic_cc() {
+        let target = mol("c1ccccc1");
+        let query = smarts("[$(cc)]");
+        let matches = get_smarts_matches(&target, &query);
+        assert_eq!(matches.len(), 6);
+    }
+
+    #[test]
+    fn match_multi_atom_cn() {
+        let target = mol("CN");
+        let query = smarts("[#6][#7]");
+        assert!(has_smarts_match(&target, &query));
+    }
+
+    #[test]
+    fn match_benzene_ring() {
+        let target = mol("c1ccccc1");
+        let query = smarts("c1ccccc1");
+        assert!(has_smarts_match(&target, &query));
+    }
+
+    #[test]
+    fn match_cyclopropane() {
+        let target = mol("C1CC1");
+        let query = smarts("C1CC1");
+        assert!(has_smarts_match(&target, &query));
+    }
+
+    // ---- Edge cases ----
+
+    #[test]
+    fn empty_string_error() {
+        assert!(from_smarts("").is_err());
+    }
+
+    #[test]
+    fn invalid_smarts_error() {
+        assert!(from_smarts("[").is_err());
+    }
+
+    #[test]
+    fn single_atom_query() {
+        let target = mol("C");
+        let query = smarts("C");
+        assert!(has_smarts_match(&target, &query));
+    }
+
+    #[test]
+    fn disconnected_query() {
+        let target = mol("[Na+].[Cl-]");
+        let query = smarts("[Na+].[Cl-]");
+        assert!(has_smarts_match(&target, &query));
+    }
+
+    #[test]
+    fn parse_hydrogen_bracket() {
+        let q = smarts("[H]");
+        let expr = q.atom(NodeIndex::new(0));
+        assert!(matches!(expr, AtomExpr::Element { atomic_num: 1, aromatic: Some(false) }));
+    }
+
+    #[test]
+    fn parse_bare_aromatic_a() {
+        let q = smarts("a");
+        assert!(matches!(q.atom(NodeIndex::new(0)), AtomExpr::Aromatic));
+    }
+
+    #[test]
+    fn parse_bare_aliphatic_aa() {
+        let q = smarts("A");
+        assert!(matches!(q.atom(NodeIndex::new(0)), AtomExpr::Aliphatic));
+    }
+
+    // ---- Writer tests ----
+
+    #[test]
+    fn writer_wildcard() {
+        let q = smarts("*");
+        assert_eq!(to_smarts(&q), "*");
+    }
+
+    #[test]
+    fn writer_bare_element() {
+        let q = smarts("C");
+        assert_eq!(to_smarts(&q), "C");
+    }
+
+    #[test]
+    fn writer_aromatic_element() {
+        let q = smarts("c");
+        assert_eq!(to_smarts(&q), "c");
+    }
+
+    #[test]
+    fn writer_double_bond() {
+        let q = smarts("C=C");
+        assert_eq!(to_smarts(&q), "C=C");
+    }
+
+    #[test]
+    fn writer_triple_bond() {
+        let q = smarts("C#C");
+        assert_eq!(to_smarts(&q), "C#C");
+    }
+
+    #[test]
+    fn writer_any_bond() {
+        let q = smarts("C~C");
+        assert_eq!(to_smarts(&q), "C~C");
+    }
+
+    #[test]
+    fn writer_default_bond_omitted() {
+        let q = smarts("CC");
+        assert_eq!(to_smarts(&q), "CC");
+    }
+
+    #[test]
+    fn writer_aromatic_bond() {
+        let q = smarts("c:c");
+        assert_eq!(to_smarts(&q), "c:c");
+    }
+
+    #[test]
+    fn writer_round_trip_bracket() {
+        let cases = ["[#6]", "[D2]", "[v4]", "[X4]", "[H1]", "[h1]", "[R]", "[R0]", "[R2]", "[r6]", "[x2]", "[+1]", "[-1]"];
+        for s in &cases {
+            let q = smarts(s);
+            let written = to_smarts(&q);
+            let reparsed = smarts(&written);
+            assert_eq!(
+                q.atom(NodeIndex::new(0)),
+                reparsed.atom(NodeIndex::new(0)),
+                "round-trip failed for {s}: wrote {written}"
+            );
+        }
+    }
+
+    #[test]
+    fn writer_round_trip_logical() {
+        let s = "[C,N]";
+        let q = smarts(s);
+        let written = to_smarts(&q);
+        let reparsed = smarts(&written);
+        assert_eq!(
+            q.atom(NodeIndex::new(0)),
+            reparsed.atom(NodeIndex::new(0)),
+            "round-trip failed for {s}: wrote {written}"
+        );
+    }
+
+    #[test]
+    fn writer_disconnected() {
+        let q = smarts("[Na].[Cl]");
+        let written = to_smarts(&q);
+        assert!(written.contains('.'));
+    }
+
+    #[test]
+    fn writer_ring() {
+        let q = smarts("C1CC1");
+        let written = to_smarts(&q);
+        assert!(written.contains('1'));
+        let reparsed = smarts(&written);
+        assert_eq!(reparsed.atom_count(), 3);
+        assert_eq!(reparsed.bond_count(), 3);
+    }
+
+    #[test]
+    fn match_bare_hydrogen() {
+        let target = mol("C");
+        let query = smarts("H");
+        assert!(!has_smarts_match(&target, &query));
+    }
+
+    #[test]
+    fn match_bracket_na_charge() {
+        let target = mol("[Na+]");
+        let query = smarts("[Na+]");
+        assert!(has_smarts_match(&target, &query));
+        let expr = query.atom(NodeIndex::new(0));
+        match expr {
+            AtomExpr::And(parts) => {
+                assert!(parts
+                    .iter()
+                    .any(|p| matches!(p, AtomExpr::Element { atomic_num: 11, aromatic: Some(false) })));
+                assert!(parts.iter().any(|p| matches!(p, AtomExpr::Charge(1))));
+            }
+            _ => panic!("expected And for [Na+], got {expr:?}"),
+        }
+    }
+
+    #[test]
+    fn match_bracket_cl_negative() {
+        let target = mol("[Cl-]");
+        let query = smarts("[Cl-]");
+        assert!(has_smarts_match(&target, &query));
+        let expr = query.atom(NodeIndex::new(0));
+        match expr {
+            AtomExpr::And(parts) => {
+                assert!(parts
+                    .iter()
+                    .any(|p| matches!(p, AtomExpr::Element { atomic_num: 17, aromatic: Some(false) })));
+                assert!(parts.iter().any(|p| matches!(p, AtomExpr::Charge(-1))));
+            }
+            _ => panic!("expected And for [Cl-], got {expr:?}"),
+        }
+    }
+
+    #[test]
+    fn match_double_bond_ethene() {
+        let target = mol("C=C");
+        let query = smarts("C=C");
+        assert!(has_smarts_match(&target, &query));
+    }
+
+    #[test]
+    fn no_match_double_bond_on_single() {
+        let target = mol("CC");
+        let query = smarts("C=C");
+        assert!(!has_smarts_match(&target, &query));
+    }
+
+    #[test]
+    fn parse_high_and_explicit() {
+        let q = smarts("[c,n&H1]");
+        let expr = q.atom(NodeIndex::new(0));
+        match expr {
+            AtomExpr::Or(parts) => {
+                assert_eq!(parts.len(), 2);
+                assert!(matches!(parts[0], AtomExpr::Element { atomic_num: 6, aromatic: Some(true) }));
+                match &parts[1] {
+                    AtomExpr::And(inner) => {
+                        assert_eq!(inner.len(), 2);
+                        assert!(matches!(inner[0], AtomExpr::Element { atomic_num: 7, aromatic: Some(true) }));
+                        assert!(matches!(inner[1], AtomExpr::TotalHCount(1)));
+                    }
+                    _ => panic!("expected And in second Or part"),
+                }
+            }
+            _ => panic!("expected Or, got {expr:?}"),
+        }
+    }
+
+    #[test]
+    fn parse_element_as_in_bracket() {
+        let q = smarts("[As]");
+        let expr = q.atom(NodeIndex::new(0));
+        assert!(matches!(expr, AtomExpr::Element { atomic_num: 33, aromatic: Some(false) }));
+    }
+
+    #[test]
+    fn parse_bare_bromine() {
+        let q = smarts("Br");
+        let expr = q.atom(NodeIndex::new(0));
+        assert!(matches!(expr, AtomExpr::Element { atomic_num: 35, aromatic: Some(false) }));
+    }
+
+    #[test]
+    fn parse_bare_chlorine() {
+        let q = smarts("Cl");
+        let expr = q.atom(NodeIndex::new(0));
+        assert!(matches!(expr, AtomExpr::Element { atomic_num: 17, aromatic: Some(false) }));
+    }
+
+    #[test]
+    fn match_ring_bond() {
+        let target = mol("C1CCCCC1");
+        let query = smarts("C@C");
+        assert!(has_smarts_match(&target, &query));
+    }
+
+    #[test]
+    fn no_ring_bond_in_chain() {
+        let target = mol("CCCC");
+        let query = smarts("C@C");
+        assert!(!has_smarts_match(&target, &query));
+    }
+
+    #[test]
+    fn match_isotope() {
+        let target = mol("[13C]");
+        let query = smarts("[13]");
+        assert!(has_smarts_match(&target, &query));
+    }
+
+    #[test]
+    fn unclosed_ring_error() {
+        assert!(matches!(
+            from_smarts("C1CC"),
+            Err(SmartsError::UnclosedRing { .. })
+        ));
+    }
+
+    #[test]
+    fn unmatched_paren_error() {
+        assert!(matches!(
+            from_smarts("C(C"),
+            Err(SmartsError::UnmatchedParen { .. })
+        ));
+    }
+
+    #[test]
+    fn bare_se_aromatic() {
+        let q = smarts("[se]");
+        let expr = q.atom(NodeIndex::new(0));
+        assert!(matches!(expr, AtomExpr::Element { atomic_num: 34, aromatic: Some(true) }));
+    }
+}

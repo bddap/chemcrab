@@ -9,6 +9,7 @@ pub mod hydrogen;
 pub mod kekulize;
 pub mod mol;
 pub mod rings;
+pub mod smarts;
 pub mod smiles;
 pub mod substruct;
 pub mod traits;
@@ -29,6 +30,10 @@ pub use hydrogen::{add_hs, remove_hs};
 pub use kekulize::{kekulize, KekulizeError};
 pub use mol::Mol;
 pub use rings::RingInfo;
+pub use smarts::{
+    from_smarts, get_smarts_match, get_smarts_matches, has_smarts_match, to_smarts, AtomExpr,
+    BondExpr, SmartsError,
+};
 pub use smiles::{from_smiles, parse_smiles, to_canonical_smiles, to_smiles, SmilesError};
 pub use substruct::{
     get_substruct_match, get_substruct_match_with, get_substruct_matches,

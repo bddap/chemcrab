@@ -95,6 +95,34 @@ impl<A, B> Default for Mol<A, B> {
     }
 }
 
+impl<A: PartialEq, B: PartialEq> PartialEq for Mol<A, B> {
+    fn eq(&self, other: &Self) -> bool {
+        if self.atom_count() != other.atom_count() || self.bond_count() != other.bond_count() {
+            return false;
+        }
+        for idx in self.atoms() {
+            if idx.index() >= other.atom_count() {
+                return false;
+            }
+            if self.atom(idx) != other.atom(idx) {
+                return false;
+            }
+        }
+        for idx in self.bonds() {
+            if idx.index() >= other.bond_count() {
+                return false;
+            }
+            if self.bond(idx) != other.bond(idx) {
+                return false;
+            }
+            if self.bond_endpoints(idx) != other.bond_endpoints(idx) {
+                return false;
+            }
+        }
+        true
+    }
+}
+
 impl<A: std::fmt::Debug, B: std::fmt::Debug> std::fmt::Debug for Mol<A, B> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Mol")
