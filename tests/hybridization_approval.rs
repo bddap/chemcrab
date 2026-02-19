@@ -1,4 +1,4 @@
-use crabchem::{assign_hybridization, from_smiles, Hybridization};
+use chemcrab::{assign_hybridization, from_smiles, Hybridization};
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -65,9 +65,9 @@ fn approval_hybridization() {
 
         let atom_symbols: Vec<&str> = (0..mol.atom_count())
             .map(|i| {
-                use crabchem::traits::HasAtomicNum;
+                use chemcrab::traits::HasAtomicNum;
                 let anum = mol.atom(petgraph::graph::NodeIndex::new(i)).atomic_num();
-                crabchem::Element::from_atomic_num(anum)
+                chemcrab::Element::from_atomic_num(anum)
                     .map(|e| e.symbol())
                     .unwrap_or("?")
             })

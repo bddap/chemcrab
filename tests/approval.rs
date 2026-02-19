@@ -8,8 +8,8 @@ use serde::Deserialize;
 
 // Known parser limitation: `c1ccc(-c2ccccc2)cc1` (biphenyl) fails because
 // the explicit `-` single bond inside an aromatic branch context is not yet handled.
-fn try_parse(smiles: &str) -> Option<crabchem::Mol<crabchem::Atom, crabchem::Bond>> {
-    match crabchem::smiles::from_smiles(smiles) {
+fn try_parse(smiles: &str) -> Option<chemcrab::Mol<chemcrab::Atom, chemcrab::Bond>> {
+    match chemcrab::smiles::from_smiles(smiles) {
         Ok(m) => Some(m),
         Err(e) => {
             eprintln!("SKIP (parse failure): {smiles:?}: {e}");
@@ -47,7 +47,7 @@ fn approval_formula_weight() {
             None => { skipped += 1; continue; }
         };
 
-        let formula = crabchem::mol_formula(&mol);
+        let formula = chemcrab::mol_formula(&mol);
         if formula != entry.formula {
             failures.push(format!(
                 "[formula] {}: expected {:?}, got {:?}",
@@ -55,7 +55,7 @@ fn approval_formula_weight() {
             ));
         }
 
-        let amw = crabchem::average_mol_weight(&mol);
+        let amw = chemcrab::average_mol_weight(&mol);
         if !approx_eq(amw, entry.average_mw, 0.01) {
             failures.push(format!(
                 "[avg_mw] {}: expected {}, got {}",
@@ -63,7 +63,7 @@ fn approval_formula_weight() {
             ));
         }
 
-        let emw = crabchem::exact_mol_weight(&mol);
+        let emw = chemcrab::exact_mol_weight(&mol);
         if !approx_eq(emw, entry.exact_mw, 0.01) {
             failures.push(format!(
                 "[exact_mw] {}: expected {}, got {}",
@@ -118,7 +118,7 @@ fn approval_aromaticity() {
             ));
         }
 
-        let aromatic = crabchem::find_aromatic_atoms(&mol);
+        let aromatic = chemcrab::find_aromatic_atoms(&mol);
         let count = aromatic.iter().filter(|&&a| a).count();
         if count != entry.num_aromatic_atoms {
             failures.push(format!(
@@ -166,7 +166,7 @@ fn approval_rings() {
             Some(m) => m,
             None => { skipped += 1; continue; }
         };
-        let ri = crabchem::RingInfo::sssr(&mol);
+        let ri = chemcrab::RingInfo::sssr(&mol);
 
         if ri.num_rings() != entry.num_rings {
             failures.push(format!(
@@ -263,7 +263,7 @@ fn approval_smarts() {
         };
 
         for (smarts_str, &expected_count) in &entry.smarts_matches {
-            let query = match crabchem::from_smarts(smarts_str) {
+            let query = match chemcrab::from_smarts(smarts_str) {
                 Ok(q) => q,
                 Err(e) => {
                     parse_failures.push(format!(
@@ -274,7 +274,7 @@ fn approval_smarts() {
                 }
             };
 
-            let matches = crabchem::get_smarts_matches(&mol, &query);
+            let matches = chemcrab::get_smarts_matches(&mol, &query);
             if matches.len() != expected_count {
                 failures.push(format!(
                     "[smarts] {} / {:?}: expected {}, got {}",
@@ -318,13 +318,13 @@ struct CanonicalEntry {
 }
 
 fn same_structure(
-    a: &crabchem::Mol<crabchem::Atom, crabchem::Bond>,
-    b: &crabchem::Mol<crabchem::Atom, crabchem::Bond>,
+    a: &chemcrab::Mol<chemcrab::Atom, chemcrab::Bond>,
+    b: &chemcrab::Mol<chemcrab::Atom, chemcrab::Bond>,
 ) -> bool {
     a.atom_count() == b.atom_count()
         && a.bond_count() == b.bond_count()
-        && crabchem::has_substruct_match(a, b)
-        && crabchem::has_substruct_match(b, a)
+        && chemcrab::has_substruct_match(a, b)
+        && chemcrab::has_substruct_match(b, a)
 }
 
 #[test]
@@ -337,7 +337,7 @@ fn approval_canonical_smiles() {
     let mut skipped = 0usize;
 
     for entry in &data {
-        let mol = match crabchem::smiles::from_smiles(&entry.canonical_isomeric) {
+        let mol = match chemcrab::smiles::from_smiles(&entry.canonical_isomeric) {
             Ok(m) => m,
             Err(e) => {
                 eprintln!(
@@ -349,10 +349,10 @@ fn approval_canonical_smiles() {
             }
         };
 
-        let our_canonical = crabchem::smiles::to_canonical_smiles(&mol);
+        let our_canonical = chemcrab::smiles::to_canonical_smiles(&mol);
 
         // Check determinism: same output if we do it again
-        let our_canonical2 = crabchem::smiles::to_canonical_smiles(&mol);
+        let our_canonical2 = chemcrab::smiles::to_canonical_smiles(&mol);
         if our_canonical != our_canonical2 {
             round_trip_failures.push(format!(
                 "non-deterministic canonical for {:?}: {:?} vs {:?}",
@@ -369,7 +369,7 @@ fn approval_canonical_smiles() {
         }
 
         // Structural round-trip: parse our canonical, compare structure
-        match crabchem::smiles::from_smiles(&our_canonical) {
+        match chemcrab::smiles::from_smiles(&our_canonical) {
             Ok(reparsed) => {
                 if !same_structure(&mol, &reparsed) {
                     round_trip_failures.push(format!(
@@ -468,7 +468,7 @@ fn approval_substruct() {
                 None => continue,
             };
 
-            let has = crabchem::has_substruct_match(&mol, &query);
+            let has = chemcrab::has_substruct_match(&mol, &query);
             if has != expected.has_match {
                 failures.push(format!(
                     "[has_match] {} / {}: expected {}, got {}",
@@ -476,7 +476,7 @@ fn approval_substruct() {
                 ));
             }
 
-            let matches = crabchem::get_substruct_matches(&mol, &query);
+            let matches = chemcrab::get_substruct_matches(&mol, &query);
             if matches.len() != expected.num_matches {
                 failures.push(format!(
                     "[num_matches] {} / {}: expected {}, got {}",
