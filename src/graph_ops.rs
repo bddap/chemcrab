@@ -7,8 +7,8 @@ use crate::bond::BondStereo;
 use crate::canonical::canonical_ordering;
 use crate::mol::Mol;
 use crate::traits::{
-    HasAromaticity, HasAtomicNum, HasBondOrder, HasBondStereo, HasChirality, HasFormalCharge,
-    HasHydrogenCount, HasIsotope,
+    HasAromaticity, HasAtomicNum, HasBondOrder, HasBondStereoMut, HasChiralityMut,
+    HasFormalCharge, HasHydrogenCount, HasIsotope,
 };
 
 pub fn adjacency_matrix<A, B>(mol: &Mol<A, B>) -> Vec<Vec<bool>> {
@@ -236,7 +236,7 @@ pub fn renumber_atoms<A: Clone, B: Clone>(
 
 fn remap_bond_stereo<A, B>(mol: &mut Mol<A, B>, old_to_new: &[NodeIndex])
 where
-    B: HasBondStereo + AsMut<BondStereo>,
+    B: HasBondStereoMut,
 {
     for edge in mol.bonds().collect::<Vec<_>>() {
         let stereo = mol.bond(edge).bond_stereo();
@@ -247,7 +247,7 @@ where
                 BondStereo::Trans(old_to_new[a.index()], old_to_new[b.index()])
             }
         };
-        *mol.bond_mut(edge).as_mut() = remapped;
+        *mol.bond_mut(edge).bond_stereo_mut() = remapped;
     }
 }
 
@@ -256,7 +256,7 @@ fn adjust_chirality<A, B>(
     old_mol: &Mol<A, B>,
     new_order: &[usize],
 ) where
-    A: HasChirality + AsMut<Chirality>,
+    A: HasChiralityMut,
 {
     let n = old_mol.atom_count();
     let mut old_to_new = vec![NodeIndex::new(0); n];
@@ -285,7 +285,7 @@ fn adjust_chirality<A, B>(
                 Chirality::Ccw => Chirality::Cw,
                 Chirality::None => Chirality::None,
             };
-            *new_mol.atom_mut(new_node).as_mut() = flipped;
+            *new_mol.atom_mut(new_node).chirality_mut() = flipped;
         }
     }
 }
@@ -296,11 +296,10 @@ where
         + HasFormalCharge
         + HasHydrogenCount
         + HasIsotope
-        + HasChirality
+        + HasChiralityMut
         + HasAromaticity
-        + Clone
-        + AsMut<Chirality>,
-    B: HasBondOrder + HasBondStereo + Clone + AsMut<BondStereo>,
+        + Clone,
+    B: HasBondOrder + HasBondStereoMut + Clone,
 {
     let n = mol.atom_count();
     if n == 0 {

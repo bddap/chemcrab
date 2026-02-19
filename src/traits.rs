@@ -14,8 +14,16 @@ pub trait HasIsotope {
     fn isotope(&self) -> u16;
 }
 
+pub trait HasIsotopeMut: HasIsotope {
+    fn isotope_mut(&mut self) -> &mut u16;
+}
+
 pub trait HasChirality {
     fn chirality(&self) -> Chirality;
+}
+
+pub trait HasChiralityMut: HasChirality {
+    fn chirality_mut(&mut self) -> &mut Chirality;
 }
 
 pub trait HasHydrogenCount {
@@ -42,6 +50,10 @@ pub trait HasBondOrder {
 
 pub trait HasBondStereo {
     fn bond_stereo(&self) -> BondStereo;
+}
+
+pub trait HasBondStereoMut: HasBondStereo {
+    fn bond_stereo_mut(&mut self) -> &mut BondStereo;
 }
 
 pub trait HasValence {

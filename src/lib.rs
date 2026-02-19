@@ -12,6 +12,7 @@ pub mod reaction;
 pub mod rings;
 pub mod smarts;
 pub mod smiles;
+pub mod strip;
 pub mod substruct;
 pub mod traits;
 pub mod chirality;
@@ -48,14 +49,16 @@ pub use smarts::{
     BondExpr, SmartsError,
 };
 pub use smiles::{from_smiles, parse_smiles, to_canonical_smiles, to_smiles, SmilesError};
+pub use strip::{strip_bond_stereo, strip_chirality, strip_isotope};
 pub use substruct::{
     get_substruct_match, get_substruct_match_with, get_substruct_match_with_filter,
     get_substruct_matches, get_substruct_matches_with, get_substruct_matches_with_filter,
     has_substruct_match, has_substruct_match_with, AtomMapping,
 };
 pub use traits::{
-    HasAromaticity, HasAtomicNum, HasBondOrder, HasBondStereo, HasChirality, HasFormalCharge,
-    HasHybridization, HasHydrogenCount, HasIsotope, HasPosition2D, HasPosition3D, HasValence,
+    HasAromaticity, HasAtomicNum, HasBondOrder, HasBondStereo, HasBondStereoMut, HasChirality,
+    HasChiralityMut, HasFormalCharge, HasHybridization, HasHydrogenCount, HasIsotope,
+    HasIsotopeMut, HasPosition2D, HasPosition3D, HasValence,
 };
 pub use radical::num_radical_electrons;
 pub use valence::{check_valence, total_valence, ValenceError};

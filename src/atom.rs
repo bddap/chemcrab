@@ -61,6 +61,18 @@ impl crate::traits::HasChirality for Atom {
     }
 }
 
+impl crate::traits::HasChiralityMut for Atom {
+    fn chirality_mut(&mut self) -> &mut Chirality {
+        &mut self.chirality
+    }
+}
+
+impl crate::traits::HasIsotopeMut for Atom {
+    fn isotope_mut(&mut self) -> &mut u16 {
+        &mut self.isotope
+    }
+}
+
 impl crate::traits::HasHydrogenCount for Atom {
     fn hydrogen_count(&self) -> u8 {
         self.hydrogen_count
@@ -73,8 +85,4 @@ impl crate::traits::HasAromaticity for Atom {
     }
 }
 
-impl AsMut<Chirality> for Atom {
-    fn as_mut(&mut self) -> &mut Chirality {
-        &mut self.chirality
-    }
-}
+
