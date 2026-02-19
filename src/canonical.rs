@@ -41,6 +41,7 @@ struct AtomInvariant {
     singles: u8,
     doubles: u8,
     triples: u8,
+    aromatic_bonds: u8,
 }
 
 fn atom_invariant<A, B>(mol: &Mol<A, B>, idx: NodeIndex) -> AtomInvariant
@@ -49,15 +50,23 @@ where
     B: HasBondOrder,
 {
     let atom = mol.atom(idx);
+    let is_aromatic = atom.is_aromatic();
     let degree = mol.neighbors(idx).count() as u8;
     let mut singles: u8 = 0;
     let mut doubles: u8 = 0;
     let mut triples: u8 = 0;
+    let mut aromatic_bonds: u8 = 0;
     for edge in mol.bonds_of(idx) {
-        match mol.bond(edge).bond_order() {
-            BondOrder::Single => singles += 1,
-            BondOrder::Double => doubles += 1,
-            BondOrder::Triple => triples += 1,
+        let (a, b) = mol.bond_endpoints(edge).unwrap();
+        let neighbor = if a == idx { b } else { a };
+        if is_aromatic && mol.atom(neighbor).is_aromatic() {
+            aromatic_bonds += 1;
+        } else {
+            match mol.bond(edge).bond_order() {
+                BondOrder::Single => singles += 1,
+                BondOrder::Double => doubles += 1,
+                BondOrder::Triple => triples += 1,
+            }
         }
     }
     AtomInvariant {
@@ -65,11 +74,12 @@ where
         degree,
         hydrogen_count: atom.hydrogen_count(),
         formal_charge: atom.formal_charge(),
-        is_aromatic: atom.is_aromatic(),
+        is_aromatic,
         isotope: atom.isotope(),
         singles,
         doubles,
         triples,
+        aromatic_bonds,
     }
 }
 

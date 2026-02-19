@@ -204,7 +204,7 @@ fn permutation_parity(from: &[NodeIndex], to: &[NodeIndex]) -> bool {
     { swaps % 2 == 0 }
 }
 
-pub fn renumber_atoms<A: Clone, B: Clone>(
+pub fn renumber_atoms<A: Clone, B: HasBondStereoMut + Clone>(
     mol: &Mol<A, B>,
     new_order: &[usize],
 ) -> Result<Mol<A, B>, RenumberError> {
@@ -230,6 +230,9 @@ pub fn renumber_atoms<A: Clone, B: Clone>(
         let new_b = NodeIndex::new(old_to_new[b.index()]);
         new_mol.add_bond(new_a, new_b, mol.bond(edge).clone());
     }
+
+    let old_to_new_nodes: Vec<NodeIndex> = old_to_new.iter().map(|&i| NodeIndex::new(i)).collect();
+    remap_bond_stereo(&mut new_mol, &old_to_new_nodes);
 
     Ok(new_mol)
 }
@@ -314,12 +317,6 @@ where
     }
     let mut new_mol = renumber_atoms(mol, &new_order).expect("canonical ordering is a valid permutation");
 
-    let mut old_to_new_nodes: Vec<NodeIndex> = vec![NodeIndex::new(0); n];
-    for (new_idx, &old_idx) in new_order.iter().enumerate() {
-        old_to_new_nodes[old_idx] = NodeIndex::new(new_idx);
-    }
-
-    remap_bond_stereo(&mut new_mol, &old_to_new_nodes);
     adjust_chirality(&mut new_mol, mol, &new_order);
 
     new_mol
@@ -409,11 +406,10 @@ mod tests {
                 BondStereo::None => {}
             }
         }
-        // Basic renumber doesn't remap stereo (it copies raw)
         let double_edge = renum_basic.bonds().find(|&e| renum_basic.bond(e).order == BondOrder::Double).unwrap();
         let stereo = renum_basic.bond(double_edge).stereo;
-        // Stereo refs are still old indices (2, 3) — not remapped
-        assert_eq!(stereo, BondStereo::Trans(n(2), n(3)));
+        // old_to_new: 0→3, 1→2, 2→1, 3→0. Trans(2,3) → Trans(1,0)
+        assert_eq!(stereo, BondStereo::Trans(n(1), n(0)));
     }
 
     #[test]

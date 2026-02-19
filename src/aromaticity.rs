@@ -382,7 +382,7 @@ where
             if has_double {
                 Some(1)
             } else {
-                Some(0)
+                None
             }
         }
         15 | 33 => {

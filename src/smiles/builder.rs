@@ -74,39 +74,51 @@ fn resolve_bond_order(
 }
 
 fn resolve_chirality(mol: &mut Mol<Atom, SmilesBond>, tree: &ParseTree, indices: &[NodeIndex]) {
+    let h_sentinel = NodeIndex::new(usize::MAX);
+
     for (i, parse_atom) in tree.atoms.iter().enumerate() {
         if parse_atom.chirality == ChiralityToken::None {
             continue;
         }
 
-        let smiles_neighbor_order: Vec<usize> = parse_atom
+        let has_bracket_h =
+            parse_atom.is_bracket && parse_atom.hcount.unwrap_or(0) > 0;
+
+        let has_preceding =
+            !parse_atom.neighbors.is_empty() && parse_atom.neighbors[0].atom_idx < i;
+
+        let explicit_smiles: Vec<NodeIndex> = parse_atom
             .neighbors
             .iter()
-            .map(|n| n.atom_idx)
+            .map(|n| indices[n.atom_idx])
             .collect();
 
-        let graph_neighbor_order: Vec<NodeIndex> = mol.neighbors(indices[i]).collect();
-        let graph_neighbor_indices: Vec<usize> = graph_neighbor_order
-            .iter()
-            .map(|ni| indices.iter().position(|&x| x == *ni).expect("graph neighbor must be in index map"))
-            .collect();
+        let mut graph_neighbors: Vec<NodeIndex> = mol.neighbors(indices[i]).collect();
 
-        let parity = parity_of_permutation(&smiles_neighbor_order, &graph_neighbor_indices);
+        let parity = if has_bracket_h {
+            let mut smiles_with_h = Vec::with_capacity(explicit_smiles.len() + 1);
+            if has_preceding {
+                smiles_with_h.push(explicit_smiles[0]);
+                smiles_with_h.push(h_sentinel);
+                smiles_with_h.extend_from_slice(&explicit_smiles[1..]);
+            } else {
+                smiles_with_h.push(h_sentinel);
+                smiles_with_h.extend_from_slice(&explicit_smiles);
+            }
+
+            graph_neighbors.insert(0, h_sentinel);
+
+            parity_ni(&smiles_with_h, &graph_neighbors)
+        } else {
+            parity_ni(&explicit_smiles, &graph_neighbors)
+        };
 
         let chirality = match parse_atom.chirality {
             ChiralityToken::CounterClockwise => {
-                if parity {
-                    Chirality::Ccw
-                } else {
-                    Chirality::Cw
-                }
+                if parity { Chirality::Ccw } else { Chirality::Cw }
             }
             ChiralityToken::Clockwise => {
-                if parity {
-                    Chirality::Cw
-                } else {
-                    Chirality::Ccw
-                }
+                if parity { Chirality::Cw } else { Chirality::Ccw }
             }
             ChiralityToken::None => unreachable!(),
         };
@@ -115,20 +127,17 @@ fn resolve_chirality(mol: &mut Mol<Atom, SmilesBond>, tree: &ParseTree, indices:
     }
 }
 
-fn parity_of_permutation(from: &[usize], to: &[usize]) -> bool {
+fn parity_ni(from: &[NodeIndex], to: &[NodeIndex]) -> bool {
     if from.len() != to.len() {
         return true;
     }
-
     let n = from.len();
     let perm: Vec<usize> = from
         .iter()
-        .map(|&f| to.iter().position(|&t| t == f).expect("permutation elements must match"))
+        .map(|f| to.iter().position(|t| t == f).unwrap_or(0))
         .collect();
-
     let mut visited = vec![false; n];
     let mut swaps = 0;
-
     for i in 0..n {
         if visited[i] {
             continue;
@@ -142,7 +151,6 @@ fn parity_of_permutation(from: &[usize], to: &[usize]) -> bool {
         }
         swaps += cycle_len - 1;
     }
-
     swaps % 2 == 0
 }
 

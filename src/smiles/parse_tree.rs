@@ -27,12 +27,21 @@ pub struct ParseTree {
     pub atoms: Vec<ParseAtom>,
 }
 
+#[derive(Clone)]
+struct RingOpen {
+    atom_idx: usize,
+    bond: Option<BondToken>,
+    #[allow(dead_code)]
+    pos: usize,
+    placeholder: usize,
+}
+
 pub fn build_parse_tree(tokens: &[Token]) -> Result<ParseTree, SmilesError> {
     let mut atoms: Vec<ParseAtom> = Vec::new();
-    let mut stack: Vec<usize> = Vec::new(); // stack of current atom indices for branches
+    let mut stack: Vec<usize> = Vec::new();
     let mut current: Option<usize> = None;
     let mut pending_bond: Option<BondToken> = None;
-    let mut ring_opens: Vec<Option<(usize, Option<BondToken>, usize)>> = vec![None; 100];
+    let mut ring_opens: Vec<Option<RingOpen>> = vec![None; 100];
 
     for token in tokens {
         match token {
@@ -66,8 +75,8 @@ pub fn build_parse_tree(tokens: &[Token]) -> Result<ParseTree, SmilesError> {
                     pos: *pos,
                 })?;
 
-                if let Some((open_idx, open_bond, _open_pos)) = ring_opens[d].take() {
-                    let ring_bond = match (bond.or(pending_bond.take()), open_bond) {
+                if let Some(open) = ring_opens[d].take() {
+                    let ring_bond = match (bond.or(pending_bond.take()), open.bond) {
                         (None, None) => None,
                         (Some(b), None) | (None, Some(b)) => Some(b),
                         (Some(b1), Some(b2)) => {
@@ -79,16 +88,26 @@ pub fn build_parse_tree(tokens: &[Token]) -> Result<ParseTree, SmilesError> {
                         }
                     };
 
-                    atoms[open_idx].neighbors.push(Neighbor {
+                    atoms[open.atom_idx].neighbors[open.placeholder] = Neighbor {
                         bond: ring_bond,
                         atom_idx: cur,
-                    });
+                    };
                     atoms[cur].neighbors.push(Neighbor {
                         bond: ring_bond,
-                        atom_idx: open_idx,
+                        atom_idx: open.atom_idx,
                     });
                 } else {
-                    ring_opens[d] = Some((cur, bond.or(pending_bond.take()), *pos));
+                    let placeholder = atoms[cur].neighbors.len();
+                    atoms[cur].neighbors.push(Neighbor {
+                        bond: None,
+                        atom_idx: usize::MAX,
+                    });
+                    ring_opens[d] = Some(RingOpen {
+                        atom_idx: cur,
+                        bond: bond.or(pending_bond.take()),
+                        pos: *pos,
+                        placeholder,
+                    });
                 }
             }
             Token::OpenParen(pos) => {
