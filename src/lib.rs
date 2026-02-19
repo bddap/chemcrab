@@ -10,6 +10,7 @@ pub mod kekulize;
 pub mod mol;
 pub mod rings;
 pub mod smiles;
+pub mod substruct;
 pub mod traits;
 pub mod valence;
 pub mod wrappers;
@@ -29,6 +30,10 @@ pub use kekulize::{kekulize, KekulizeError};
 pub use mol::Mol;
 pub use rings::RingInfo;
 pub use smiles::{from_smiles, parse_smiles, to_canonical_smiles, to_smiles, SmilesError};
+pub use substruct::{
+    get_substruct_match, get_substruct_match_with, get_substruct_matches,
+    get_substruct_matches_with, has_substruct_match, has_substruct_match_with, AtomMapping,
+};
 pub use traits::{
     HasAromaticity, HasAtomicNum, HasBondOrder, HasBondStereo, HasChirality, HasFormalCharge,
     HasHybridization, HasHydrogenCount, HasIsotope, HasPosition2D, HasPosition3D, HasValence,
