@@ -233,6 +233,12 @@ fn extract_chirality_and_h(expr: &AtomExpr) -> Option<(Chirality, bool)> {
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum NeighborRef {
+    Atom(NodeIndex),
+    ImplicitH,
+}
+
 fn validate_chirality(
     mapping: &AtomMapping,
     target: &Mol<Atom, Bond>,
@@ -257,39 +263,33 @@ fn validate_chirality(
             continue;
         }
 
-        let q_chiral = cqa.chirality;
-        let t_chiral = t_atom.chirality;
-
-        let mut mapped_target_neighbors: Vec<NodeIndex> = Vec::new();
-
-        if cqa.has_implicit_h {
-            let sentinel = NodeIndex::new(usize::MAX);
-            mapped_target_neighbors.push(sentinel);
-        }
-
-        for q_nb in query.neighbors(q_idx) {
-            let t_nb = match mapping.iter().find(|&&(q, _)| q == q_nb) {
-                Some(&(_, t)) => t,
-                None => return false,
-            };
-            mapped_target_neighbors.push(t_nb);
-        }
-
-        let target_stored_neighbors: Vec<NodeIndex> = {
-            let mut nbs: Vec<NodeIndex> = target.neighbors(t_idx).collect();
-            if t_atom.hydrogen_count > 0 && cqa.has_implicit_h {
-                let sentinel = NodeIndex::new(usize::MAX);
-                nbs.insert(0, sentinel);
+        let mapped: Vec<NeighborRef> = {
+            let mut v = Vec::new();
+            if cqa.has_implicit_h {
+                v.push(NeighborRef::ImplicitH);
             }
-            nbs
+            for q_nb in query.neighbors(q_idx) {
+                match mapping.iter().find(|&&(q, _)| q == q_nb) {
+                    Some(&(_, t)) => v.push(NeighborRef::Atom(t)),
+                    None => return false,
+                }
+            }
+            v
         };
 
-        let perm_count = count_inversions(&mapped_target_neighbors, &target_stored_neighbors);
+        let stored: Vec<NeighborRef> = {
+            let h_iter = (t_atom.hydrogen_count > 0 && cqa.has_implicit_h)
+                .then_some(NeighborRef::ImplicitH);
+            let atom_iter = target.neighbors(t_idx).map(NeighborRef::Atom);
+            h_iter.into_iter().chain(atom_iter).collect()
+        };
 
-        let parities_match = if perm_count.is_multiple_of(2) {
-            q_chiral == t_chiral
+        let perm_parity = count_inversions(&mapped, &stored);
+
+        let parities_match = if perm_parity.is_multiple_of(2) {
+            cqa.chirality == t_atom.chirality
         } else {
-            q_chiral != t_chiral
+            cqa.chirality != t_atom.chirality
         };
 
         if !parities_match {
@@ -299,14 +299,10 @@ fn validate_chirality(
     true
 }
 
-fn count_inversions(mapped: &[NodeIndex], stored: &[NodeIndex]) -> usize {
-    let position_of = |node: NodeIndex| -> Option<usize> {
-        stored.iter().position(|&n| n == node)
-    };
-
+fn count_inversions(mapped: &[NeighborRef], stored: &[NeighborRef]) -> usize {
     let positions: Vec<usize> = mapped
         .iter()
-        .filter_map(|&n| position_of(n))
+        .map(|n| stored.iter().position(|s| s == n).expect("mapped neighbor not found in stored"))
         .collect();
 
     let mut inversions = 0;
