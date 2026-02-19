@@ -173,15 +173,34 @@ impl Element {
 
     pub fn default_valences(self) -> &'static [u8] {
         match self {
+            Element::H => &[1],
             Element::B => &[3],
             Element::C => &[4],
             Element::N => &[3, 5],
             Element::O => &[2],
-            Element::P => &[3, 5],
-            Element::S => &[2, 4, 6],
-            Element::F | Element::Cl | Element::Br | Element::I => &[1],
+            Element::F | Element::Cl | Element::Br | Element::At => &[1],
+            Element::Si | Element::Ge => &[4],
+            Element::P | Element::As => &[3, 5],
+            Element::S | Element::Se | Element::Te => &[2, 4, 6],
+            Element::I => &[1, 3, 5, 7],
             _ => &[],
         }
+    }
+
+    pub fn is_organic_subset(self) -> bool {
+        matches!(
+            self,
+            Element::B
+                | Element::C
+                | Element::N
+                | Element::O
+                | Element::P
+                | Element::S
+                | Element::F
+                | Element::Cl
+                | Element::Br
+                | Element::I
+        )
     }
 }
 
@@ -975,15 +994,38 @@ mod tests {
         assert_eq!(Element::F.default_valences(), &[1]);
         assert_eq!(Element::Cl.default_valences(), &[1]);
         assert_eq!(Element::Br.default_valences(), &[1]);
-        assert_eq!(Element::I.default_valences(), &[1]);
+        assert_eq!(Element::I.default_valences(), &[1, 3, 5, 7]);
+    }
+
+    #[test]
+    fn default_valences_hydrogen() {
+        assert_eq!(Element::H.default_valences(), &[1]);
+    }
+
+    #[test]
+    fn default_valences_extended() {
+        assert_eq!(Element::Si.default_valences(), &[4]);
+        assert_eq!(Element::Ge.default_valences(), &[4]);
+        assert_eq!(Element::As.default_valences(), &[3, 5]);
+        assert_eq!(Element::Se.default_valences(), &[2, 4, 6]);
+        assert_eq!(Element::Te.default_valences(), &[2, 4, 6]);
+        assert_eq!(Element::I.default_valences(), &[1, 3, 5, 7]);
+        assert_eq!(Element::At.default_valences(), &[1]);
     }
 
     #[test]
     fn default_valences_non_organic_empty() {
-        assert_eq!(Element::H.default_valences(), &[] as &[u8]);
         assert_eq!(Element::He.default_valences(), &[] as &[u8]);
         assert_eq!(Element::Fe.default_valences(), &[] as &[u8]);
         assert_eq!(Element::Og.default_valences(), &[] as &[u8]);
+    }
+
+    #[test]
+    fn organic_subset() {
+        assert!(Element::C.is_organic_subset());
+        assert!(Element::Br.is_organic_subset());
+        assert!(!Element::Fe.is_organic_subset());
+        assert!(!Element::H.is_organic_subset());
     }
 
     #[test]
