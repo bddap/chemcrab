@@ -1817,4 +1817,44 @@ mod tests {
         let query_opp = smarts("[C@@](F)(Cl)Br");
         assert!(!has_smarts_match_chiral(&target, &query_opp));
     }
+
+    #[test]
+    fn total_h_count_explicit_deuterium() {
+        let target = mol("[2H]C([2H])([2H])[2H]");
+        let query = smarts("[H0]");
+        let matches = get_smarts_matches(&target, &query);
+        assert_eq!(matches.len(), 4, "each deuterium has 0 total H, carbon has 4");
+        for m in &matches {
+            let target_idx = m[0].1;
+            assert_eq!(target.atom(target_idx).atomic_num, 1);
+        }
+    }
+
+    #[test]
+    fn total_h_count_virtual_only() {
+        let target = mol("CCO");
+        let query = smarts("[H1]");
+        let matches = get_smarts_matches(&target, &query);
+        assert_eq!(matches.len(), 1, "only oxygen has 1 total H");
+        let target_idx = matches[0][0].1;
+        assert_eq!(target.atom(target_idx).atomic_num, 8);
+    }
+
+    #[test]
+    fn total_h_count_four_explicit() {
+        let target = mol("[2H]C([2H])([2H])[2H]");
+        let query = smarts("[H4]");
+        let matches = get_smarts_matches(&target, &query);
+        assert_eq!(matches.len(), 1, "carbon has 4 total H (all explicit)");
+        let target_idx = matches[0][0].1;
+        assert_eq!(target.atom(target_idx).atomic_num, 6);
+    }
+
+    #[test]
+    fn implicit_h_count_deuterium() {
+        let target = mol("[2H]C([2H])([2H])[2H]");
+        let query = smarts("[h0]");
+        let matches = get_smarts_matches(&target, &query);
+        assert_eq!(matches.len(), 5, "all atoms have 0 implicit H");
+    }
 }

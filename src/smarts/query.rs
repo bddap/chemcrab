@@ -113,6 +113,12 @@ fn aliphatic_hetero_neighbor_count(mol: &Mol<Atom, Bond>, idx: NodeIndex) -> u8 
         .count() as u8
 }
 
+fn explicit_h_count(mol: &Mol<Atom, Bond>, idx: NodeIndex) -> u8 {
+    mol.neighbors(idx)
+        .filter(|&nb| mol.atom(nb).atomic_num == 1)
+        .count() as u8
+}
+
 fn bond_order_sum(mol: &Mol<Atom, Bond>, idx: NodeIndex) -> u8 {
     mol.bonds_of(idx)
         .map(|ei| match mol.bond(ei).order {
@@ -150,7 +156,7 @@ fn range_value(kind: RangeKind, atom: &Atom, ctx: &MatchContext, idx: NodeIndex)
     match kind {
         RangeKind::Degree => ctx.mol.neighbors(idx).count() as u8,
         RangeKind::NonHDegree => non_h_degree(ctx.mol, idx),
-        RangeKind::TotalHCount => atom.hydrogen_count,
+        RangeKind::TotalHCount => atom.hydrogen_count + explicit_h_count(ctx.mol, idx),
         RangeKind::ImplicitHCount => atom.hydrogen_count,
         RangeKind::SmallestRingSize => ctx
             .ring_info
@@ -224,7 +230,7 @@ impl AtomExpr {
                 total == *x
             }
             AtomExpr::TotalHCount(h) => {
-                atom.hydrogen_count == *h
+                (atom.hydrogen_count + explicit_h_count(ctx.mol, idx)) == *h
             }
             AtomExpr::ImplicitHCount(h) => {
                 atom.hydrogen_count == *h
