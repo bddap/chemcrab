@@ -3,7 +3,7 @@ use petgraph::graph::{EdgeIndex, NodeIndex};
 use crate::bond::BondOrder;
 use crate::element::{outer_shell_electrons, Element};
 use crate::mol::Mol;
-use crate::traits::{HasAromaticity, HasAtomicNum, HasBondOrder, HasFormalCharge, HasHydrogenCount};
+use crate::traits::{HasAtomicNum, HasBondOrder, HasFormalCharge, HasHydrogenCount};
 use crate::valence::total_valence;
 
 fn count_atom_elec<A, B>(mol: &Mol<A, B>, idx: NodeIndex) -> i16
@@ -124,15 +124,6 @@ where
     }
 
     conjugated
-}
-
-pub fn is_conjugated_bond<A, B>(mol: &Mol<A, B>, edge: EdgeIndex) -> bool
-where
-    A: HasAtomicNum + HasHydrogenCount + HasFormalCharge + HasAromaticity,
-    B: HasBondOrder,
-{
-    let conj = assign_conjugation(mol);
-    edge.index() < conj.len() && conj[edge.index()]
 }
 
 #[cfg(test)]

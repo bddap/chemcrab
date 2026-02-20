@@ -80,14 +80,6 @@ impl<A, B> Mol<A, B> {
         self.graph.edge_endpoints(idx)
     }
 
-    pub fn swap_remove_atom(&mut self, idx: NodeIndex) -> A {
-        self.graph.remove_node(idx).expect("node index out of bounds")
-    }
-
-    pub fn swap_remove_bond(&mut self, idx: EdgeIndex) -> B {
-        self.graph.remove_edge(idx).expect("edge index out of bounds")
-    }
-
     pub fn tetrahedral_stereo(&self) -> &[[AtomId; 4]] {
         &self.tetrahedral_stereo
     }

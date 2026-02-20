@@ -111,7 +111,9 @@ pub fn num_components<A, B>(mol: &Mol<A, B>) -> usize {
     connected_components(mol).len()
 }
 
-pub fn get_fragments<A: Clone, B: Clone>(mol: &Mol<A, B>) -> Vec<Mol<A, B>> {
+pub fn get_fragments<A: Clone, B: Clone + HasBondStereoMut>(
+    mol: &Mol<A, B>,
+) -> Vec<Mol<A, B>> {
     let components = connected_components(mol);
     let mut fragments = Vec::with_capacity(components.len());
     for component in &components {
@@ -134,6 +136,17 @@ pub fn get_fragments<A: Clone, B: Clone>(mol: &Mol<A, B>) -> Vec<Mol<A, B>> {
                 }
             }
         }
+        remap_bond_stereo(&mut frag, &index_map);
+        let remapped_stereo = mol
+            .tetrahedral_stereo()
+            .iter()
+            .filter(|s| match s[0] {
+                AtomId::Node(idx) => component.contains(&idx),
+                AtomId::VirtualH(parent, _) => component.contains(&parent),
+            })
+            .map(|s| s.map(|aid| remap_atom_id(aid, &index_map)))
+            .collect();
+        frag.set_tetrahedral_stereo(remapped_stereo);
         fragments.push(frag);
     }
     fragments
@@ -571,5 +584,40 @@ mod tests {
         assert_eq!(frags.len(), 1);
         assert_eq!(frags[0].atom_count(), mol.atom_count());
         assert_eq!(frags[0].bond_count(), mol.bond_count());
+    }
+
+    #[test]
+    fn fragment_preserves_tetrahedral_stereo() {
+        let mol = from_smiles("[C@@H](F)(Cl)Br.[Na+]").unwrap();
+        let frags = get_fragments(&mol);
+        let organic = frags.iter().find(|f| f.atom_count() > 1).unwrap();
+        let smi = to_canonical_smiles(organic);
+        assert!(smi.contains('@'), "chirality lost in fragment: {smi}");
+    }
+
+    #[test]
+    fn fragment_preserves_ez_stereo() {
+        let mol = from_smiles("F/C=C/F.[Na+]").unwrap();
+        let frags = get_fragments(&mol);
+        let organic = frags.iter().find(|f| f.atom_count() > 1).unwrap();
+        let smi = to_canonical_smiles(organic);
+        assert!(
+            smi.contains('\\') || smi.contains('/'),
+            "E/Z stereo lost in fragment: {smi}"
+        );
+    }
+
+    #[test]
+    fn fragment_multi_component_stereo() {
+        let mol = from_smiles("[C@@H](F)(Cl)Br.F/C=C/F").unwrap();
+        let frags = get_fragments(&mol);
+        assert_eq!(frags.len(), 2);
+        for frag in &frags {
+            let smi = to_canonical_smiles(frag);
+            assert!(
+                smi.contains('@') || smi.contains('\\') || smi.contains('/'),
+                "stereo lost in fragment: {smi}"
+            );
+        }
     }
 }
