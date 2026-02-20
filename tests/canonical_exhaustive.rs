@@ -79,6 +79,31 @@ const MOLECULES: &[&str] = &[
     "c1cnc2ccccc2n1",
     "[O-][N+](=O)c1ccccc1",
     "c1cc2ccc3cccc4ccc(c1)c2c34",
+    // Bug A regressions: symmetric chirality tie-breaking
+    "[C@@H]1(O)C[C@H](O)C[C@@H](O)C1",
+    "[C@H]1(O)C[C@@H](O)C[C@H](O)C1",
+    "[C@@H]1(O)C[C@@H](O)C[C@@H](O)C1",
+    "[C@H]1(O)C[C@H](O)C[C@H](O)C1",
+    "[C@@H]1(F)C[C@H](F)C[C@@H](F)C1",
+    "[C@@H]1(Cl)C[C@H](Cl)C[C@@H](Cl)C1",
+    "[C@@H]1(CC1)[C@H]2CC2",
+    "[C@H]1(CC1)[C@H]2CC2",
+    "[C@@H]1(CCC1)[C@H]2CCC2",
+    "[C@@H]1(CC1)[C@H]2CCC2",
+    "[C@@H]1(CCC1)[C@H]2CC2",
+    "[C@@H]1(CC1)[C@@H](F)CC",
+    "[C@@H]1(CCCC1)[C@H]2CCCC2",
+    // Bug B regressions: E/Z conjugated diene direction signs
+    r"F/C=C/C=C\F",
+    r"F/C=C\C=C\F",
+    r"Cl/C=C\C=C\Cl",
+    r"Br/C=C\C=C\Br",
+    r"F/C=C\C=C/C=C\F",
+    r"F/C=C/C=C\C=C/F",
+    r"C1/C=C\CCC1",
+    r"C/1=C\CCC/C1",
+    r"C/1=C/C=C\CC1",
+    r"C/1=C\C=C/CC1",
 ];
 
 fn canonical(smiles: &str) -> String {
