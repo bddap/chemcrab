@@ -1212,7 +1212,6 @@ mod tests {
         for smi in &cases {
             let mol = from_smiles(smi).unwrap();
             let c1 = to_canonical_smiles(&mol);
-            eprintln!("{smi} -> {c1}");
             let reparsed = from_smiles(&c1).unwrap_or_else(|e| {
                 panic!("reparse of '{c1}' from '{smi}' failed: {e}");
             });
