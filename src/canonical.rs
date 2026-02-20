@@ -146,38 +146,29 @@ where
     }
 }
 
-fn chirality_refine<A, B>(mol: &Mol<A, B>, ranks: &mut Vec<usize>)
+fn above_rank_seq<A, B>(mol: &Mol<A, B>, stereo: &crate::mol::TetrahedralStereo, ranks: &[usize]) -> [usize; 4]
 where
     A: HasHydrogenCount,
 {
-    let n = ranks.len();
-    let mut values = vec![0u64; n];
-    let mut any_stereo = false;
+    let n = mol.atom_count();
+    std::array::from_fn(|i| match stereo.above[i] {
+        AtomId::Node(idx) => ranks[idx.index()],
+        AtomId::VirtualH(_, _) => n,
+    })
+}
 
-    for stereo in mol.tetrahedral_stereo() {
-        let center = stereo.center;
-        if center.index() >= n {
-            continue;
-        }
+fn hash_stereo_for_ranks(ranks4: &[usize; 4], center_rank: usize) -> u64 {
+    let mut sorted4 = *ranks4;
+    sorted4.sort_unstable();
+    let has_ties = sorted4.windows(2).any(|w| w[0] == w[1]);
 
-        let full = stereo.above;
+    let mut h = Fnv1aHasher::new();
+    center_rank.hash(&mut h);
 
-        let rank_of = |id: &AtomId| -> usize {
-            match id {
-                AtomId::Node(idx) => ranks[idx.index()],
-                AtomId::VirtualH(_, _) => n,
-            }
-        };
-
-        let ranks4 = [rank_of(&full[0]), rank_of(&full[1]), rank_of(&full[2]), rank_of(&full[3])];
-
-        // Need all 4 neighbor ranks distinct for unambiguous parity.
-        let mut sorted4 = ranks4;
-        sorted4.sort_unstable();
-        if sorted4.windows(2).any(|w| w[0] == w[1]) {
-            continue;
-        }
-
+    if has_ties {
+        sorted4.hash(&mut h);
+        3u64.hash(&mut h);
+    } else {
         let perm: [usize; 4] = std::array::from_fn(|i| {
             sorted4.iter().position(|&s| s == ranks4[i]).unwrap()
         });
@@ -196,13 +187,29 @@ where
             }
             swaps += cycle_len - 1;
         }
-
         let parity: u64 = if swaps.is_multiple_of(2) { 1 } else { 2 };
-
-        let mut h = Fnv1aHasher::new();
-        ranks[center.index()].hash(&mut h);
         parity.hash(&mut h);
-        values[center.index()] = h.finish();
+    }
+
+    h.finish()
+}
+
+fn chirality_refine<A, B>(mol: &Mol<A, B>, ranks: &mut Vec<usize>)
+where
+    A: HasHydrogenCount,
+{
+    let n = ranks.len();
+    let mut values = vec![0u64; n];
+    let mut any_stereo = false;
+
+    for stereo in mol.tetrahedral_stereo() {
+        let center = stereo.center;
+        if center.index() >= n {
+            continue;
+        }
+
+        let ranks4 = above_rank_seq(mol, stereo, ranks);
+        values[center.index()] = hash_stereo_for_ranks(&ranks4, ranks[center.index()]);
         any_stereo = true;
     }
 
@@ -307,6 +314,15 @@ where
 
     morgan_refine(mol, &mut ranks);
 
+    loop {
+        let prev = count_distinct(&ranks);
+        chirality_refine(mol, &mut ranks);
+        morgan_refine(mol, &mut ranks);
+        if count_distinct(&ranks) <= prev {
+            break;
+        }
+    }
+
     if count_distinct(&ranks) < n {
         break_ties(mol, &mut ranks, &invariants);
     }
@@ -332,7 +348,7 @@ where
             return;
         }
 
-        let min_tied_rank = find_min_tied_rank(ranks);
+        let min_tied_rank = find_best_tied_rank(mol, ranks);
 
         let tied_atoms: Vec<usize> = (0..n)
             .filter(|&i| ranks[i] == min_tied_rank)
@@ -358,8 +374,6 @@ where
                     break;
                 }
             }
-            // Build trace: sort atoms by their trial rank, then hash each
-            // atom's invariant + neighbor-rank signature.
             let mut indexed: Vec<(usize, usize)> = trial.iter().copied().enumerate().collect();
             indexed.sort_by_key(|&(_, r)| r);
             let trace: Vec<u64> = indexed
@@ -373,6 +387,11 @@ where
                         .collect();
                     nb_ranks.sort_unstable();
                     nb_ranks.hash(&mut h);
+                    if let Some(stereo) = mol.tetrahedral_stereo_for(NodeIndex::new(atom_i)) {
+                        let ranks4 = above_rank_seq(mol, stereo, &trial);
+                        let stereo_hash = hash_stereo_for_ranks(&ranks4, trial[atom_i]);
+                        stereo_hash.hash(&mut h);
+                    }
                     h.finish()
                 })
                 .collect();
@@ -386,17 +405,31 @@ where
     }
 }
 
-fn find_min_tied_rank(ranks: &[usize]) -> usize {
+fn find_best_tied_rank<A, B>(mol: &Mol<A, B>, ranks: &[usize]) -> usize
+where
+    A: HasHydrogenCount,
+{
     let mut counts = std::collections::HashMap::new();
     for &r in ranks {
         *counts.entry(r).or_insert(0usize) += 1;
     }
-    *counts
-        .iter()
-        .filter(|(_, &count)| count > 1)
+    let tied_ranks: Vec<usize> = counts
+        .into_iter()
+        .filter(|&(_, count)| count > 1)
         .map(|(rank, _)| rank)
-        .min()
-        .unwrap()
+        .collect();
+
+    let has_stereo_at_rank = |r: usize| -> bool {
+        mol.tetrahedral_stereo().iter().any(|s| {
+            s.center.index() < ranks.len() && ranks[s.center.index()] == r
+        })
+    };
+
+    let non_stereo: Option<usize> = tied_ranks.iter().copied()
+        .filter(|&r| !has_stereo_at_rank(r))
+        .min();
+
+    non_stereo.unwrap_or_else(|| *tied_ranks.iter().min().unwrap())
 }
 
 #[cfg(test)]
@@ -436,5 +469,65 @@ mod tests {
         let mut sorted = ranks.clone();
         sorted.sort();
         assert_eq!(sorted, vec![0, 1, 2, 3, 4, 5]);
+    }
+
+    #[test]
+    fn canonical_135_cyclohexane_triol_idempotent() {
+        let cases = [
+            "[C@@H]1(O)C[C@H](O)C[C@@H](O)C1",
+            "[C@H]1(O)C[C@@H](O)C[C@H](O)C1",
+            "[C@@H]1(O)C[C@@H](O)C[C@@H](O)C1",
+            "[C@H]1(O)C[C@H](O)C[C@H](O)C1",
+            "[C@@H]1(F)C[C@H](F)C[C@@H](F)C1",
+            "[C@@H]1(Cl)C[C@H](Cl)C[C@@H](Cl)C1",
+        ];
+        for smi in &cases {
+            let mol = from_smiles(smi).unwrap();
+            let c1 = crate::to_canonical_smiles(&mol);
+            let reparsed = from_smiles(&c1).unwrap();
+            let c2 = crate::to_canonical_smiles(&reparsed);
+            assert_eq!(c1, c2, "round-trip failed for {smi}: '{c1}' vs '{c2}'");
+        }
+    }
+
+    #[test]
+    fn canonical_spiro_stereo_idempotent() {
+        let cases = [
+            "[C@@H]1(CC1)[C@H]2CC2",
+            "[C@H]1(CC1)[C@H]2CC2",
+            "[C@@H]1(CCC1)[C@H]2CCC2",
+            "[C@@H]1(CC1)[C@H]2CCC2",
+            "[C@@H]1(CCC1)[C@H]2CC2",
+            "[C@@H]1(CC1)[C@@H](F)CC",
+            "[C@@H]1(CCCC1)[C@H]2CCCC2",
+        ];
+        for smi in &cases {
+            let mol = from_smiles(smi).unwrap();
+            let c1 = crate::to_canonical_smiles(&mol);
+            let reparsed = from_smiles(&c1).unwrap();
+            let c2 = crate::to_canonical_smiles(&reparsed);
+            assert_eq!(c1, c2, "round-trip failed for {smi}: '{c1}' vs '{c2}'");
+        }
+    }
+
+    #[test]
+    fn canonical_symmetric_chirality_permutation_invariant() {
+        use crate::graph_ops::renumber_atoms;
+        let cases = [
+            "[C@@H]1(O)C[C@H](O)C[C@@H](O)C1",
+            "[C@@H]1(CC1)[C@H]2CC2",
+            "[C@@H]1(CCC1)[C@H]2CCC2",
+        ];
+        for smi in &cases {
+            let mol = from_smiles(smi).unwrap();
+            let c1 = crate::to_canonical_smiles(&mol);
+            let n = mol.atom_count();
+            for offset in 1..n {
+                let perm: Vec<usize> = (0..n).map(|i| (i + offset) % n).collect();
+                let renum = renumber_atoms(&mol, &perm).unwrap();
+                let c2 = crate::to_canonical_smiles(&renum);
+                assert_eq!(c1, c2, "permutation invariance failed for {smi} with offset {offset}: '{c1}' vs '{c2}'");
+            }
+        }
     }
 }
