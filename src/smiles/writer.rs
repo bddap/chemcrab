@@ -1059,6 +1059,16 @@ mod tests {
     }
 
     #[test]
+    fn inositol_idempotent() {
+        let smi = "[C@@H]1(O)[C@H](O)[C@@H](O)[C@H](O)[C@@H](O)[C@H]1O";
+        let mol = from_smiles(smi).unwrap();
+        let canon = to_canonical_smiles(&mol);
+        let reparsed = from_smiles(&canon).unwrap();
+        let canon2 = to_canonical_smiles(&reparsed);
+        assert_eq!(canon, canon2, "inositol round-trip: '{canon}' vs '{canon2}'");
+    }
+
+    #[test]
     fn canonical_three_fragments_determinism() {
         let s = canonical("[Na+].[Cl-].O");
         assert_eq!(s.matches('.').count(), 2);

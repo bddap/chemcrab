@@ -49,6 +49,8 @@ const MOLECULES: &[&str] = &[
     r"F/C=C/C=C/F",
     // Mixed stereo
     r"F/C=C/[C@@H](Cl)Br",
+    // Highly symmetric chiral
+    "[C@@H]1(O)[C@H](O)[C@@H](O)[C@H](O)[C@@H](O)[C@H]1O",
     // Functional groups
     "CC(=O)OC",
     "c1ccc(cc1)O",

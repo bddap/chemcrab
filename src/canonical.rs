@@ -3,7 +3,7 @@ use std::hash::{Hash, Hasher};
 use petgraph::graph::NodeIndex;
 
 use crate::bond::BondOrder;
-use crate::mol::Mol;
+use crate::mol::{AtomId, Mol};
 use crate::traits::{
     HasAromaticity, HasAtomicNum, HasBondOrder, HasFormalCharge, HasHydrogenCount,
     HasIsotope,
@@ -146,6 +146,99 @@ where
     }
 }
 
+fn chirality_refine<A, B>(mol: &Mol<A, B>, ranks: &mut Vec<usize>)
+where
+    A: HasHydrogenCount,
+{
+    let n = ranks.len();
+    let mut values = vec![0u64; n];
+    let mut any_stereo = false;
+
+    for stereo in mol.tetrahedral_stereo() {
+        let center = match stereo[0] {
+            AtomId::Node(idx) => idx,
+            _ => continue,
+        };
+        if center.index() >= n {
+            continue;
+        }
+
+        let stored_three = &stereo[1..4];
+
+        let mut all_neighbors: Vec<AtomId> = mol
+            .neighbors(center)
+            .map(AtomId::Node)
+            .collect();
+        for i in 0..mol.atom(center).hydrogen_count() {
+            all_neighbors.push(AtomId::VirtualH(center, i));
+        }
+
+        let excluded = match all_neighbors.iter().find(|id| !stored_three.contains(id)) {
+            Some(&id) => id,
+            None => continue,
+        };
+
+        let full = [excluded, stereo[1], stereo[2], stereo[3]];
+
+        let rank_of = |id: &AtomId| -> usize {
+            match id {
+                AtomId::Node(idx) => ranks[idx.index()],
+                AtomId::VirtualH(_, _) => n,
+            }
+        };
+
+        let ranks4 = [rank_of(&full[0]), rank_of(&full[1]), rank_of(&full[2]), rank_of(&full[3])];
+
+        // Need all 4 neighbor ranks distinct for unambiguous parity.
+        let mut sorted4 = ranks4;
+        sorted4.sort_unstable();
+        if sorted4.windows(2).any(|w| w[0] == w[1]) {
+            continue;
+        }
+
+        let perm: [usize; 4] = std::array::from_fn(|i| {
+            sorted4.iter().position(|&s| s == ranks4[i]).unwrap()
+        });
+        let mut visited = [false; 4];
+        let mut swaps = 0usize;
+        for i in 0..4 {
+            if visited[i] {
+                continue;
+            }
+            let mut cycle_len = 0;
+            let mut j = i;
+            while !visited[j] {
+                visited[j] = true;
+                j = perm[j];
+                cycle_len += 1;
+            }
+            swaps += cycle_len - 1;
+        }
+
+        let parity: u64 = if swaps.is_multiple_of(2) { 1 } else { 2 };
+
+        let mut h = Fnv1aHasher::new();
+        ranks[center.index()].hash(&mut h);
+        parity.hash(&mut h);
+        values[center.index()] = h.finish();
+        any_stereo = true;
+    }
+
+    if !any_stereo {
+        return;
+    }
+
+    for i in 0..n {
+        if values[i] == 0 {
+            let mut h = Fnv1aHasher::new();
+            ranks[i].hash(&mut h);
+            values[i] = h.finish();
+        }
+    }
+
+    *ranks = ranks_from_values(&values);
+}
+
 pub fn canonical_ordering<A, B>(mol: &Mol<A, B>) -> Vec<usize>
 where
     A: HasAtomicNum
@@ -200,15 +293,50 @@ where
             .filter(|&i| ranks[i] == min_tied_rank)
             .collect();
 
-        let chosen = *tied_atoms
-            .iter()
-            .min_by(|&&a, &&b| invariants[a].cmp(&invariants[b]).then_with(|| a.cmp(&b)))
-            .unwrap();
-
+        // Try promoting each tied atom and pick the one that yields the
+        // lexicographically smallest invariant trace (atom invariants sorted
+        // by resulting rank). This is independent of atom numbering.
         let max_rank = *ranks.iter().max().unwrap();
-        ranks[chosen] = max_rank + 1;
+        let mut best_trace: Option<Vec<u64>> = None;
+        let mut best_ranks: Option<Vec<usize>> = None;
 
-        morgan_refine(mol, ranks);
+        for &candidate in &tied_atoms {
+            let mut trial = ranks.clone();
+            trial[candidate] = max_rank + 1;
+            morgan_refine(mol, &mut trial);
+            loop {
+                let prev_distinct = count_distinct(&trial);
+                chirality_refine(mol, &mut trial);
+                morgan_refine(mol, &mut trial);
+                if count_distinct(&trial) <= prev_distinct {
+                    break;
+                }
+            }
+            // Build trace: sort atoms by their trial rank, then hash each
+            // atom's invariant + neighbor-rank signature.
+            let mut indexed: Vec<(usize, usize)> = trial.iter().copied().enumerate().collect();
+            indexed.sort_by_key(|&(_, r)| r);
+            let trace: Vec<u64> = indexed
+                .iter()
+                .map(|&(atom_i, _)| {
+                    let mut h = Fnv1aHasher::new();
+                    invariants[atom_i].hash(&mut h);
+                    let mut nb_ranks: Vec<usize> = mol
+                        .neighbors(NodeIndex::new(atom_i))
+                        .map(|nb| trial[nb.index()])
+                        .collect();
+                    nb_ranks.sort_unstable();
+                    nb_ranks.hash(&mut h);
+                    h.finish()
+                })
+                .collect();
+            if best_trace.as_ref().is_none_or(|best| trace < *best) {
+                best_trace = Some(trace);
+                best_ranks = Some(trial);
+            }
+        }
+
+        *ranks = best_ranks.unwrap();
     }
 }
 
