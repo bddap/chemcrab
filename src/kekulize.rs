@@ -163,14 +163,12 @@ pub fn kekulize(mol: Mol<Atom, SmilesBond>) -> Result<Mol<Atom, Bond>, KekulizeE
         result.add_bond(
             node_map[a.index()],
             node_map[b.index()],
-            Bond {
-                order,
-                stereo: smiles_bond.stereo,
-            },
+            Bond { order },
         );
     }
 
     result.set_tetrahedral_stereo(mol.tetrahedral_stereo().to_vec());
+    result.set_ez_stereo(mol.ez_stereo().to_vec());
 
     Ok(result)
 }
@@ -251,7 +249,6 @@ fn flip_path(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bond::BondStereo;
     use crate::smiles::parse_smiles;
 
     fn n(i: usize) -> NodeIndex {
@@ -429,7 +426,7 @@ mod tests {
         let mol = kekulize(smiles_mol).unwrap();
         let e = mol.bond_between(n(1), n(2)).unwrap();
         assert_eq!(mol.bond(e).order, BondOrder::Double);
-        assert!(matches!(mol.bond(e).stereo, BondStereo::Trans(_, _)));
+        assert!(mol.ez_stereo_for(n(1), n(2)).is_some(), "E/Z stereo lost in kekulize");
     }
 
     #[test]

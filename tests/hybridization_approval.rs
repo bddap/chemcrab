@@ -59,7 +59,7 @@ fn approval_hybridization() {
             .iter()
             .map(|a| (a.symbol.as_str(), parse_hybridization(&a.hybridization)))
             .collect();
-        expected.sort_by(|a, b| a.0.cmp(&b.0).then(hyb_label(a.1).cmp(hyb_label(b.1))));
+        expected.sort_by(|a, b| a.0.cmp(b.0).then(hyb_label(a.1).cmp(hyb_label(b.1))));
 
         let atom_symbols: Vec<&str> = (0..mol.atom_count())
             .map(|i| {
@@ -76,7 +76,7 @@ fn approval_hybridization() {
             .zip(computed.iter())
             .map(|(&sym, &hyb)| (sym, hyb))
             .collect();
-        got.sort_by(|a, b| a.0.cmp(&b.0).then(hyb_label(a.1).cmp(hyb_label(b.1))));
+        got.sort_by(|a, b| a.0.cmp(b.0).then(hyb_label(a.1).cmp(hyb_label(b.1))));
 
         if expected == got {
             pass += 1;

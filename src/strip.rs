@@ -1,15 +1,12 @@
-use crate::bond::BondStereo;
 use crate::mol::Mol;
-use crate::traits::{HasBondStereoMut, HasIsotopeMut};
+use crate::traits::HasIsotopeMut;
 
 pub fn strip_chirality<A, B>(mol: &mut Mol<A, B>) {
     mol.set_tetrahedral_stereo(vec![]);
 }
 
-pub fn strip_bond_stereo<A, B: HasBondStereoMut>(mol: &mut Mol<A, B>) {
-    for idx in mol.bonds().collect::<Vec<_>>() {
-        *mol.bond_mut(idx).bond_stereo_mut() = BondStereo::None;
-    }
+pub fn strip_bond_stereo<A, B>(mol: &mut Mol<A, B>) {
+    mol.set_ez_stereo(vec![]);
 }
 
 pub fn strip_isotope<A: HasIsotopeMut, B>(mol: &mut Mol<A, B>) {
@@ -34,9 +31,7 @@ mod tests {
     fn strip_bond_stereo_removes_ez() {
         let mut mol = from_smiles("F/C=C/F").unwrap();
         strip_bond_stereo(&mut mol);
-        for idx in mol.bonds() {
-            assert_eq!(mol.bond(idx).stereo, BondStereo::None);
-        }
+        assert!(mol.ez_stereo().is_empty());
     }
 
     #[test]

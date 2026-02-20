@@ -16,7 +16,6 @@ fn mol_add_atoms_and_bonds() {
         o,
         Bond {
             order: BondOrder::Double,
-            ..Bond::default()
         },
     );
 
@@ -97,26 +96,9 @@ fn atom_trait_impls() {
 fn bond_trait_impls() {
     let bond = Bond {
         order: BondOrder::Triple,
-        stereo: BondStereo::None,
     };
 
     assert_eq!(HasBondOrder::bond_order(&bond), BondOrder::Triple);
-    assert_eq!(HasBondStereo::bond_stereo(&bond), BondStereo::None);
-}
-
-#[test]
-fn smiles_bond_has_bond_stereo_but_not_order() {
-    use petgraph::graph::NodeIndex;
-
-    let sb = SmilesBond {
-        order: SmilesBondOrder::Aromatic,
-        stereo: BondStereo::Cis(NodeIndex::new(0), NodeIndex::new(1)),
-    };
-
-    assert_eq!(
-        HasBondStereo::bond_stereo(&sb),
-        BondStereo::Cis(NodeIndex::new(0), NodeIndex::new(1))
-    );
 }
 
 #[test]

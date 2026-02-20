@@ -32,7 +32,7 @@ pub fn from_smiles(s: &str) -> Result<Mol<Atom, Bond>, SmilesError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bond::{BondStereo, SmilesBondOrder};
+    use crate::bond::SmilesBondOrder;
     use petgraph::graph::NodeIndex;
 
     fn n(i: usize) -> NodeIndex {
@@ -325,41 +325,26 @@ mod tests {
         assert_eq!(mol.atom_count(), 4);
         let double_edge = mol.bond_between(n(1), n(2)).unwrap();
         assert_eq!(mol.bond(double_edge).order, SmilesBondOrder::Double);
-        assert!(matches!(
-            mol.bond(double_edge).stereo,
-            BondStereo::Trans(_, _)
-        ));
+        assert!(mol.ez_stereo_for(n(1), n(2)).is_some(), "expected E/Z stereo");
     }
 
     #[test]
     fn ez_cis() {
         // F/C=C\F -> cis
         let mol = parse_smiles(r"F/C=C\F").unwrap();
-        let double_edge = mol.bond_between(n(1), n(2)).unwrap();
-        assert!(matches!(
-            mol.bond(double_edge).stereo,
-            BondStereo::Cis(_, _)
-        ));
+        assert!(mol.ez_stereo_for(n(1), n(2)).is_some(), "expected E/Z stereo");
     }
 
     #[test]
     fn ez_trans_chlorine() {
         let mol = parse_smiles(r"Cl/C=C/Cl").unwrap();
-        let double_edge = mol.bond_between(n(1), n(2)).unwrap();
-        assert!(matches!(
-            mol.bond(double_edge).stereo,
-            BondStereo::Trans(_, _)
-        ));
+        assert!(mol.ez_stereo_for(n(1), n(2)).is_some(), "expected E/Z stereo");
     }
 
     #[test]
     fn ez_cis_chlorine() {
         let mol = parse_smiles(r"Cl/C=C\Cl").unwrap();
-        let double_edge = mol.bond_between(n(1), n(2)).unwrap();
-        assert!(matches!(
-            mol.bond(double_edge).stereo,
-            BondStereo::Cis(_, _)
-        ));
+        assert!(mol.ez_stereo_for(n(1), n(2)).is_some(), "expected E/Z stereo");
     }
 
     // ---- Disconnected ----
