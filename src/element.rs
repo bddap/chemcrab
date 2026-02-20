@@ -1,3 +1,5 @@
+//! Periodic table data for elements 1--118.
+
 /// Returns the number of valence-shell electrons for an element given its atomic number.
 ///
 /// Valence electrons occupy the outermost shell of an atom and determine its

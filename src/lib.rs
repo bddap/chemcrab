@@ -69,29 +69,6 @@
 //!
 //! Both use [`AtomId`] to refer to neighbors, which can be either a graph
 //! node or a virtual hydrogen.
-//!
-//! # Modules
-//!
-//! | Module | What it does |
-//! |---|---|
-//! | [`smiles`] | Parse and write SMILES, the *de facto* line notation for molecules |
-//! | [`smarts`] | Parse and match SMARTS, a query language for substructure search |
-//! | [`substruct`] | Graph-based substructure matching (VF2 algorithm) |
-//! | [`reaction`] | Reaction SMARTS: parse, apply, and write chemical reactions |
-//! | [`element`] | Periodic table data for elements 1–118 |
-//! | [`aromaticity`] | Aromaticity perception via Hückel's rule |
-//! | [`kekulize`] | Convert aromatic bonds to alternating single/double (Kekulé form) |
-//! | [`rings`] | Ring perception: smallest set of smallest rings (SSSR) |
-//! | [`hydrogen`] | Add and remove explicit hydrogen atoms |
-//! | [`formula`] | Molecular formula, average and exact molecular weight |
-//! | [`valence`] | Valence validation |
-//! | [`hybridization`] | Orbital hybridization assignment (sp, sp², sp³, …) |
-//! | [`radical`] | Radical electron counting |
-//! | [`chirality`] | Chirality cleanup and validation |
-//! | [`strip`] | Remove stereochemistry or isotope labels |
-//! | [`graph`] | Graph algorithms: components, fragments, paths, renumbering |
-//! | [`traits`] | Atom and bond property traits for generic algorithms |
-//! | [`wrappers`] | Newtype wrappers that enrich atoms with extra properties |
 
 // ── Internal modules ────────────────────────────────────────────────────
 //
