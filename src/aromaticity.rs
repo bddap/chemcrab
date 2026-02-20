@@ -1,3 +1,14 @@
+//! Aromaticity perception determines which atoms and bonds participate in aromatic ring systems.
+//!
+//! Aromatic rings have delocalized pi electrons obeying Hückel's 4n+2 rule.
+//! Benzene (6 pi electrons, n=1) is the classic example. For fused ring
+//! systems like naphthalene and pyrene, an iterative sp2 propagation step
+//! extends aromaticity across shared edges.
+//!
+//! The low-level [`find_aromatic_atoms`] returns a boolean vector; prefer
+//! [`set_aromaticity`], which writes the `is_aromatic` flag directly onto
+//! each [`Atom`](crate::Atom).
+
 use std::collections::HashSet;
 
 use petgraph::graph::NodeIndex;
@@ -7,8 +18,11 @@ use crate::mol::Mol;
 use crate::rings::RingInfo;
 use crate::traits::{HasAtomicNum, HasBondOrder, HasFormalCharge, HasHydrogenCount};
 
+/// Selects which aromaticity perception algorithm to use.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AromaticityModel {
+    /// Hückel's 4n+2 rule applied to SSSR rings, with iterative sp2
+    /// propagation for fused systems.
     Huckel,
 }
 
@@ -24,6 +38,11 @@ const SP2_CAPABLE: [u8; 9] = [
     52, // Te
 ];
 
+/// Returns a `Vec<bool>` marking each atom as aromatic or not.
+///
+/// This is the low-level interface — it does not modify the molecule.
+/// Prefer [`set_aromaticity`] when you want the `is_aromatic` flags
+/// set on the atoms themselves.
 pub fn find_aromatic_atoms<A, B>(mol: &Mol<A, B>) -> Vec<bool>
 where
     A: HasAtomicNum + HasFormalCharge + HasHydrogenCount,
@@ -32,6 +51,11 @@ where
     find_aromatic_atoms_huckel(mol)
 }
 
+/// Perceives aromaticity and sets the `is_aromatic` flag on each atom.
+///
+/// Uses the SSSR to find candidate rings, checks Hückel's rule on each,
+/// then iteratively propagates sp2 character across fused ring systems
+/// (e.g., pyrene's 5-ring fusion where no individual SSSR ring is 4n+2).
 pub fn set_aromaticity(
     mol: &mut Mol<crate::atom::Atom, crate::bond::Bond>,
     model: AromaticityModel,
@@ -563,9 +587,9 @@ mod tests {
     fn pyrene_canonical_round_trip() {
         let smiles = "c1cc2ccc3cccc4ccc(c1)c2c34";
         let mol = from_smiles(smiles).unwrap();
-        let canonical = crate::to_canonical_smiles(&mol);
+        let canonical = crate::smiles::to_canonical_smiles(&mol);
         let mol2 = from_smiles(&canonical).unwrap();
-        let canonical2 = crate::to_canonical_smiles(&mol2);
+        let canonical2 = crate::smiles::to_canonical_smiles(&mol2);
         assert_eq!(
             canonical, canonical2,
             "pyrene canonical SMILES not idempotent"

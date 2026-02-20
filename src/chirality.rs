@@ -1,7 +1,19 @@
+//! Chirality cleanup removes invalid stereocenters.
+//!
+//! After molecular editing or parsing, some atoms may carry tetrahedral
+//! stereo descriptors even though they lack the geometry to be true
+//! stereocenters (e.g., fewer than 3 distinct neighbors, or all neighbors
+//! identical).
+
 use crate::atom::Atom;
 use crate::mol::Mol;
 use crate::traits::HasBondOrder;
 
+/// Remove tetrahedral stereo descriptors for atoms that cannot be stereocenters.
+///
+/// An atom's stereo is removed if it has fewer than 3 neighbors (or 4
+/// for elements without lone-pair stereogenicity like carbon), or if all
+/// its neighbors are identical (same element and bond order).
 pub fn cleanup_chirality<B>(mol: &mut Mol<Atom, B>)
 where
     B: HasBondOrder,

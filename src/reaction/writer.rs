@@ -2,6 +2,7 @@ use crate::smarts::to_smarts;
 
 use super::Reaction;
 
+/// Write a [`Reaction`] back to a reaction SMARTS string.
 pub fn to_reaction_smarts(rxn: &Reaction) -> String {
     let reactants: Vec<String> = rxn.reactant_templates.iter().map(to_smarts).collect();
     let products: Vec<String> = rxn.product_templates.iter().map(to_smarts).collect();

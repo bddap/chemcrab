@@ -36,7 +36,7 @@ fn approval_formula_weight() {
     for entry in &data {
         let mol = parse(&entry.smiles);
 
-        let formula = chemcrab::mol_formula(&mol);
+        let formula = chemcrab::formula::mol_formula(&mol);
         if formula != entry.formula {
             failures.push(format!(
                 "[formula] {}: expected {:?}, got {:?}",
@@ -44,7 +44,7 @@ fn approval_formula_weight() {
             ));
         }
 
-        let amw = chemcrab::average_mol_weight(&mol);
+        let amw = chemcrab::formula::average_mol_weight(&mol);
         if !approx_eq(amw, entry.average_mw, 0.01) {
             failures.push(format!(
                 "[avg_mw] {}: expected {}, got {}",
@@ -52,7 +52,7 @@ fn approval_formula_weight() {
             ));
         }
 
-        let emw = chemcrab::exact_mol_weight(&mol);
+        let emw = chemcrab::formula::exact_mol_weight(&mol);
         if !approx_eq(emw, entry.exact_mw, 0.01) {
             failures.push(format!(
                 "[exact_mw] {}: expected {}, got {}",
@@ -99,7 +99,7 @@ fn approval_aromaticity() {
             ));
         }
 
-        let aromatic = chemcrab::find_aromatic_atoms(&mol);
+        let aromatic = chemcrab::aromaticity::find_aromatic_atoms(&mol);
         let count = aromatic.iter().filter(|&&a| a).count();
         if count != entry.num_aromatic_atoms {
             failures.push(format!(
@@ -139,7 +139,7 @@ fn approval_rings() {
     let mut failures = Vec::new();
     for entry in &data {
         let mol = parse(&entry.smiles);
-        let ri = chemcrab::RingInfo::symmetrized_sssr(&mol);
+        let ri = chemcrab::rings::RingInfo::symmetrized_sssr(&mol);
 
         if ri.num_rings() != entry.num_rings {
             failures.push(format!(
@@ -222,10 +222,10 @@ fn approval_smarts() {
         let mol = parse(&entry.smiles);
 
         for (smarts_str, &expected_count) in &entry.smarts_matches {
-            let query = chemcrab::from_smarts(smarts_str)
+            let query = chemcrab::smarts::from_smarts(smarts_str)
                 .unwrap_or_else(|e| panic!("failed to parse SMARTS {smarts_str:?}: {e}"));
 
-            let matches = chemcrab::get_smarts_matches(&mol, &query);
+            let matches = chemcrab::smarts::get_smarts_matches(&mol, &query);
             if matches.len() != expected_count {
                 failures.push(format!(
                     "[smarts] {} / {:?}: expected {}, got {}",
@@ -291,7 +291,7 @@ fn approval_substruct() {
         for (name, expected) in &entry.substruct_matches {
             let query = parse(query_smiles_for_name(name));
 
-            let has = chemcrab::has_substruct_match(&mol, &query);
+            let has = chemcrab::substruct::has_substruct_match(&mol, &query);
             if has != expected.has_match {
                 failures.push(format!(
                     "[has_match] {} / {}: expected {}, got {}",
@@ -299,7 +299,7 @@ fn approval_substruct() {
                 ));
             }
 
-            let matches = chemcrab::get_substruct_matches_unique(&mol, &query);
+            let matches = chemcrab::substruct::get_substruct_matches_unique(&mol, &query);
             if matches.len() != expected.num_matches {
                 failures.push(format!(
                     "[num_matches] {} / {}: expected {}, got {}",

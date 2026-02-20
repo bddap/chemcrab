@@ -3,12 +3,18 @@ use std::fmt;
 use crate::kekulize::KekulizeError;
 use crate::smarts::SmartsError;
 
+/// Error returned when parsing a reaction SMARTS string.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ReactionSmartsError {
+    /// No `>>` separator found.
     MissingSeparator,
+    /// More than two `>` separators.
     TooManySeparators,
+    /// The reactant section is empty.
     EmptyReactants,
+    /// The product section is empty.
     EmptyProducts,
+    /// A SMARTS component failed to parse.
     InvalidComponent {
         section: &'static str,
         detail: SmartsError,
@@ -31,11 +37,16 @@ impl fmt::Display for ReactionSmartsError {
 
 impl std::error::Error for ReactionSmartsError {}
 
+/// Error returned when applying a reaction to reactant molecules.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ReactionError {
+    /// The number of reactant molecules does not match the number of templates.
     WrongReactantCount { expected: usize, got: usize },
+    /// Match enumeration exceeded the combination limit.
     TooManyCombinations,
+    /// An atom map number appears more than once in the reactant templates.
     DuplicateAtomMap { map_num: u16 },
+    /// The product molecule could not be kekulized.
     Kekulize(KekulizeError),
 }
 

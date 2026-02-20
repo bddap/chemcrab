@@ -1,14 +1,23 @@
 use std::fmt;
 
+/// Errors produced when parsing a SMARTS pattern string.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SmartsError {
+    /// The input string was empty.
     EmptyInput,
+    /// An unexpected character was encountered at the given position.
     UnexpectedChar { pos: usize, ch: char },
+    /// A bracket atom `[` was opened but never closed with `]`.
     UnclosedBracket { pos: usize },
+    /// A ring-opening digit was never matched by a ring-closing digit.
     UnclosedRing { digit: u16 },
+    /// A parenthesis was opened without a matching close, or vice versa.
     UnmatchedParen { pos: usize },
+    /// An `#n` atomic number specifier could not be parsed.
     InvalidAtomicNum { pos: usize },
+    /// A recursive SMARTS `$( ... )` was opened but never closed.
     UnclosedRecursive { pos: usize },
+    /// A catch-all for other SMARTS parse errors.
     InvalidSmarts { pos: usize, msg: String },
 }
 

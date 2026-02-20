@@ -1,3 +1,18 @@
+//! Ring perception via the Smallest Set of Smallest Rings (SSSR).
+//!
+//! The SSSR is a minimal set of linearly independent rings that generates
+//! all rings in a molecule through XOR combinations. Its size equals the
+//! cyclomatic number: `|E| - |V| + C`, where `C` is the number of
+//! connected components.
+//!
+//! The symmetrized SSSR adds rings to account for topological symmetry —
+//! for example, naphthalene's SSSR contains both 6-rings rather than one
+//! 6-ring and one 10-ring, even though both bases are valid.
+//!
+//! Ring perception uses Horton's algorithm to enumerate candidate rings,
+//! then selects a linearly independent basis via Gaussian elimination over
+//! GF(2) edge-bitvectors.
+
 use std::collections::VecDeque;
 
 use petgraph::algo::connected_components;
@@ -5,12 +20,17 @@ use petgraph::graph::NodeIndex;
 
 use crate::mol::Mol;
 
+/// Ring information for a molecule, computed via SSSR or symmetrized SSSR.
+///
+/// Construct with [`RingInfo::sssr`] or [`RingInfo::symmetrized_sssr`],
+/// then query individual atoms and bonds for ring membership.
 #[derive(Debug, Clone)]
 pub struct RingInfo {
     rings: Vec<Vec<NodeIndex>>,
 }
 
 impl RingInfo {
+    /// Compute the Smallest Set of Smallest Rings.
     pub fn sssr<A, B>(mol: &Mol<A, B>) -> Self {
         let num_expected = Self::expected_ring_count(mol);
         if num_expected == 0 {
@@ -24,6 +44,11 @@ impl RingInfo {
         Self { rings }
     }
 
+    /// Compute the symmetrized SSSR.
+    ///
+    /// Includes all rings whose size matches an SSSR ring and that lie
+    /// in the cycle space, capturing topologically equivalent rings that
+    /// a strict SSSR might arbitrarily exclude.
     pub fn symmetrized_sssr<A, B>(mol: &Mol<A, B>) -> Self {
         let num_expected = Self::expected_ring_count(mol);
         if num_expected == 0 {
@@ -88,18 +113,24 @@ impl RingInfo {
         Self { rings }
     }
 
+    /// Returns the number of rings in this set.
     pub fn num_rings(&self) -> usize {
         self.rings.len()
     }
 
+    /// Returns the rings as slices of atom indices.
+    ///
+    /// Each ring is a cycle of `NodeIndex` values in traversal order.
     pub fn rings(&self) -> &[Vec<NodeIndex>] {
         &self.rings
     }
 
+    /// Returns `true` if `atom` belongs to at least one ring.
     pub fn is_ring_atom(&self, atom: NodeIndex) -> bool {
         self.rings.iter().any(|ring| ring.contains(&atom))
     }
 
+    /// Returns `true` if the bond between `a` and `b` belongs to at least one ring.
     pub fn is_ring_bond(&self, a: NodeIndex, b: NodeIndex) -> bool {
         self.rings.iter().any(|ring| {
             let len = ring.len();
@@ -110,6 +141,7 @@ impl RingInfo {
         })
     }
 
+    /// Returns the size of the smallest ring containing `atom`, or `None` if acyclic.
     pub fn smallest_ring_size(&self, atom: NodeIndex) -> Option<usize> {
         self.rings
             .iter()
@@ -118,6 +150,7 @@ impl RingInfo {
             .min()
     }
 
+    /// Returns all rings that contain `atom`.
     pub fn atom_rings(&self, atom: NodeIndex) -> Vec<&Vec<NodeIndex>> {
         self.rings
             .iter()
@@ -125,6 +158,9 @@ impl RingInfo {
             .collect()
     }
 
+    /// Returns the cyclomatic number: `|E| - |V| + C`.
+    ///
+    /// This is the number of linearly independent rings in the molecule.
     pub fn expected_ring_count<A, B>(mol: &Mol<A, B>) -> usize {
         let v = mol.atom_count();
         let e = mol.bond_count();

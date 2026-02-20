@@ -7,89 +7,164 @@ use crate::bond::{Bond, BondOrder};
 use crate::mol::Mol;
 use crate::rings::RingInfo;
 
+/// Hybridization state for SMARTS `^n` queries.
+///
+/// Computed from the bond order sum and neighbor count of an atom.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Hybridization {
+    /// s hybridization (no bonds or lone atoms).
     S,
+    /// sp hybridization (e.g. alkynes, nitriles).
     SP,
+    /// sp2 hybridization (e.g. alkenes, aromatic atoms).
     SP2,
+    /// sp3 hybridization (e.g. saturated carbon).
     SP3,
+    /// sp3d hybridization (e.g. pentacoordinate phosphorus).
     SP3D,
+    /// sp3d2 hybridization (e.g. hexacoordinate sulfur).
     SP3D2,
 }
 
+/// Identifies the property being tested in a SMARTS range expression `{low-high}`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum RangeKind {
+    /// Heavy-atom degree (`D`).
     Degree,
+    /// Non-hydrogen degree (`d`).
     NonHDegree,
+    /// Total hydrogen count including explicit H neighbors (`H`).
     TotalHCount,
+    /// Implicit (virtual) hydrogen count (`h`).
     ImplicitHCount,
+    /// Size of the smallest SSSR ring containing the atom (`r`).
     SmallestRingSize,
+    /// Number of SSSR rings containing the atom (`R`).
     RingMembership,
+    /// Sum of bond orders plus implicit hydrogens (`v`).
     Valence,
+    /// Number of ring bonds on the atom (`x`).
     RingBondCount,
+    /// Total connectivity: degree plus implicit H count (`X`).
     Connectivity,
+    /// Number of non-C, non-H neighbors (`z`).
     HeteroNeighborCount,
+    /// Number of non-C, non-H, non-aromatic neighbors (`Z`).
     AliphaticHeteroNeighborCount,
+    /// Positive formal charge value (`+{n-m}`).
     PositiveCharge,
+    /// Negative formal charge magnitude (`-{n-m}`).
     NegativeCharge,
 }
 
+/// AST node for a SMARTS atom query expression.
+///
+/// Each variant represents a primitive test or a logical combination of tests.
+/// During substructure search, [`AtomExpr::matches`] evaluates the expression
+/// tree against a target atom.
 #[derive(Debug, Clone, PartialEq)]
 pub enum AtomExpr {
+    /// Matches any atom (wildcard `*`).
     True,
+    /// Matches by element. `aromatic` is `None` for `#n` (either), `Some(true)`
+    /// for lowercase (`c`), `Some(false)` for uppercase (`C`).
     Element {
         atomic_num: u8,
         aromatic: Option<bool>,
     },
+    /// Matches any aromatic atom (`a`).
     Aromatic,
+    /// Matches any aliphatic atom (`A`).
     Aliphatic,
+    /// Matches a specific isotope number.
     Isotope(u16),
+    /// Matches explicit degree — number of heavy-atom neighbors (`D`).
     Degree(u8),
+    /// Matches non-hydrogen degree (`d`).
     NonHDegree(u8),
+    /// Matches total valence: sum of bond orders plus implicit H count (`v`).
     Valence(u8),
+    /// Matches total connectivity: degree plus implicit H count (`X`).
     Connectivity(u8),
+    /// Matches total hydrogen count including explicit H neighbors (`H`).
     TotalHCount(u8),
+    /// Matches implicit (virtual) hydrogen count (`h`).
     ImplicitHCount(u8),
+    /// Matches the number of SSSR rings containing the atom (`R`).
     RingMembership(u8),
+    /// Matches the size of the smallest SSSR ring containing the atom (`r`).
     SmallestRingSize(u8),
+    /// Matches the number of ring bonds on the atom (`x`).
     RingBondCount(u8),
+    /// Matches formal charge.
     Charge(i8),
+    /// Matches the count of non-C, non-H neighbors (`z` with value).
     HeteroNeighborCount(u8),
+    /// Matches the count of aliphatic non-C, non-H neighbors (`Z` with value).
     AliphaticHeteroNeighborCount(u8),
+    /// Matches atoms with at least one heteroatom neighbor (`z` bare).
     HasHeteroNeighbor,
+    /// Matches atoms with at least one aliphatic heteroatom neighbor (`Z` bare).
     HasAliphaticHeteroNeighbor,
+    /// Matches computed hybridization state (`^n`).
     Hybridization(Hybridization),
+    /// Matches a numeric property within a range (`{low-high}`).
     Range {
         kind: RangeKind,
         low: Option<u8>,
         high: Option<u8>,
     },
+    /// Matches atoms in at least one ring (`R` bare).
     InRing,
+    /// Matches atoms not in any ring (`R0`).
     NotInRing,
+    /// A recursive SMARTS sub-query (`$(...)`).
     Recursive(Mol<AtomExpr, BondExpr>),
+    /// Atom map class (`:n`) — always matches, used for reaction mapping.
     AtomMapClass(u16),
+    /// Logical AND of sub-expressions.
     And(Vec<AtomExpr>),
+    /// Logical OR of sub-expressions.
     Or(Vec<AtomExpr>),
+    /// Matches tetrahedral chirality (`@` or `@@`).
     Chirality(crate::atom::Chirality),
+    /// Logical NOT of a sub-expression.
     Not(Box<AtomExpr>),
 }
 
+/// AST node for a SMARTS bond query expression.
+///
+/// Implicit bonds in SMARTS default to [`BondExpr::SingleOrAromatic`], unlike
+/// SMILES where implicit bonds are always single.
 #[derive(Debug, Clone, PartialEq)]
 pub enum BondExpr {
+    /// Matches any bond (`~`).
     True,
+    /// Matches a single bond (`-`), excluding aromatic bonds between aromatic atoms.
     Single,
+    /// Matches a double bond (`=`), excluding aromatic bonds.
     Double,
+    /// Matches a triple bond (`#`).
     Triple,
+    /// Matches an aromatic bond (`:`) — both endpoints must be aromatic.
     Aromatic,
+    /// Matches a ring bond (`@`).
     Ring,
+    /// Default SMARTS bond: matches single or aromatic.
     SingleOrAromatic,
+    /// Matches an up directional bond (`/`).
     Up,
+    /// Matches a down directional bond (`\`).
     Down,
+    /// Logical AND of sub-expressions.
     And(Vec<BondExpr>),
+    /// Logical OR of sub-expressions.
     Or(Vec<BondExpr>),
+    /// Logical NOT of a sub-expression.
     Not(Box<BondExpr>),
 }
 
+/// Context passed to [`AtomExpr::matches`] during SMARTS evaluation.
 pub struct MatchContext<'a> {
     pub mol: &'a Mol<Atom, Bond>,
     pub ring_info: &'a RingInfo,
@@ -136,6 +211,8 @@ fn bond_order_sum(mol: &Mol<Atom, Bond>, idx: NodeIndex) -> u8 {
         .sum()
 }
 
+/// Computes the hybridization state of an atom from its bond orders and
+/// neighbor count.
 pub fn compute_hybridization(mol: &Mol<Atom, Bond>, idx: NodeIndex) -> Hybridization {
     let atom = mol.atom(idx);
     let explicit_degree = mol.neighbors(idx).count() as u8;

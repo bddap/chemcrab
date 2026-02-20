@@ -1,3 +1,9 @@
+//! Molecular formula and molecular weight calculations.
+//!
+//! [`mol_formula`] produces a Hill system string, [`average_mol_weight`]
+//! gives the average molecular weight in daltons, and [`exact_mol_weight`]
+//! gives the monoisotopic exact mass.
+
 use std::collections::BTreeMap;
 use std::fmt::Write;
 
@@ -6,6 +12,11 @@ use crate::element::Element;
 use crate::mol::Mol;
 use crate::traits::{HasAtomicNum, HasFormalCharge, HasHydrogenCount, HasIsotope};
 
+/// Compute the average molecular weight in daltons (Da).
+///
+/// Uses standard atomic weights averaged over natural isotopic abundance.
+/// Atoms with an explicit isotope label use that isotope's exact mass
+/// instead.
 pub fn average_mol_weight<A: HasAtomicNum + HasHydrogenCount + HasIsotope, B>(
     mol: &Mol<A, B>,
 ) -> f64 {
@@ -25,6 +36,10 @@ pub fn average_mol_weight<A: HasAtomicNum + HasHydrogenCount + HasIsotope, B>(
     })
 }
 
+/// Compute the monoisotopic exact mass.
+///
+/// Uses the mass of the most abundant isotope of each element. Atoms
+/// with an explicit isotope label use that isotope's exact mass.
 pub fn exact_mol_weight<A: HasAtomicNum + HasHydrogenCount + HasIsotope, B>(
     mol: &Mol<A, B>,
 ) -> f64 {
@@ -44,6 +59,12 @@ pub fn exact_mol_weight<A: HasAtomicNum + HasHydrogenCount + HasIsotope, B>(
     })
 }
 
+/// Compute the molecular formula as a Hill system string.
+///
+/// The Hill system lists C first, then H, then remaining elements
+/// alphabetically. This is the standard convention used in chemical
+/// databases. Molecules without carbon list all elements alphabetically.
+/// Net charge is appended as `+`, `2+`, `-`, `2-`, etc.
 pub fn mol_formula<A: HasAtomicNum + HasHydrogenCount + HasFormalCharge, B>(
     mol: &Mol<A, B>,
 ) -> String {

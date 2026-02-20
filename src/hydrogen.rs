@@ -1,3 +1,9 @@
+//! Add and remove explicit hydrogen atoms.
+//!
+//! Chemcrab normally stores hydrogens as a virtual count on each heavy
+//! atom. [`add_hs`] converts those virtual hydrogens into explicit graph
+//! nodes; [`remove_hs`] collapses them back. Both preserve stereochemistry.
+
 use petgraph::graph::NodeIndex;
 
 use crate::atom::Atom;
@@ -32,6 +38,12 @@ fn stereo_referenced_atoms(mol: &Mol<Atom, Bond>) -> Vec<bool> {
     referenced
 }
 
+/// Convert virtual hydrogens to explicit graph nodes.
+///
+/// Each virtual H becomes a new `Atom` (atomic number 1) bonded to its
+/// parent with a single bond. The parent's `hydrogen_count` is set to 0.
+/// Stereochemistry descriptors referencing `AtomId::VirtualH` are remapped
+/// to the new explicit nodes.
 pub fn add_hs(mol: &Mol<Atom, Bond>) -> Mol<Atom, Bond> {
     let mut result = Mol::new();
     let mut index_map = Vec::new();
@@ -119,15 +131,28 @@ pub fn add_hs(mol: &Mol<Atom, Bond>) -> Mol<Atom, Bond> {
     result
 }
 
+/// Options for [`remove_hs_with`].
 #[derive(Debug, Clone, Default)]
 pub struct RemoveHsOptions {
+    /// When `true`, retain explicit H atoms that are referenced by a
+    /// stereo descriptor. Prevents loss of E/Z or tetrahedral information.
     pub keep_stereo_hs: bool,
 }
 
+/// Remove all removable explicit hydrogen atoms using default options.
+///
+/// Equivalent to `remove_hs_with(mol, &RemoveHsOptions::default())`.
+/// Isotopic hydrogens (e.g., deuterium), charged hydrogens, and
+/// hydrogens with more than one neighbor are kept.
 pub fn remove_hs(mol: &Mol<Atom, Bond>) -> Mol<Atom, Bond> {
     remove_hs_with(mol, &RemoveHsOptions::default())
 }
 
+/// Remove explicit hydrogen atoms with configurable options.
+///
+/// Explicit H nodes that are removable (uncharged, non-isotopic,
+/// single-bonded to exactly one neighbor) are collapsed back into the
+/// parent's `hydrogen_count`. Stereochemistry is remapped accordingly.
 pub fn remove_hs_with(mol: &Mol<Atom, Bond>, opts: &RemoveHsOptions) -> Mol<Atom, Bond> {
     let node_count = mol.atom_count();
     let stereo_refs = if opts.keep_stereo_hs {
@@ -231,10 +256,10 @@ pub fn remove_hs_with(mol: &Mol<Atom, Bond>, opts: &RemoveHsOptions) -> Mol<Atom
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::bond::SmilesBond;
     use crate::bond::SmilesBondOrder;
     use crate::mol::{AtomId, TetrahedralStereo};
     use crate::smiles::{from_smiles, parse_smiles, to_smiles};
-    use crate::SmilesBond;
     use petgraph::graph::NodeIndex;
 
     fn smiles_to_mol(s: &str) -> Mol<Atom, Bond> {

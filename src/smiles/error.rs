@@ -2,20 +2,34 @@ use std::fmt;
 
 use crate::kekulize::KekulizeError;
 
+/// Errors produced when parsing a SMILES string.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SmilesError {
+    /// Input ended before a complete token could be read.
     UnexpectedEnd,
+    /// An unexpected character was encountered at the given position.
     UnexpectedChar { pos: usize, ch: char },
+    /// An unrecognized element symbol was found.
     InvalidElement { pos: usize, text: String },
+    /// A bracket atom `[` was opened but never closed with `]`.
     UnclosedBracket { pos: usize },
+    /// A ring-opening digit was never matched by a ring-closing digit.
     UnclosedRing { digit: u16 },
+    /// A parenthesis was opened without a matching close, or vice versa.
     UnmatchedParen { pos: usize },
+    /// A charge specifier inside a bracket atom could not be parsed.
     InvalidCharge { pos: usize },
+    /// An isotope number overflowed or was otherwise invalid.
     InvalidIsotope { pos: usize },
+    /// An atom class (`:n`) could not be parsed.
     InvalidAtomClass { pos: usize },
+    /// A bond was specified on a ring-closure digit that is inconsistent.
     InvalidRingBond { digit: u16, pos: usize },
+    /// The input string was empty or contained only whitespace.
     EmptyInput,
+    /// Two ring-closure bonds on the same digit specify conflicting bond types.
     RingBondConflict { digit: u16 },
+    /// Kekulization of the aromatic system failed.
     Kekulize(KekulizeError),
 }
 

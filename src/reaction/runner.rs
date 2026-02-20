@@ -14,6 +14,11 @@ use super::Reaction;
 const MAX_COMBINATIONS: usize = 1000;
 
 impl Reaction {
+    /// Apply this reaction to a set of reactant molecules.
+    ///
+    /// Returns one result per match combination. Each result is a `Vec`
+    /// of product molecules (one per product template). Returns an empty
+    /// `Vec` if no template matches the input.
     pub fn run(
         &self,
         reactants: &[&Mol<Atom, Bond>],
@@ -411,6 +416,7 @@ fn smiles_bond_from_expr(expr: &BondExpr) -> SmilesBond {
     SmilesBond { order }
 }
 
+/// Extract the atom map number from a SMARTS atom expression, if present.
 pub fn extract_atom_map_num(expr: &AtomExpr) -> Option<u16> {
     match expr {
         AtomExpr::AtomMapClass(0) => None,

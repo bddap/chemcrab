@@ -1,16 +1,126 @@
-pub mod aromaticity;
+//! Cheminformatics library for Rust.
+//!
+//! Chemcrab provides a molecular representation, file format parsers, and
+//! algorithms for working with chemical structures. If you are new to
+//! cheminformatics, the module-level docs below introduce both the API and
+//! the chemistry behind it.
+//!
+//! # Quick start
+//!
+//! ```
+//! use chemcrab::Mol;
+//! use chemcrab::smiles;
+//!
+//! // Parse a SMILES string into a molecule.
+//! // SMILES encodes molecular graphs as text — atoms are nodes, bonds are
+//! // edges, and ring closures are back-edges written with matching digits.
+//! let caffeine = smiles::from_smiles("CN1C=NC2=C1C(=O)N(C(=O)N2C)C")?;
+//!
+//! assert_eq!(caffeine.atom_count(), 14);
+//! assert_eq!(caffeine.bond_count(), 15);
+//!
+//! // Canonical SMILES: a unique string for each molecule, regardless of
+//! // how the atoms were numbered in the input.
+//! let canonical = smiles::to_canonical_smiles(&caffeine);
+//! # Ok::<(), chemcrab::smiles::SmilesError>(())
+//! ```
+//!
+//! # Molecular representation
+//!
+//! [`Mol<A, B>`] is a generic molecular graph parameterized over atom type `A`
+//! and bond type `B`. The default concrete types are [`Atom`] and [`Bond`]:
+//!
+//! - **[`Atom`]** stores atomic number, formal charge, isotope, hydrogen count,
+//!   and aromaticity. No cached properties — valence, hybridization, and
+//!   coordinates are added via wrapper types when needed.
+//!
+//! - **[`Bond`]** stores a [`BondOrder`] (`Single`, `Double`, or `Triple`).
+//!   There is no `Aromatic` bond order — every bond in a `Mol<Atom, Bond>` has
+//!   a concrete Kekulé assignment.
+//!
+//! Algorithms declare their requirements via trait bounds
+//! (`HasAtomicNum`, `HasBondOrder`, etc.) so they work with any atom/bond
+//! types that implement the right traits. See the [`traits`] module.
+//!
+//! ## Hydrogen model
+//!
+//! Chemcrab uses a *virtual hydrogen* model: hydrogen atoms that are not
+//! explicit nodes in the graph are represented as an integer count on their
+//! parent atom ([`Atom::hydrogen_count`]). The SMILES parser resolves
+//! implicit hydrogen counts at parse time using the element's
+//! [default valences](Element::default_valences); after parsing, the stored
+//! count is the single source of truth.
+//!
+//! Use [`hydrogen::add_hs`] and [`hydrogen::remove_hs`] to convert between
+//! explicit and virtual representations.
+//!
+//! ## Stereochemistry
+//!
+//! Stereochemistry lives on [`Mol`], not on atoms or bonds:
+//!
+//! - **Tetrahedral**: [`TetrahedralStereo`] stores four neighbors in a
+//!   specific order. The first neighbor is *above* the plane defined by the
+//!   other three (right-hand rule). Swapping any pair flips the handedness.
+//!
+//! - **E/Z (cis/trans)**: [`EZStereo`] stores a double bond and two reference
+//!   substituents that are on the *same side* (cis). There is no explicit
+//!   `Cis`/`Trans` enum — the geometry is fully determined by which
+//!   substituents are recorded as the cis pair.
+//!
+//! Both use [`AtomId`] to refer to neighbors, which can be either a graph
+//! node or a virtual hydrogen.
+//!
+//! # Modules
+//!
+//! | Module | What it does |
+//! |---|---|
+//! | [`smiles`] | Parse and write SMILES, the *de facto* line notation for molecules |
+//! | [`smarts`] | Parse and match SMARTS, a query language for substructure search |
+//! | [`substruct`] | Graph-based substructure matching (VF2 algorithm) |
+//! | [`reaction`] | Reaction SMARTS: parse, apply, and write chemical reactions |
+//! | [`element`] | Periodic table data for elements 1–118 |
+//! | [`aromaticity`] | Aromaticity perception via Hückel's rule |
+//! | [`kekulize`] | Convert aromatic bonds to alternating single/double (Kekulé form) |
+//! | [`rings`] | Ring perception: smallest set of smallest rings (SSSR) |
+//! | [`hydrogen`] | Add and remove explicit hydrogen atoms |
+//! | [`formula`] | Molecular formula, average and exact molecular weight |
+//! | [`valence`] | Valence validation |
+//! | [`hybridization`] | Orbital hybridization assignment (sp, sp², sp³, …) |
+//! | [`radical`] | Radical electron counting |
+//! | [`chirality`] | Chirality cleanup and validation |
+//! | [`strip`] | Remove stereochemistry or isotope labels |
+//! | [`graph`] | Graph algorithms: components, fragments, paths, renumbering |
+//! | [`traits`] | Atom and bond property traits for generic algorithms |
+//! | [`wrappers`] | Newtype wrappers that enrich atoms with extra properties |
+
+// ── Internal modules ────────────────────────────────────────────────────
+//
+// These remain `pub` so that integration tests and internal code can reach
+// them via `crate::` paths, but they are hidden from rustdoc.  The facade
+// modules below re-export the curated public API.
+
+#[doc(hidden)]
 pub mod atom;
+#[doc(hidden)]
 pub mod bond;
+#[doc(hidden)]
 pub mod canonical;
-pub mod chirality;
+#[doc(hidden)]
 pub mod conjugation;
+#[doc(hidden)]
+pub mod graph_ops;
+#[doc(hidden)]
+pub mod mol;
+
+// ── Public modules ──────────────────────────────────────────────────────
+
+pub mod aromaticity;
+pub mod chirality;
 pub mod element;
 pub mod formula;
-pub mod graph_ops;
 pub mod hybridization;
 pub mod hydrogen;
 pub mod kekulize;
-pub mod mol;
 pub mod radical;
 pub mod reaction;
 pub mod rings;
@@ -22,47 +132,26 @@ pub mod traits;
 pub mod valence;
 pub mod wrappers;
 
-pub use aromaticity::{find_aromatic_atoms, set_aromaticity, AromaticityModel};
-pub use atom::{Atom, Chirality};
-pub use bond::{Bond, BondOrder, SmilesBond, SmilesBondOrder};
-pub use canonical::canonical_ordering;
-pub use chirality::cleanup_chirality;
-pub use conjugation::assign_conjugation;
-pub use element::{outer_shell_electrons, Element};
-pub use formula::{average_mol_weight, exact_mol_weight, mol_formula};
-pub use graph_ops::{
-    adjacency_matrix, connected_components, distance_matrix, get_fragments, num_components,
-    renumber_atoms, renumber_atoms_canonical, shortest_path, RenumberError,
-};
-pub use hybridization::assign_hybridization;
-pub use hydrogen::{add_hs, remove_hs, remove_hs_with, RemoveHsOptions};
-pub use kekulize::{kekulize, KekulizeError};
+/// Graph algorithms on molecular graphs.
+///
+/// These operate on the topology of a [`Mol`] — connected components,
+/// shortest paths, fragmentation, and atom renumbering. Higher-level
+/// chemical algorithms (rings, aromaticity) live in their own modules.
+pub mod graph {
+    pub use crate::graph_ops::{
+        connected_components, get_fragments, renumber_atoms, shortest_path, RenumberError,
+    };
+}
+
+// ── Root re-exports ─────────────────────────────────────────────────────
+//
+// The most commonly used types are re-exported at the crate root so that
+// `use chemcrab::{Mol, Atom, Bond}` works without diving into modules.
+
+pub use atom::Atom;
+pub use bond::{Bond, BondOrder};
+pub use element::Element;
 pub use mol::{AtomId, EZStereo, Mol, TetrahedralStereo};
-pub use radical::num_radical_electrons;
-pub use reaction::{
-    extract_atom_map_num, from_reaction_smarts, to_reaction_smarts, Reaction, ReactionError,
-    ReactionSmartsError,
-};
-pub use rings::RingInfo;
-pub use smarts::{
-    from_smarts, get_smarts_match, get_smarts_match_chiral, get_smarts_matches,
-    get_smarts_matches_chiral, has_smarts_match, has_smarts_match_chiral, to_smarts, AtomExpr,
-    BondExpr, SmartsError,
-};
-pub use smiles::{from_smiles, parse_smiles, to_canonical_smiles, to_smiles, SmilesError};
-pub use strip::{strip_bond_stereo, strip_chirality, strip_isotope};
-pub use substruct::{
-    get_substruct_match, get_substruct_match_with, get_substruct_match_with_filter,
-    get_substruct_matches, get_substruct_matches_unique, get_substruct_matches_with,
-    get_substruct_matches_with_filter, get_substruct_matches_with_unique, has_substruct_match,
-    has_substruct_match_with, uniquify_atom_mappings, AtomMapping,
-};
-pub use traits::{
-    HasAromaticity, HasAtomicNum, HasBondOrder, HasFormalCharge, HasHybridization,
-    HasHydrogenCount, HasIsotope, HasIsotopeMut, HasPosition2D, HasPosition3D, HasValence,
-};
-pub use valence::{check_valence, total_valence, ValenceError};
-pub use wrappers::{Hybridization, WithHybridization, WithPosition2D, WithPosition3D, WithValence};
 
 #[cfg(test)]
 mod tests;

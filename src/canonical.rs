@@ -483,9 +483,9 @@ mod tests {
         ];
         for smi in &cases {
             let mol = from_smiles(smi).unwrap();
-            let c1 = crate::to_canonical_smiles(&mol);
+            let c1 = crate::smiles::to_canonical_smiles(&mol);
             let reparsed = from_smiles(&c1).unwrap();
-            let c2 = crate::to_canonical_smiles(&reparsed);
+            let c2 = crate::smiles::to_canonical_smiles(&reparsed);
             assert_eq!(c1, c2, "round-trip failed for {smi}: '{c1}' vs '{c2}'");
         }
     }
@@ -503,9 +503,9 @@ mod tests {
         ];
         for smi in &cases {
             let mol = from_smiles(smi).unwrap();
-            let c1 = crate::to_canonical_smiles(&mol);
+            let c1 = crate::smiles::to_canonical_smiles(&mol);
             let reparsed = from_smiles(&c1).unwrap();
-            let c2 = crate::to_canonical_smiles(&reparsed);
+            let c2 = crate::smiles::to_canonical_smiles(&reparsed);
             assert_eq!(c1, c2, "round-trip failed for {smi}: '{c1}' vs '{c2}'");
         }
     }
@@ -520,12 +520,12 @@ mod tests {
         ];
         for smi in &cases {
             let mol = from_smiles(smi).unwrap();
-            let c1 = crate::to_canonical_smiles(&mol);
+            let c1 = crate::smiles::to_canonical_smiles(&mol);
             let n = mol.atom_count();
             for offset in 1..n {
                 let perm: Vec<usize> = (0..n).map(|i| (i + offset) % n).collect();
                 let renum = renumber_atoms(&mol, &perm).unwrap();
-                let c2 = crate::to_canonical_smiles(&renum);
+                let c2 = crate::smiles::to_canonical_smiles(&renum);
                 assert_eq!(c1, c2, "permutation invariance failed for {smi} with offset {offset}: '{c1}' vs '{c2}'");
             }
         }

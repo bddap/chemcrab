@@ -1,4 +1,5 @@
-use chemcrab::{from_smiles, renumber_atoms, to_canonical_smiles};
+use chemcrab::graph::renumber_atoms;
+use chemcrab::smiles::{from_smiles, to_canonical_smiles};
 
 fn canonical(smiles: &str) -> String {
     let mol = from_smiles(smiles).unwrap();

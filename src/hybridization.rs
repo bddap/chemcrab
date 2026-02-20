@@ -1,3 +1,13 @@
+//! Orbital hybridization assignment.
+//!
+//! Hybridization describes the mixing of atomic orbitals into equivalent
+//! hybrid orbitals: sp3 (tetrahedral, 109.5°), sp2 (trigonal planar,
+//! 120°), sp (linear, 180°). It is determined by the number of bonding
+//! plus lone-pair electron domains around an atom.
+//!
+//! Use [`assign_hybridization`] to compute hybridization for all atoms
+//! in a molecule.
+
 use petgraph::graph::NodeIndex;
 
 use crate::element::outer_shell_electrons;
@@ -77,6 +87,11 @@ where
     }
 }
 
+/// Compute hybridization for every atom in the molecule.
+///
+/// Returns a `Vec<Hybridization>` indexed by atom position. Conjugation
+/// is taken into account: an sp3 atom adjacent to a conjugated bond may
+/// be promoted to sp2.
 pub fn assign_hybridization<A, B>(mol: &Mol<A, B>) -> Vec<Hybridization>
 where
     A: HasAtomicNum + HasHydrogenCount + HasFormalCharge + HasAromaticity,

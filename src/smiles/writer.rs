@@ -10,6 +10,11 @@ use crate::element::Element;
 use crate::graph_ops::connected_components;
 use crate::mol::{permutation_parity, AtomId, Mol};
 
+/// Writes a molecule as a SMILES string.
+///
+/// The output is **not** canonical: atom ordering follows the internal graph
+/// traversal order. For a deterministic representation, use
+/// [`to_canonical_smiles`].
 pub fn to_smiles(mol: &Mol<Atom, Bond>) -> String {
     let components = connected_components(mol);
     let mut parts = Vec::with_capacity(components.len());
@@ -19,6 +24,20 @@ pub fn to_smiles(mol: &Mol<Atom, Bond>) -> String {
     parts.join(".")
 }
 
+/// Writes a canonical SMILES string for the given molecule.
+///
+/// The same molecule always produces the same string regardless of atom
+/// numbering. Canonicalization uses Morgan-like invariants refined with
+/// chirality and E/Z stereo information.
+///
+/// # Examples
+///
+/// ```
+/// use chemcrab::smiles::{from_smiles, to_canonical_smiles};
+///
+/// let mol = from_smiles("OCC").unwrap();
+/// assert_eq!(to_canonical_smiles(&mol), to_canonical_smiles(&from_smiles("CCO").unwrap()));
+/// ```
 pub fn to_canonical_smiles(mol: &Mol<Atom, Bond>) -> String {
     let mut mol = mol.clone();
     set_aromaticity(&mut mol, AromaticityModel::Huckel);

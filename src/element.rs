@@ -1,3 +1,13 @@
+/// Returns the number of valence-shell electrons for an element given its atomic number.
+///
+/// Valence electrons occupy the outermost shell of an atom and determine its
+/// bonding behavior. Carbon (Z=6) has 4, nitrogen (Z=7) has 5, oxygen (Z=8)
+/// has 6. For transition metals the count includes d-electrons, which is why
+/// iron returns 8 rather than 2.
+///
+/// Returns 0 for `atomic_num` outside 1..=118.
+///
+/// Used internally for hybridization and radical electron calculations.
 pub fn outer_shell_electrons(atomic_num: u8) -> u8 {
     OUTER_ELECTRONS
         .get(atomic_num as usize)
@@ -20,7 +30,22 @@ static OUTER_ELECTRONS: [u8; 119] = [
     3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 3, 4, 5, 6, 7, 8, // Lr Rf..Cn Nh Fl Mc Lv Ts Og
 ];
 
-/// Periodic table data for elements 1–118.
+/// Periodic table data for elements 1--118.
+///
+/// Each variant is named by its IUPAC chemical symbol ([`Element::C`] for
+/// carbon, [`Element::Fe`] for iron, etc.). The enum is `#[repr(u8)]` so
+/// the discriminant equals the atomic number, making conversion free.
+///
+/// # Examples
+///
+/// ```
+/// use chemcrab::Element;
+///
+/// let carbon = Element::from_symbol("C").unwrap();
+/// assert_eq!(carbon.atomic_num(), 6);
+/// assert_eq!(carbon.name(), "Carbon");
+/// assert!((carbon.atomic_weight() - 12.011).abs() < 0.001);
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u8)]
 pub enum Element {
@@ -145,6 +170,10 @@ pub enum Element {
 }
 
 impl Element {
+    /// Returns the element with atomic number `n`, or `None` for 0 or >118.
+    ///
+    /// The atomic number uniquely identifies an element: it is the number of
+    /// protons in the nucleus and determines all chemical properties.
     pub fn from_atomic_num(n: u8) -> Option<Element> {
         if (1..=118).contains(&n) {
             // SAFETY: Element is repr(u8) with variants 1..=118, and we checked bounds.
@@ -154,6 +183,9 @@ impl Element {
         }
     }
 
+    /// Returns the element with the given IUPAC chemical symbol, or `None`.
+    ///
+    /// The lookup is case-sensitive: `"Fe"` matches iron, `"fe"` does not.
     pub fn from_symbol(s: &str) -> Option<Element> {
         SYMBOL_TABLE
             .iter()
@@ -161,26 +193,47 @@ impl Element {
             .map(|(_, e)| *e)
     }
 
+    /// Returns the atomic number (number of protons).
+    ///
+    /// The atomic number uniquely identifies an element. Hydrogen is 1,
+    /// carbon is 6, oganesson is 118.
     pub fn atomic_num(self) -> u8 {
         self as u8
     }
 
+    /// Returns the IUPAC chemical symbol (e.g. `"H"`, `"Fe"`, `"Og"`).
     pub fn symbol(self) -> &'static str {
         SYMBOLS[self as usize - 1]
     }
 
+    /// Returns the full English element name (e.g. `"Hydrogen"`, `"Iron"`).
     pub fn name(self) -> &'static str {
         NAMES[self as usize - 1]
     }
 
+    /// Returns the standard atomic weight in daltons (Da).
+    ///
+    /// This is the IUPAC conventional weight, averaged over the natural
+    /// isotopic abundance. For radioactive elements without stable isotopes,
+    /// the mass number of the longest-lived isotope is used instead.
     pub fn atomic_weight(self) -> f64 {
         ATOMIC_WEIGHTS[self as usize - 1]
     }
 
+    /// Returns the monoisotopic exact mass in daltons (Da).
+    ///
+    /// This is the mass of the most abundant naturally occurring isotope of
+    /// the element. For carbon that is exactly 12.0 (carbon-12 defines the
+    /// dalton). Use this for high-resolution mass spectrometry calculations.
     pub fn exact_mass(self) -> f64 {
         EXACT_MASSES[self as usize - 1]
     }
 
+    /// Returns the covalent radius in angstroms, or `None` if unavailable.
+    ///
+    /// The covalent radius approximates how far an atom extends when it
+    /// shares electrons in a covalent bond. The sum of two covalent radii
+    /// gives a first estimate of the bond length between them.
     pub fn covalent_radius(self) -> Option<f64> {
         let v = COVALENT_RADII[self as usize - 1];
         if v < 0.0 {
@@ -190,6 +243,11 @@ impl Element {
         }
     }
 
+    /// Returns the van der Waals radius in angstroms, or `None` if unavailable.
+    ///
+    /// The van der Waals radius is the effective atomic "size" for
+    /// non-bonded contacts. Two atoms closer than the sum of their vdW
+    /// radii are considered to be in steric contact.
     pub fn vdw_radius(self) -> Option<f64> {
         let v = VDW_RADII[self as usize - 1];
         if v < 0.0 {
@@ -199,6 +257,11 @@ impl Element {
         }
     }
 
+    /// Returns the Pauling electronegativity, or `None` if no reliable value exists.
+    ///
+    /// Electronegativity measures how strongly an atom attracts electrons in
+    /// a covalent bond. Fluorine (3.98) is the most electronegative element;
+    /// francium (0.7) is the least. Noble gases have no defined value.
     pub fn electronegativity(self) -> Option<f64> {
         let v = ELECTRONEGATIVITIES[self as usize - 1];
         if v < 0.0 {
@@ -208,6 +271,15 @@ impl Element {
         }
     }
 
+    /// Returns the allowed default valence states for this element.
+    ///
+    /// A valence is the number of bonds an atom typically forms. These
+    /// defaults determine how many implicit hydrogens the SMILES parser
+    /// assigns: [`Element::C`] returns `[4]`, [`Element::N`] returns
+    /// `[3, 5]`, [`Element::S`] returns `[2, 4, 6]`.
+    ///
+    /// Returns an empty slice for elements with no defined default valence
+    /// (noble gases, transition metals, etc.).
     pub fn default_valences(self) -> &'static [u8] {
         match self {
             Element::H => &[1],
@@ -224,10 +296,21 @@ impl Element {
         }
     }
 
+    /// Returns the exact mass (in Da) for a specific isotope of this element.
+    ///
+    /// Isotopes are atoms of the same element with different numbers of
+    /// neutrons. Carbon-12 (mass number 12) and carbon-13 (mass number 13)
+    /// are both carbon, but they differ in mass. Returns `None` if the
+    /// isotope is not in the table.
     pub fn isotope_exact_mass(self, mass_number: u16) -> Option<f64> {
         isotope_exact_mass(self.atomic_num(), mass_number)
     }
 
+    /// Returns `true` if this element belongs to the SMILES organic subset.
+    ///
+    /// SMILES defines B, C, N, O, P, S, F, Cl, Br, and I as the "organic
+    /// subset." These elements can appear as bare (non-bracket) atoms in a
+    /// SMILES string, e.g. `C` for carbon rather than `[C]`.
     pub fn is_organic_subset(self) -> bool {
         matches!(
             self,
@@ -1110,6 +1193,24 @@ static ELECTRONEGATIVITIES: [f64; 118] = [
     -1.0, // Og
 ];
 
+/// Returns the exact mass (in Da) for a specific isotope, identified by
+/// atomic number and mass number.
+///
+/// This is the free-function form of [`Element::isotope_exact_mass`].
+/// Returns `None` if the isotope is not in the table.
+///
+/// # Examples
+///
+/// ```
+/// use chemcrab::element::isotope_exact_mass;
+///
+/// // Deuterium (hydrogen-2)
+/// let d = isotope_exact_mass(1, 2).unwrap();
+/// assert!((d - 2.014101778).abs() < 1e-6);
+///
+/// // Unknown isotope
+/// assert!(isotope_exact_mass(6, 14).is_none());
+/// ```
 pub fn isotope_exact_mass(atomic_num: u8, mass_number: u16) -> Option<f64> {
     let key = (atomic_num as u32) << 16 | mass_number as u32;
     let idx = ISOTOPE_TABLE

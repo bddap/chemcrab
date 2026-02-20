@@ -1,14 +1,23 @@
+//! Functions to strip stereochemistry or isotope labels from a molecule.
+//!
+//! Useful for generating a "plain" molecular graph that compares only
+//! connectivity — for example, to check whether two molecules are the
+//! same ignoring stereochemistry.
+
 use crate::mol::Mol;
 use crate::traits::HasIsotopeMut;
 
+/// Remove all tetrahedral stereo descriptors.
 pub fn strip_chirality<A, B>(mol: &mut Mol<A, B>) {
     mol.set_tetrahedral_stereo(vec![]);
 }
 
+/// Remove all E/Z (cis/trans) stereo descriptors.
 pub fn strip_bond_stereo<A, B>(mol: &mut Mol<A, B>) {
     mol.set_ez_stereo(vec![]);
 }
 
+/// Set all isotope labels to 0 (natural abundance).
 pub fn strip_isotope<A: HasIsotopeMut, B>(mol: &mut Mol<A, B>) {
     for idx in mol.atoms().collect::<Vec<_>>() {
         *mol.atom_mut(idx).isotope_mut() = 0;

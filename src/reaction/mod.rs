@@ -1,3 +1,14 @@
+//! Reaction SMARTS — parse, apply, and write chemical reactions.
+//!
+//! Reaction SMARTS use `>>` to separate reactant and product templates,
+//! with optional agents between single `>` separators. Atom map numbers
+//! (`:1`, `:2`, …) link atoms across the transformation, so the engine
+//! knows which reactant atom becomes which product atom.
+//!
+//! ```text
+//! [C:1][Br:2].[OH-:3]>>[C:1][O:3].[Br-:2]
+//! ```
+
 pub mod error;
 mod parser;
 mod runner;
@@ -11,6 +22,9 @@ pub use writer::to_reaction_smarts;
 use crate::mol::Mol;
 use crate::smarts::{AtomExpr, BondExpr};
 
+/// A parsed chemical reaction with reactant, product, and agent templates.
+///
+/// Construct via [`from_reaction_smarts`] and apply with [`Reaction::run`].
 #[derive(Debug, Clone, PartialEq)]
 pub struct Reaction {
     pub(crate) reactant_templates: Vec<Mol<AtomExpr, BondExpr>>,
@@ -19,19 +33,26 @@ pub struct Reaction {
 }
 
 impl Reaction {
+    /// Returns the reactant SMARTS templates.
     pub fn reactant_templates(&self) -> &[Mol<AtomExpr, BondExpr>] {
         &self.reactant_templates
     }
 
+    /// Returns the product SMARTS templates.
     pub fn product_templates(&self) -> &[Mol<AtomExpr, BondExpr>] {
         &self.product_templates
     }
 
+    /// Returns the agent SMARTS templates (catalysts, solvents, etc.).
     pub fn agent_templates(&self) -> &[Mol<AtomExpr, BondExpr>] {
         &self.agent_templates
     }
 }
 
+/// Parse a reaction SMARTS string into a [`Reaction`].
+///
+/// The string must contain `>>` (or `>agent>`) to separate reactants
+/// from products. Components within each section are separated by `.`.
 pub fn from_reaction_smarts(s: &str) -> Result<Reaction, ReactionSmartsError> {
     parse_reaction_smarts(s)
 }

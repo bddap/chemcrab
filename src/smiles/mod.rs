@@ -1,3 +1,30 @@
+//! SMILES (Simplified Molecular-Input Line-Entry System) parsing and writing.
+//!
+//! SMILES is a line notation for describing molecular structure as a graph:
+//! atoms are nodes and bonds are edges. Organic-subset atoms are written with
+//! their element symbol (`C`, `N`, `O`, `S`, `P`, `F`, `Cl`, `Br`, `I`);
+//! other atoms use brackets (`[Fe]`, `[NH4+]`).
+//!
+//! Key features of the notation:
+//!
+//! - **Branches** are enclosed in parentheses: `CC(=O)O` is acetic acid.
+//! - **Ring closures** use matching digits: `C1CCCCC1` is cyclohexane.
+//!   Multi-digit rings use `%nn` syntax: `C%10CC%10`.
+//! - **Aromaticity** is indicated by lowercase letters: `c1ccccc1` is benzene.
+//! - **E/Z geometry** on double bonds uses `/` and `\` directional bonds:
+//!   `F/C=C/F` is *trans*-1,2-difluoroethene.
+//! - **Tetrahedral chirality** uses `@` (counterclockwise) and `@@` (clockwise):
+//!   `[C@@H](F)(Cl)Br` specifies a particular enantiomer.
+//!
+//! # Entry points
+//!
+//! | Function | Returns | Use case |
+//! |---|---|---|
+//! | [`from_smiles`] | `Mol<Atom, Bond>` | Normal usage — fully kekulized molecule |
+//! | [`parse_smiles`] | `Mol<Atom, SmilesBond>` | Low-level — aromatic bonds preserved |
+//! | [`to_smiles`] | `String` | Non-canonical SMILES output |
+//! | [`to_canonical_smiles`] | `String` | Canonical SMILES output |
+
 mod builder;
 pub mod error;
 mod parse_tree;
@@ -11,6 +38,16 @@ use crate::mol::Mol;
 pub use error::SmilesError;
 pub use writer::{to_canonical_smiles, to_smiles};
 
+/// Parses a SMILES string without kekulization.
+///
+/// Returns a `Mol<Atom, SmilesBond>` with aromatic and implicit bonds intact.
+/// This is rarely needed outside internal use; prefer [`from_smiles`] for
+/// normal molecule construction.
+///
+/// # Errors
+///
+/// Returns [`SmilesError`] on invalid syntax, unclosed rings, or mismatched
+/// parentheses.
 pub fn parse_smiles(s: &str) -> Result<Mol<Atom, SmilesBond>, SmilesError> {
     let trimmed = s.trim();
     if trimmed.is_empty() {
@@ -24,6 +61,25 @@ pub fn parse_smiles(s: &str) -> Result<Mol<Atom, SmilesBond>, SmilesError> {
     Ok(builder::build_mol(&tree))
 }
 
+/// Parses a SMILES string into a kekulized molecule.
+///
+/// This is the main entry point for reading SMILES. It tokenizes the input,
+/// builds the molecular graph, resolves implicit hydrogen counts, and
+/// kekulizes aromatic bonds into alternating single/double bonds.
+///
+/// # Errors
+///
+/// Returns [`SmilesError`] on invalid syntax or if kekulization fails
+/// (e.g. an odd-sized aromatic ring that cannot be Kekule-resolved).
+///
+/// # Examples
+///
+/// ```
+/// use chemcrab::smiles::from_smiles;
+///
+/// let mol = from_smiles("c1ccccc1").unwrap();
+/// assert_eq!(mol.atom_count(), 6);
+/// ```
 pub fn from_smiles(s: &str) -> Result<Mol<Atom, Bond>, SmilesError> {
     let mol = parse_smiles(s)?;
     Ok(kekulize::kekulize(mol)?)

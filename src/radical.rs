@@ -1,3 +1,10 @@
+//! Radical electron counting.
+//!
+//! A radical is an atom with unpaired electrons — for example, a methyl
+//! radical `[CH3]` has one unpaired electron on carbon. The count is
+//! inferred from the difference between the atom's valence shell capacity
+//! and its actual bonding plus lone-pair electrons.
+
 use petgraph::graph::NodeIndex;
 
 use crate::bond::BondOrder;
@@ -5,6 +12,10 @@ use crate::element::{outer_shell_electrons, Element};
 use crate::mol::Mol;
 use crate::traits::{HasAtomicNum, HasBondOrder, HasFormalCharge, HasHydrogenCount};
 
+/// Count unpaired (radical) electrons on a specific atom.
+///
+/// Returns 0 for atoms in a normal bonding state. Returns 1 for
+/// monoradicals (e.g., `[CH3]`), 2 for diradicals (e.g., `[CH2]`), etc.
 pub fn num_radical_electrons<A, B>(mol: &Mol<A, B>, idx: NodeIndex) -> u8
 where
     A: HasAtomicNum + HasHydrogenCount + HasFormalCharge,

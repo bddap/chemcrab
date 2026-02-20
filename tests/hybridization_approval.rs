@@ -1,4 +1,6 @@
-use chemcrab::{assign_hybridization, from_smiles, Hybridization};
+use chemcrab::hybridization::assign_hybridization;
+use chemcrab::smiles::from_smiles;
+use chemcrab::wrappers::Hybridization;
 use serde::Deserialize;
 
 #[derive(Deserialize)]

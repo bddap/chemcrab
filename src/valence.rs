@@ -1,3 +1,10 @@
+//! Valence is the number of bonds an atom forms, including bonds to virtual hydrogens.
+//!
+//! Valence validation checks that each atom's total valence matches one of
+//! its element's allowed valence states, adjusted for formal charge. Atoms
+//! whose element has no default valence table (e.g., transition metals) are
+//! silently skipped.
+
 use petgraph::graph::NodeIndex;
 
 use crate::bond::BondOrder;
@@ -5,6 +12,10 @@ use crate::element::Element;
 use crate::mol::Mol;
 use crate::traits::{HasAtomicNum, HasBondOrder, HasFormalCharge, HasHydrogenCount};
 
+/// A valence violation for a single atom.
+///
+/// Reports the atom index, its element, the observed valence, and the set
+/// of valences that would have been accepted.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ValenceError {
     pub atom_idx: NodeIndex,
@@ -31,6 +42,8 @@ impl std::fmt::Display for ValenceError {
 
 impl std::error::Error for ValenceError {}
 
+/// Compute the total valence of `atom`: the sum of explicit bond orders
+/// plus the virtual hydrogen count.
 pub fn total_valence<A, B>(mol: &Mol<A, B>, atom: NodeIndex) -> u8
 where
     A: HasHydrogenCount,
@@ -47,6 +60,10 @@ where
     bond_sum + mol.atom(atom).hydrogen_count()
 }
 
+/// Validate that every atom's valence is allowed for its element.
+///
+/// Returns `Ok(())` if all atoms pass, or `Err` with a [`ValenceError`]
+/// for each violating atom.
 pub fn check_valence<A, B>(mol: &Mol<A, B>) -> Result<(), Vec<ValenceError>>
 where
     A: HasAtomicNum + HasFormalCharge + HasHydrogenCount,

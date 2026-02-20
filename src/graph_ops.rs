@@ -41,6 +41,11 @@ pub fn distance_matrix<A, B>(mol: &Mol<A, B>) -> Vec<Vec<usize>> {
     dist
 }
 
+/// BFS shortest path between two atoms.
+///
+/// Returns `Some(path)` with the sequence of `NodeIndex` values from
+/// `from` to `to` (inclusive), or `None` if the atoms are in different
+/// connected components.
 pub fn shortest_path<A, B>(
     mol: &Mol<A, B>,
     from: NodeIndex,
@@ -77,6 +82,10 @@ pub fn shortest_path<A, B>(
     None
 }
 
+/// Return the connected components as groups of atom indices.
+///
+/// A disconnected molecule (e.g., `[Na+].[Cl-]`) has multiple components.
+/// Each component is a sorted `Vec<NodeIndex>`.
 pub fn connected_components<A, B>(mol: &Mol<A, B>) -> Vec<Vec<NodeIndex>> {
     let n = mol.atom_count();
     let mut visited = vec![false; n];
@@ -109,6 +118,10 @@ pub fn num_components<A, B>(mol: &Mol<A, B>) -> usize {
     connected_components(mol).len()
 }
 
+/// Split a molecule into separate `Mol` objects, one per connected component.
+///
+/// Stereochemistry is preserved within each fragment. Atom indices are
+/// renumbered starting from 0 in each fragment.
 pub fn get_fragments<A: Clone, B: Clone>(mol: &Mol<A, B>) -> Vec<Mol<A, B>> {
     let components = connected_components(mol);
     let mut fragments = Vec::with_capacity(components.len());
@@ -154,9 +167,12 @@ pub fn get_fragments<A: Clone, B: Clone>(mol: &Mol<A, B>) -> Vec<Mol<A, B>> {
     fragments
 }
 
+/// Error type for invalid atom permutations passed to [`renumber_atoms`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RenumberError {
+    /// The permutation length does not match the atom count.
     LengthMismatch { expected: usize, got: usize },
+    /// The slice is not a valid permutation (duplicate or out-of-range index).
     InvalidPermutation,
 }
 
@@ -190,6 +206,12 @@ fn validate_permutation(new_order: &[usize], n: usize) -> Result<(), RenumberErr
     Ok(())
 }
 
+/// Reorder atoms according to a permutation.
+///
+/// `new_order[i]` is the old atom index that becomes new atom `i`.
+/// Bonds and stereochemistry are remapped accordingly.
+///
+/// Returns [`RenumberError`] if `new_order` is not a valid permutation.
 pub fn renumber_atoms<A: Clone, B: Clone>(
     mol: &Mol<A, B>,
     new_order: &[usize],

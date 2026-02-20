@@ -1,3 +1,34 @@
+//! SMARTS (SMiles ARbitrary Target Specification) parsing and substructure search.
+//!
+//! SMARTS is a query language for substructure matching that extends SMILES
+//! with logical operators and atom/bond primitives. Where SMILES describes a
+//! single molecule, a SMARTS pattern describes a *set* of molecules (or
+//! substructures) that match.
+//!
+//! Key extensions over SMILES:
+//!
+//! - **Atomic number**: `[#6]` matches any carbon regardless of aromaticity.
+//! - **Ring membership**: `[R]` matches ring atoms, `[R0]` matches chain atoms.
+//! - **Boolean logic**: `;` is AND (low precedence), `&` is AND (high
+//!   precedence), `,` is OR, `!` is NOT. Example: `[C,N;H1]` matches carbon
+//!   or nitrogen with exactly one hydrogen.
+//! - **Recursive SMARTS**: `[$([CX3](=O))]` matches atoms that are part of a
+//!   substructure matching the inner pattern.
+//! - **Bond primitives**: `-` single, `=` double, `#` triple, `:` aromatic,
+//!   `~` any, `@` ring bond.
+//!
+//! # Entry points
+//!
+//! | Function | Purpose |
+//! |---|---|
+//! | [`from_smarts`] | Parse a SMARTS string |
+//! | [`has_smarts_match`] | Does target contain the pattern? |
+//! | [`get_smarts_match`] | First match (atom mapping) |
+//! | [`get_smarts_matches`] | All unique matches |
+//! | [`has_smarts_match_chiral`] | Chirality-aware containment check |
+//! | [`get_smarts_match_chiral`] | First chirality-aware match |
+//! | [`get_smarts_matches_chiral`] | All unique chirality-aware matches |
+
 mod error;
 mod parser;
 pub mod query;
@@ -26,14 +57,29 @@ use query::MatchContext;
 
 type RecursiveRef<'a> = (*const Mol<AtomExpr, BondExpr>, &'a Mol<AtomExpr, BondExpr>);
 
+/// Parses a SMARTS pattern string into a query molecule.
+///
+/// The returned `Mol<AtomExpr, BondExpr>` uses expression trees for atoms
+/// and bonds rather than concrete chemical types, enabling flexible
+/// substructure matching.
+///
+/// # Errors
+///
+/// Returns [`SmartsError`] on invalid syntax, unclosed brackets, or
+/// malformed recursive SMARTS.
 pub fn from_smarts(s: &str) -> Result<Mol<AtomExpr, BondExpr>, SmartsError> {
     parser::parse(s)
 }
 
+/// Returns `true` if `target` contains a substructure matching `query`.
 pub fn has_smarts_match(target: &Mol<Atom, Bond>, query: &Mol<AtomExpr, BondExpr>) -> bool {
     get_smarts_match(target, query).is_some()
 }
 
+/// Returns the first substructure match of `query` in `target`, if any.
+///
+/// The returned [`AtomMapping`] maps each query atom index to its
+/// corresponding target atom index.
 pub fn get_smarts_match(
     target: &Mol<Atom, Bond>,
     query: &Mol<AtomExpr, BondExpr>,
@@ -71,6 +117,10 @@ pub fn get_smarts_match(
     )
 }
 
+/// Returns all unique substructure matches of `query` in `target`.
+///
+/// Matches are deduplicated so that each set of matched target atoms appears
+/// at most once, regardless of automorphic permutations.
 pub fn get_smarts_matches(
     target: &Mol<Atom, Bond>,
     query: &Mol<AtomExpr, BondExpr>,
@@ -109,10 +159,18 @@ pub fn get_smarts_matches(
     uniquify_atom_mappings(&all)
 }
 
+/// Returns `true` if `target` contains a chirality-aware match for `query`.
+///
+/// In addition to the standard SMARTS atom and bond matching, this verifies
+/// that tetrahedral stereocenters in the query have the same handedness in
+/// the matched target atoms.
 pub fn has_smarts_match_chiral(target: &Mol<Atom, Bond>, query: &Mol<AtomExpr, BondExpr>) -> bool {
     get_smarts_match_chiral(target, query).is_some()
 }
 
+/// Returns the first chirality-aware match of `query` in `target`, if any.
+///
+/// See [`has_smarts_match_chiral`] for details on chirality verification.
 pub fn get_smarts_match_chiral(
     target: &Mol<Atom, Bond>,
     query: &Mol<AtomExpr, BondExpr>,
@@ -153,6 +211,9 @@ pub fn get_smarts_match_chiral(
     )
 }
 
+/// Returns all unique chirality-aware matches of `query` in `target`.
+///
+/// See [`has_smarts_match_chiral`] for details on chirality verification.
 pub fn get_smarts_matches_chiral(
     target: &Mol<Atom, Bond>,
     query: &Mol<AtomExpr, BondExpr>,

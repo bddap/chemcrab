@@ -1,3 +1,10 @@
+//! Substructure matching via the VF2 algorithm.
+//!
+//! Compares atoms by element, aromaticity, and formal charge. Compares bonds
+//! by bond order (with aromatic bonds handled specially). For richer queries
+//! involving hydrogen counts, ring membership, or degree constraints, use the
+//! [`crate::smarts`] module instead.
+
 use std::collections::HashSet;
 
 use petgraph::graph::NodeIndex;
@@ -5,8 +12,13 @@ use petgraph::graph::NodeIndex;
 use crate::mol::Mol;
 use crate::traits::{HasAromaticity, HasAtomicNum, HasBondOrder, HasFormalCharge};
 
+/// A mapping from query atom indices to target atom indices.
 pub type AtomMapping = Vec<(NodeIndex, NodeIndex)>;
 
+/// Deduplicates atom mappings so each unique set of target atoms appears once.
+///
+/// Two mappings are considered duplicates if they map to the same set of
+/// target atom indices, regardless of the query-side ordering.
 pub fn uniquify_atom_mappings(mappings: &[AtomMapping]) -> Vec<AtomMapping> {
     let mut seen = HashSet::new();
     mappings
@@ -20,6 +32,7 @@ pub fn uniquify_atom_mappings(mappings: &[AtomMapping]) -> Vec<AtomMapping> {
         .collect()
 }
 
+/// Returns `true` if `target` contains a substructure matching `query`.
 pub fn has_substruct_match<A, B>(target: &Mol<A, B>, query: &Mol<A, B>) -> bool
 where
     A: HasAtomicNum + HasAromaticity + HasFormalCharge,
@@ -28,6 +41,7 @@ where
     get_substruct_match(target, query).is_some()
 }
 
+/// Returns the first substructure match of `query` in `target`, if any.
 pub fn get_substruct_match<A, B>(target: &Mol<A, B>, query: &Mol<A, B>) -> Option<AtomMapping>
 where
     A: HasAtomicNum + HasAromaticity + HasFormalCharge,
@@ -36,6 +50,10 @@ where
     Vf2::new(target, query, default_atom_match, default_bond_match).find_first()
 }
 
+/// Returns all substructure matches of `query` in `target`.
+///
+/// This includes automorphic permutations. Use [`get_substruct_matches_unique`]
+/// to deduplicate.
 pub fn get_substruct_matches<A, B>(target: &Mol<A, B>, query: &Mol<A, B>) -> Vec<AtomMapping>
 where
     A: HasAtomicNum + HasAromaticity + HasFormalCharge,
@@ -44,6 +62,7 @@ where
     Vf2::new(target, query, default_atom_match, default_bond_match).find_all()
 }
 
+/// Returns all unique substructure matches, deduplicated by target atom set.
 pub fn get_substruct_matches_unique<A, B>(target: &Mol<A, B>, query: &Mol<A, B>) -> Vec<AtomMapping>
 where
     A: HasAtomicNum + HasAromaticity + HasFormalCharge,
@@ -52,6 +71,7 @@ where
     uniquify_atom_mappings(&get_substruct_matches(target, query))
 }
 
+/// Like [`get_substruct_matches_unique`] but with custom match functions.
 pub fn get_substruct_matches_with_unique<A1, B1, A2, B2>(
     target: &Mol<A1, B1>,
     query: &Mol<A2, B2>,
@@ -63,6 +83,7 @@ pub fn get_substruct_matches_with_unique<A1, B1, A2, B2>(
     ))
 }
 
+/// Like [`has_substruct_match`] but with custom atom and bond match functions.
 pub fn has_substruct_match_with<A1, B1, A2, B2>(
     target: &Mol<A1, B1>,
     query: &Mol<A2, B2>,
@@ -72,6 +93,7 @@ pub fn has_substruct_match_with<A1, B1, A2, B2>(
     get_substruct_match_with(target, query, atom_match, bond_match).is_some()
 }
 
+/// Like [`get_substruct_match`] but with custom atom and bond match functions.
 pub fn get_substruct_match_with<A1, B1, A2, B2>(
     target: &Mol<A1, B1>,
     query: &Mol<A2, B2>,
@@ -81,6 +103,7 @@ pub fn get_substruct_match_with<A1, B1, A2, B2>(
     Vf2::new(target, query, atom_match, bond_match).find_first()
 }
 
+/// Like [`get_substruct_matches`] but with custom atom and bond match functions.
 pub fn get_substruct_matches_with<A1, B1, A2, B2>(
     target: &Mol<A1, B1>,
     query: &Mol<A2, B2>,
@@ -90,6 +113,7 @@ pub fn get_substruct_matches_with<A1, B1, A2, B2>(
     Vf2::new(target, query, atom_match, bond_match).find_all()
 }
 
+/// Like [`get_substruct_match_with`] with an additional post-match filter.
 pub fn get_substruct_match_with_filter<A1, B1, A2, B2>(
     target: &Mol<A1, B1>,
     query: &Mol<A2, B2>,
@@ -100,6 +124,7 @@ pub fn get_substruct_match_with_filter<A1, B1, A2, B2>(
     Vf2WithFilter::new(target, query, atom_match, bond_match, filter).find_first()
 }
 
+/// Like [`get_substruct_matches_with`] with an additional post-match filter.
 pub fn get_substruct_matches_with_filter<A1, B1, A2, B2>(
     target: &Mol<A1, B1>,
     query: &Mol<A2, B2>,

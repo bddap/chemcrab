@@ -1,35 +1,56 @@
+//! Newtype wrappers that enrich atom types with additional computed properties.
+//!
+//! Rather than storing every possible property on [`Atom`](crate::Atom),
+//! chemcrab uses wrapper types: `WithValence<Atom>` adds a precomputed
+//! valence, `WithHybridization<Atom>` adds hybridization, etc. Wrappers
+//! compose freely and delegate all inner traits automatically via blanket
+//! impls, so `WithHybridization<WithValence<Atom>>` implements every
+//! trait that `Atom` does, plus `HasValence` and `HasHybridization`.
+
 use crate::traits::*;
 
+/// Orbital hybridization of an atom.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum Hybridization {
+    /// Pure s orbital (bare ion, no bonds).
     S,
+    /// sp — linear geometry, 180° bond angles.
     SP,
+    /// sp2 — trigonal planar, 120° bond angles.
     SP2,
+    /// sp3 — tetrahedral, 109.5° bond angles.
     #[default]
     SP3,
+    /// sp3d — trigonal bipyramidal, 5 electron domains.
     SP3D,
+    /// sp3d2 — octahedral, 6 electron domains.
     SP3D2,
+    /// Hybridization could not be determined.
     Other,
 }
 
+/// Wraps an atom type with a precomputed total valence.
 #[derive(Debug, Clone, PartialEq)]
 pub struct WithValence<T> {
     pub inner: T,
     pub valence: u8,
 }
 
+/// Wraps an atom type with a computed hybridization.
 #[derive(Debug, Clone, PartialEq)]
 pub struct WithHybridization<T> {
     pub inner: T,
     pub hybridization: Hybridization,
 }
 
+/// Wraps an atom type with optional 2D coordinates.
 #[derive(Debug, Clone, PartialEq)]
 pub struct WithPosition2D<T> {
     pub inner: T,
     pub position_2d: Option<[f64; 2]>,
 }
 
+/// Wraps an atom type with optional 3D coordinates.
 #[derive(Debug, Clone, PartialEq)]
 pub struct WithPosition3D<T> {
     pub inner: T,
