@@ -1,9 +1,9 @@
 use std::collections::BTreeMap;
 use std::fmt::Write;
 
+use crate::element::isotope_exact_mass;
 use crate::element::Element;
 use crate::mol::Mol;
-use crate::element::isotope_exact_mass;
 use crate::traits::{HasAtomicNum, HasFormalCharge, HasHydrogenCount, HasIsotope};
 
 pub fn average_mol_weight<A: HasAtomicNum + HasHydrogenCount + HasIsotope, B>(
@@ -212,7 +212,10 @@ mod tests {
         let mol = parse_smiles("[O-2]").unwrap();
         let f = mol_formula(&mol);
         assert_eq!(f, "O2-");
-        assert!(!f.contains('\u{2212}'), "should use ASCII minus, not Unicode minus");
+        assert!(
+            !f.contains('\u{2212}'),
+            "should use ASCII minus, not Unicode minus"
+        );
     }
 
     #[test]

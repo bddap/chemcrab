@@ -198,11 +198,7 @@ fn approval_rings() {
     }
 
     if !failures.is_empty() {
-        panic!(
-            "{} ring failures:\n{}",
-            failures.len(),
-            failures.join("\n")
-        );
+        panic!("{} ring failures:\n{}", failures.len(), failures.join("\n"));
     }
 }
 
@@ -233,7 +229,10 @@ fn approval_smarts() {
             if matches.len() != expected_count {
                 failures.push(format!(
                     "[smarts] {} / {:?}: expected {}, got {}",
-                    entry.smiles, smarts_str, expected_count, matches.len()
+                    entry.smiles,
+                    smarts_str,
+                    expected_count,
+                    matches.len()
                 ));
             }
         }
@@ -304,7 +303,10 @@ fn approval_substruct() {
             if matches.len() != expected.num_matches {
                 failures.push(format!(
                     "[num_matches] {} / {}: expected {}, got {}",
-                    entry.smiles, name, expected.num_matches, matches.len()
+                    entry.smiles,
+                    name,
+                    expected.num_matches,
+                    matches.len()
                 ));
             }
         }

@@ -51,5 +51,3 @@ impl crate::traits::HasAromaticity for Atom {
         self.is_aromatic
     }
 }
-
-

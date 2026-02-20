@@ -125,10 +125,20 @@ delegate_position_3d!(WithHybridization);
 
 delegate_common!(WithPosition2D);
 delegate_trait!(WithPosition2D, HasValence, valence, u8);
-delegate_trait!(WithPosition2D, HasHybridization, hybridization, Hybridization);
+delegate_trait!(
+    WithPosition2D,
+    HasHybridization,
+    hybridization,
+    Hybridization
+);
 delegate_position_3d!(WithPosition2D);
 
 delegate_common!(WithPosition3D);
 delegate_trait!(WithPosition3D, HasValence, valence, u8);
-delegate_trait!(WithPosition3D, HasHybridization, hybridization, Hybridization);
+delegate_trait!(
+    WithPosition3D,
+    HasHybridization,
+    hybridization,
+    Hybridization
+);
 delegate_position_2d!(WithPosition3D);

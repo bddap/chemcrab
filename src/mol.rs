@@ -103,9 +103,7 @@ impl<A, B> Mol<A, B> {
     }
 
     pub fn tetrahedral_stereo_for(&self, center: NodeIndex) -> Option<&TetrahedralStereo> {
-        self.tetrahedral_stereo
-            .iter()
-            .find(|s| s.center == center)
+        self.tetrahedral_stereo.iter().find(|s| s.center == center)
     }
 
     pub fn add_tetrahedral_stereo(&mut self, stereo: TetrahedralStereo) {
@@ -113,8 +111,7 @@ impl<A, B> Mol<A, B> {
     }
 
     pub fn remove_tetrahedral_stereo(&mut self, center: NodeIndex) {
-        self.tetrahedral_stereo
-            .retain(|s| s.center != center);
+        self.tetrahedral_stereo.retain(|s| s.center != center);
     }
 
     pub fn ez_stereo(&self) -> &[EZStereo] {
@@ -126,7 +123,11 @@ impl<A, B> Mol<A, B> {
     }
 
     pub fn ez_stereo_for(&self, a: NodeIndex, b: NodeIndex) -> Option<&EZStereo> {
-        let (lo, hi) = if a.index() < b.index() { (a, b) } else { (b, a) };
+        let (lo, hi) = if a.index() < b.index() {
+            (a, b)
+        } else {
+            (b, a)
+        };
         self.ez_stereo.iter().find(|s| s.bond == (lo, hi))
     }
 
@@ -135,7 +136,11 @@ impl<A, B> Mol<A, B> {
     }
 
     pub fn remove_ez_stereo(&mut self, a: NodeIndex, b: NodeIndex) {
-        let (lo, hi) = if a.index() < b.index() { (a, b) } else { (b, a) };
+        let (lo, hi) = if a.index() < b.index() {
+            (a, b)
+        } else {
+            (b, a)
+        };
         self.ez_stereo.retain(|s| s.bond != (lo, hi));
     }
 }
@@ -180,8 +185,7 @@ impl<A: PartialEq, B: PartialEq> PartialEq for Mol<A, B> {
                 return false;
             }
         }
-        self.tetrahedral_stereo == other.tetrahedral_stereo
-            && self.ez_stereo == other.ez_stereo
+        self.tetrahedral_stereo == other.tetrahedral_stereo && self.ez_stereo == other.ez_stereo
     }
 }
 

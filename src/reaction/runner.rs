@@ -57,10 +57,7 @@ impl Reaction {
         match_combo: &[&HashMap<NodeIndex, NodeIndex>],
         reactants: &[&Mol<Atom, Bond>],
     ) -> Result<Vec<Mol<Atom, Bond>>, ReactionError> {
-        let reactant_atom_map = build_reactant_atom_map(
-            &self.reactant_templates,
-            match_combo,
-        )?;
+        let reactant_atom_map = build_reactant_atom_map(&self.reactant_templates, match_combo)?;
 
         let matched_target_atoms = collect_matched_atoms(match_combo);
 
@@ -111,9 +108,7 @@ fn collect_matched_atoms(
         .collect()
 }
 
-fn collect_template_bonds(
-    templates: &[Mol<AtomExpr, BondExpr>],
-) -> Vec<HashSet<(u16, u16)>> {
+fn collect_template_bonds(templates: &[Mol<AtomExpr, BondExpr>]) -> Vec<HashSet<(u16, u16)>> {
     templates
         .iter()
         .map(|tmpl| {
@@ -224,7 +219,10 @@ fn generate_single_product(
 
                     if !in_reactant_template && !in_product_template {
                         if let Some(&neighbor_product_node) = map_num_to_product_node.get(&n_mn) {
-                            if product.bond_between(product_node, neighbor_product_node).is_none() {
+                            if product
+                                .bond_between(product_node, neighbor_product_node)
+                                .is_none()
+                            {
                                 if let Some(edge) = reactant_mol.bond_between(t_idx, neighbor) {
                                     let bond = bond_to_smiles_bond(reactant_mol.bond(edge));
                                     product.add_bond(product_node, neighbor_product_node, bond);
@@ -270,7 +268,11 @@ fn carry_substituents(
         let carried_node = carried_atom_map[&key];
         if product.bond_between(product_anchor, carried_node).is_none() {
             if let Some(edge) = reactant_mol.bond_between(anchor, start_neighbor) {
-                product.add_bond(product_anchor, carried_node, bond_to_smiles_bond(reactant_mol.bond(edge)));
+                product.add_bond(
+                    product_anchor,
+                    carried_node,
+                    bond_to_smiles_bond(reactant_mol.bond(edge)),
+                );
             }
         }
         return;
@@ -280,7 +282,11 @@ fn carry_substituents(
     carried_atom_map.insert(key, new_node);
 
     if let Some(edge) = reactant_mol.bond_between(anchor, start_neighbor) {
-        product.add_bond(product_anchor, new_node, bond_to_smiles_bond(reactant_mol.bond(edge)));
+        product.add_bond(
+            product_anchor,
+            new_node,
+            bond_to_smiles_bond(reactant_mol.bond(edge)),
+        );
     }
 
     queue.push_back((start_neighbor, new_node));
@@ -299,7 +305,11 @@ fn carry_substituents(
             carried_atom_map.insert(nb_key, nb_product);
 
             if let Some(edge) = reactant_mol.bond_between(r_node, nb) {
-                product.add_bond(p_node, nb_product, bond_to_smiles_bond(reactant_mol.bond(edge)));
+                product.add_bond(
+                    p_node,
+                    nb_product,
+                    bond_to_smiles_bond(reactant_mol.bond(edge)),
+                );
             }
 
             queue.push_back((nb, nb_product));
@@ -357,7 +367,10 @@ fn build_unmapped_atom(expr: &AtomExpr) -> Atom {
 
 fn apply_expr_to_atom(atom: &mut Atom, expr: &AtomExpr) {
     match expr {
-        AtomExpr::Element { atomic_num, aromatic } => {
+        AtomExpr::Element {
+            atomic_num,
+            aromatic,
+        } => {
             atom.atomic_num = *atomic_num;
             if let Some(arom) = aromatic {
                 atom.is_aromatic = *arom;

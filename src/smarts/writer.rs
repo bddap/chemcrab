@@ -81,12 +81,15 @@ fn write_component(mol: &Mol<AtomExpr, BondExpr>, component: &[NodeIndex]) -> St
             children[node.index()].push(neighbor);
             stack.push((neighbor, 0));
         } else if parent[node.index()] != Some(neighbor) {
-            let already = ring_opens[neighbor.index()]
-                .iter()
-                .any(|(rid, _)| ring_closes[node.index()].iter().any(|(rid2, _)| rid2 == rid))
-                || ring_opens[node.index()]
+            let already = ring_opens[neighbor.index()].iter().any(|(rid, _)| {
+                ring_closes[node.index()]
                     .iter()
-                    .any(|(rid, _)| ring_closes[neighbor.index()].iter().any(|(rid2, _)| rid2 == rid));
+                    .any(|(rid2, _)| rid2 == rid)
+            }) || ring_opens[node.index()].iter().any(|(rid, _)| {
+                ring_closes[neighbor.index()]
+                    .iter()
+                    .any(|(rid2, _)| rid2 == rid)
+            });
             if !already {
                 let ring_id = next_ring_id;
                 next_ring_id += 1;
@@ -203,7 +206,10 @@ fn write_atom_expr(expr: &AtomExpr, out: &mut String) {
             out.push('A');
             out.push(']');
         }
-        AtomExpr::Element { atomic_num, aromatic } => {
+        AtomExpr::Element {
+            atomic_num,
+            aromatic,
+        } => {
             if can_write_bare(*atomic_num, *aromatic) {
                 write_bare_element(*atomic_num, *aromatic, out);
             } else {
@@ -266,7 +272,10 @@ fn write_element_symbol(atomic_num: u8, aromatic: Option<bool>, out: &mut String
 fn write_atom_expr_inner(expr: &AtomExpr, out: &mut String) {
     match expr {
         AtomExpr::True => out.push('*'),
-        AtomExpr::Element { atomic_num, aromatic } => match aromatic {
+        AtomExpr::Element {
+            atomic_num,
+            aromatic,
+        } => match aromatic {
             Some(is_arom) => write_element_symbol(*atomic_num, Some(*is_arom), out),
             None => {
                 out.push('#');
@@ -395,8 +404,9 @@ fn write_atom_expr_inner(expr: &AtomExpr, out: &mut String) {
             out.push_str(&n.to_string());
         }
         AtomExpr::And(exprs) => {
-            let (map_parts, other_parts): (Vec<_>, Vec<_>) =
-                exprs.iter().partition(|e| matches!(e, AtomExpr::AtomMapClass(_)));
+            let (map_parts, other_parts): (Vec<_>, Vec<_>) = exprs
+                .iter()
+                .partition(|e| matches!(e, AtomExpr::AtomMapClass(_)));
             for (i, e) in other_parts.iter().enumerate() {
                 if i > 0 {
                     out.push('&');

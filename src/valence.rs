@@ -66,7 +66,11 @@ where
                 .iter()
                 .filter_map(|&v| {
                     let adjusted = v as i16 + charge;
-                    if adjusted > 0 { Some(adjusted as u8) } else { None }
+                    if adjusted > 0 {
+                        Some(adjusted as u8)
+                    } else {
+                        None
+                    }
                 })
                 .collect();
             if allowed.is_empty() {

@@ -124,10 +124,7 @@ fn resolve_chirality(mol: &mut Mol<Atom, SmilesBond>, tree: &ParseTree, indices:
             above.swap(2, 3);
         }
 
-        mol.add_tetrahedral_stereo(TetrahedralStereo {
-            center,
-            above,
-        });
+        mol.add_tetrahedral_stereo(TetrahedralStereo { center, above });
     }
 }
 
@@ -164,7 +161,10 @@ fn resolve_ez_stereo(mol: &mut Mol<Atom, SmilesBond>, tree: &ParseTree, indices:
                     let other = other_substituent(mol, indices[j], indices[i], indices[right_atom]);
                     (AtomId::Node(indices[left_atom]), other)
                 } else {
-                    (AtomId::Node(indices[left_atom]), AtomId::Node(indices[right_atom]))
+                    (
+                        AtomId::Node(indices[left_atom]),
+                        AtomId::Node(indices[right_atom]),
+                    )
                 };
 
                 let (lo, hi) = if indices[i].index() < indices[j].index() {
@@ -179,7 +179,10 @@ fn resolve_ez_stereo(mol: &mut Mol<Atom, SmilesBond>, tree: &ParseTree, indices:
                     [cis_right, cis_left]
                 };
 
-                mol.add_ez_stereo(EZStereo { bond: (lo, hi), refs });
+                mol.add_ez_stereo(EZStereo {
+                    bond: (lo, hi),
+                    refs,
+                });
             }
         }
     }
@@ -254,11 +257,7 @@ fn resolve_hydrogen_counts(
     }
 }
 
-fn compute_implicit_h(
-    mol: &Mol<Atom, SmilesBond>,
-    node: NodeIndex,
-    parse_atom: &ParseAtom,
-) -> u8 {
+fn compute_implicit_h(mol: &Mol<Atom, SmilesBond>, node: NodeIndex, parse_atom: &ParseAtom) -> u8 {
     let valences = parse_atom.element.default_valences();
     if valences.is_empty() {
         return 0;
@@ -303,11 +302,7 @@ fn bond_order_sum(mol: &Mol<Atom, SmilesBond>, node: NodeIndex) -> u8 {
     sum
 }
 
-fn adjust_valences_for_charge(
-    valences: &[u8],
-    _element: Element,
-    charge: i8,
-) -> Vec<u8> {
+fn adjust_valences_for_charge(valences: &[u8], _element: Element, charge: i8) -> Vec<u8> {
     debug_assert_eq!(charge, 0, "bare atoms in SMILES never carry charge");
     valences.to_vec()
 }

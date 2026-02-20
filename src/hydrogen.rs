@@ -48,11 +48,7 @@ pub fn add_hs(mol: &Mol<Atom, Bond>) -> Mol<Atom, Bond> {
     for edge in mol.bonds() {
         let (a, b) = mol.bond_endpoints(edge).unwrap();
         let bond = mol.bond(edge);
-        result.add_bond(
-            index_map[a.index()],
-            index_map[b.index()],
-            bond.clone(),
-        );
+        result.add_bond(index_map[a.index()], index_map[b.index()], bond.clone());
     }
 
     let mut new_h_map: Vec<Option<NodeIndex>> = vec![None; mol.atom_count()];
@@ -84,12 +80,10 @@ pub fn add_hs(mol: &Mol<Atom, Bond>) -> Mol<Atom, Bond> {
     let remap_aid = |aid: AtomId| -> AtomId {
         match aid {
             AtomId::Node(idx) => AtomId::Node(index_map[idx.index()]),
-            AtomId::VirtualH(parent, _) => {
-                match new_h_map[parent.index()] {
-                    Some(h_idx) => AtomId::Node(h_idx),
-                    None => AtomId::VirtualH(index_map[parent.index()], 0),
-                }
-            }
+            AtomId::VirtualH(parent, _) => match new_h_map[parent.index()] {
+                Some(h_idx) => AtomId::Node(h_idx),
+                None => AtomId::VirtualH(index_map[parent.index()], 0),
+            },
         }
     };
 
@@ -114,7 +108,10 @@ pub fn add_hs(mol: &Mol<Atom, Bond>) -> Mol<Atom, Bond> {
             } else {
                 (new_b, new_a, [remap_aid(s.refs[1]), remap_aid(s.refs[0])])
             };
-            EZStereo { bond: (lo, hi), refs }
+            EZStereo {
+                bond: (lo, hi),
+                refs,
+            }
         })
         .collect();
     result.set_ez_stereo(new_ez);
@@ -144,10 +141,7 @@ pub fn remove_hs_with(mol: &Mol<Atom, Bond>, opts: &RemoveHsOptions) -> Mol<Atom
 
     for idx in mol.atoms() {
         let atom = mol.atom(idx);
-        if atom.atomic_num == 1
-            && atom.isotope == 0
-            && atom.formal_charge == 0
-        {
+        if atom.atomic_num == 1 && atom.isotope == 0 && atom.formal_charge == 0 {
             let neighbors: Vec<_> = mol.neighbors(idx).collect();
             if neighbors.len() == 1 {
                 if opts.keep_stereo_hs && stereo_refs[idx.index()] {
@@ -192,9 +186,7 @@ pub fn remove_hs_with(mol: &Mol<Atom, Bond>, opts: &RemoveHsOptions) -> Mol<Atom
                     Some(AtomId::Node(index_map[idx.index()]?))
                 }
             }
-            AtomId::VirtualH(parent, n) => {
-                Some(AtomId::VirtualH(index_map[parent.index()]?, n))
-            }
+            AtomId::VirtualH(parent, n) => Some(AtomId::VirtualH(index_map[parent.index()]?, n)),
         }
     };
 
@@ -225,7 +217,10 @@ pub fn remove_hs_with(mol: &Mol<Atom, Bond>, opts: &RemoveHsOptions) -> Mol<Atom
             } else {
                 (new_b, new_a, [ref1, ref0])
             };
-            Some(EZStereo { bond: (lo, hi), refs })
+            Some(EZStereo {
+                bond: (lo, hi),
+                refs,
+            })
         })
         .collect();
     result.set_ez_stereo(new_ez);
@@ -236,10 +231,10 @@ pub fn remove_hs_with(mol: &Mol<Atom, Bond>, opts: &RemoveHsOptions) -> Mol<Atom
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::bond::SmilesBondOrder;
     use crate::mol::{AtomId, TetrahedralStereo};
     use crate::smiles::{from_smiles, parse_smiles, to_smiles};
     use crate::SmilesBond;
-    use crate::bond::SmilesBondOrder;
     use petgraph::graph::NodeIndex;
 
     fn smiles_to_mol(s: &str) -> Mol<Atom, Bond> {
@@ -258,11 +253,7 @@ mod tests {
                 SmilesBondOrder::Triple => BondOrder::Triple,
                 SmilesBondOrder::Aromatic => BondOrder::Single,
             };
-            mol.add_bond(
-                map[a.index()],
-                map[b.index()],
-                Bond { order },
-            );
+            mol.add_bond(map[a.index()], map[b.index()], Bond { order });
         }
         mol
     }
@@ -373,7 +364,9 @@ mod tests {
             ],
         });
         let explicit = add_hs(&mol);
-        let stereo = explicit.tetrahedral_stereo_for(n(0)).expect("chirality should exist");
+        let stereo = explicit
+            .tetrahedral_stereo_for(n(0))
+            .expect("chirality should exist");
         assert!(
             stereo.above.iter().all(|id| matches!(id, AtomId::Node(_))),
             "VirtualH should have been replaced with Node"
@@ -627,7 +620,10 @@ mod tests {
         let mol = from_smiles("Cl/C=C/Br").unwrap();
         let explicit = add_hs(&mol);
         let collapsed = remove_hs(&explicit);
-        assert!(has_ez_stereo(&collapsed), "E/Z stereo lost after round trip");
+        assert!(
+            has_ez_stereo(&collapsed),
+            "E/Z stereo lost after round trip"
+        );
     }
 
     #[test]
@@ -635,7 +631,10 @@ mod tests {
         let mol = from_smiles("CC/C=C/CC").unwrap();
         let explicit = add_hs(&mol);
         let collapsed = remove_hs(&explicit);
-        assert!(has_ez_stereo(&collapsed), "E/Z stereo lost after round trip");
+        assert!(
+            has_ez_stereo(&collapsed),
+            "E/Z stereo lost after round trip"
+        );
     }
 
     #[test]
@@ -647,7 +646,10 @@ mod tests {
             assert!(ez.bond.1.index() < explicit.atom_count());
             for r in &ez.refs {
                 if let AtomId::Node(n) = r {
-                    assert!(n.index() < explicit.atom_count(), "ref atom {n:?} out of bounds");
+                    assert!(
+                        n.index() < explicit.atom_count(),
+                        "ref atom {n:?} out of bounds"
+                    );
                 }
             }
         }
@@ -663,7 +665,10 @@ mod tests {
             assert!(ez.bond.1.index() < collapsed.atom_count());
             for r in &ez.refs {
                 if let AtomId::Node(n) = r {
-                    assert!(n.index() < collapsed.atom_count(), "ref atom {n:?} out of bounds");
+                    assert!(
+                        n.index() < collapsed.atom_count(),
+                        "ref atom {n:?} out of bounds"
+                    );
                 }
             }
         }
@@ -676,10 +681,15 @@ mod tests {
         let mol = from_smiles("F/C=C/F").unwrap();
         let explicit = add_hs(&mol);
 
-        let opts = RemoveHsOptions { keep_stereo_hs: true };
+        let opts = RemoveHsOptions {
+            keep_stereo_hs: true,
+        };
         let result = remove_hs_with(&explicit, &opts);
 
-        assert!(has_ez_stereo(&result), "E/Z stereo lost with keep_stereo_hs");
+        assert!(
+            has_ez_stereo(&result),
+            "E/Z stereo lost with keep_stereo_hs"
+        );
     }
 
     #[test]
@@ -687,7 +697,9 @@ mod tests {
         let mol = from_smiles("F/C=C/F").unwrap();
         let explicit = add_hs(&mol);
 
-        let opts = RemoveHsOptions { keep_stereo_hs: true };
+        let opts = RemoveHsOptions {
+            keep_stereo_hs: true,
+        };
         let result = remove_hs_with(&explicit, &opts);
         assert!(has_ez_stereo(&result));
     }
@@ -699,7 +711,9 @@ mod tests {
         let total_explicit = explicit.atom_count();
         assert!(total_explicit > 4);
 
-        let opts = RemoveHsOptions { keep_stereo_hs: true };
+        let opts = RemoveHsOptions {
+            keep_stereo_hs: true,
+        };
         let result = remove_hs_with(&explicit, &opts);
         assert!(result.atom_count() <= total_explicit);
     }

@@ -36,7 +36,10 @@ fn has_lone_pair_stereo(atomic_num: u8) -> bool {
     matches!(atomic_num, 7 | 15 | 33 | 16 | 34 | 52)
 }
 
-fn all_neighbors_identical<B: HasBondOrder>(mol: &Mol<Atom, B>, idx: petgraph::graph::NodeIndex) -> bool {
+fn all_neighbors_identical<B: HasBondOrder>(
+    mol: &Mol<Atom, B>,
+    idx: petgraph::graph::NodeIndex,
+) -> bool {
     let atom = mol.atom(idx);
     let mut neighbor_keys: Vec<(u8, u8)> = mol
         .neighbors(idx)

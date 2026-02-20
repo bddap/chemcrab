@@ -5,8 +5,7 @@ use petgraph::graph::NodeIndex;
 use crate::bond::BondOrder;
 use crate::mol::{AtomId, Mol};
 use crate::traits::{
-    HasAromaticity, HasAtomicNum, HasBondOrder, HasFormalCharge, HasHydrogenCount,
-    HasIsotope,
+    HasAromaticity, HasAtomicNum, HasBondOrder, HasFormalCharge, HasHydrogenCount, HasIsotope,
 };
 
 struct Fnv1aHasher(u64);
@@ -146,7 +145,11 @@ where
     }
 }
 
-fn above_rank_seq<A, B>(mol: &Mol<A, B>, stereo: &crate::mol::TetrahedralStereo, ranks: &[usize]) -> [usize; 4]
+fn above_rank_seq<A, B>(
+    mol: &Mol<A, B>,
+    stereo: &crate::mol::TetrahedralStereo,
+    ranks: &[usize],
+) -> [usize; 4]
 where
     A: HasHydrogenCount,
 {
@@ -169,9 +172,8 @@ fn hash_stereo_for_ranks(ranks4: &[usize; 4], center_rank: usize) -> u64 {
         sorted4.hash(&mut h);
         3u64.hash(&mut h);
     } else {
-        let perm: [usize; 4] = std::array::from_fn(|i| {
-            sorted4.iter().position(|&s| s == ranks4[i]).unwrap()
-        });
+        let perm: [usize; 4] =
+            std::array::from_fn(|i| sorted4.iter().position(|&s| s == ranks4[i]).unwrap());
         let mut visited = [false; 4];
         let mut swaps = 0usize;
         for i in 0..4 {
@@ -243,10 +245,12 @@ where
             continue;
         }
 
-        let highest_ref_a = mol.neighbors(a)
+        let highest_ref_a = mol
+            .neighbors(a)
             .filter(|&nb| nb != b)
             .max_by_key(|nb| ranks[nb.index()]);
-        let highest_ref_b = mol.neighbors(b)
+        let highest_ref_b = mol
+            .neighbors(b)
             .filter(|&nb| nb != a)
             .max_by_key(|nb| ranks[nb.index()]);
 
@@ -293,11 +297,7 @@ where
 
 pub fn canonical_ordering<A, B>(mol: &Mol<A, B>) -> Vec<usize>
 where
-    A: HasAtomicNum
-        + HasHydrogenCount
-        + HasFormalCharge
-        + HasAromaticity
-        + HasIsotope,
+    A: HasAtomicNum + HasHydrogenCount + HasFormalCharge + HasAromaticity + HasIsotope,
     B: HasBondOrder,
 {
     let n = mol.atom_count();
@@ -350,9 +350,7 @@ where
 
         let min_tied_rank = find_best_tied_rank(mol, ranks);
 
-        let tied_atoms: Vec<usize> = (0..n)
-            .filter(|&i| ranks[i] == min_tied_rank)
-            .collect();
+        let tied_atoms: Vec<usize> = (0..n).filter(|&i| ranks[i] == min_tied_rank).collect();
 
         // Try promoting each tied atom and pick the one that yields the
         // lexicographically smallest invariant trace (atom invariants sorted
@@ -420,12 +418,14 @@ where
         .collect();
 
     let has_stereo_at_rank = |r: usize| -> bool {
-        mol.tetrahedral_stereo().iter().any(|s| {
-            s.center.index() < ranks.len() && ranks[s.center.index()] == r
-        })
+        mol.tetrahedral_stereo()
+            .iter()
+            .any(|s| s.center.index() < ranks.len() && ranks[s.center.index()] == r)
     };
 
-    let non_stereo: Option<usize> = tied_ranks.iter().copied()
+    let non_stereo: Option<usize> = tied_ranks
+        .iter()
+        .copied()
         .filter(|&r| !has_stereo_at_rank(r))
         .min();
 

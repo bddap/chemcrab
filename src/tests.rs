@@ -129,7 +129,10 @@ fn with_hybridization_wraps_atom() {
         hybridization: Hybridization::SP2,
     };
 
-    assert_eq!(HasHybridization::hybridization(&enriched), Hybridization::SP2);
+    assert_eq!(
+        HasHybridization::hybridization(&enriched),
+        Hybridization::SP2
+    );
     assert_eq!(HasAtomicNum::atomic_num(&enriched), 7);
 }
 
@@ -147,7 +150,10 @@ fn nested_wrappers() {
         hybridization: Hybridization::SP3,
     };
 
-    assert_eq!(HasHybridization::hybridization(&enriched), Hybridization::SP3);
+    assert_eq!(
+        HasHybridization::hybridization(&enriched),
+        Hybridization::SP3
+    );
     assert_eq!(HasValence::valence(&enriched), 2);
     assert_eq!(HasAtomicNum::atomic_num(&enriched), 8);
 }
@@ -180,10 +186,7 @@ fn with_position_3d() {
         position_3d: Some([1.0, 2.0, 3.0]),
     };
 
-    assert_eq!(
-        HasPosition3D::position_3d(&enriched),
-        Some([1.0, 2.0, 3.0])
-    );
+    assert_eq!(HasPosition3D::position_3d(&enriched), Some([1.0, 2.0, 3.0]));
     HasPosition3D::set_position_3d(&mut enriched, None);
     assert_eq!(HasPosition3D::position_3d(&enriched), None);
 }

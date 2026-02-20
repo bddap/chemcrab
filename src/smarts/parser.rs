@@ -28,7 +28,10 @@ impl<'a> Parser<'a> {
     fn expect(&mut self, ch: char) -> Result<(), SmartsError> {
         match self.advance() {
             Some(c) if c == ch => Ok(()),
-            Some(c) => Err(SmartsError::UnexpectedChar { pos: self.pos - 1, ch: c }),
+            Some(c) => Err(SmartsError::UnexpectedChar {
+                pos: self.pos - 1,
+                ch: c,
+            }),
             None => Err(SmartsError::InvalidSmarts {
                 pos: self.pos,
                 msg: format!("expected '{ch}', got end of input"),
@@ -123,7 +126,10 @@ impl<'a> Parser<'a> {
                         } else {
                             ring_map.insert(
                                 digit,
-                                (cur, pending_bond.take().unwrap_or(BondExpr::SingleOrAromatic)),
+                                (
+                                    cur,
+                                    pending_bond.take().unwrap_or(BondExpr::SingleOrAromatic),
+                                ),
                             );
                         }
                     } else {
@@ -198,7 +204,10 @@ impl<'a> Parser<'a> {
             '/' => Ok(BondExpr::Up),
             '\\' => Ok(BondExpr::Down),
             '@' => Ok(BondExpr::Ring),
-            _ => Err(SmartsError::UnexpectedChar { pos: self.pos - 1, ch }),
+            _ => Err(SmartsError::UnexpectedChar {
+                pos: self.pos - 1,
+                ch,
+            }),
         }
     }
 
@@ -225,23 +234,15 @@ impl<'a> Parser<'a> {
             return Ok(AtomExpr::Aromatic);
         }
 
-        self.parse_bare_element().map_err(|_| SmartsError::UnexpectedChar {
-            pos: start,
-            ch,
-        })
+        self.parse_bare_element()
+            .map_err(|_| SmartsError::UnexpectedChar { pos: start, ch })
     }
 
     fn parse_bare_element(&mut self) -> Result<AtomExpr, SmartsError> {
         let start = self.pos;
         let ch = self.chars[self.pos];
 
-        let aromatic_atoms = [
-            ('c', 6u8),
-            ('n', 7),
-            ('o', 8),
-            ('s', 16),
-            ('p', 15),
-        ];
+        let aromatic_atoms = [('c', 6u8), ('n', 7), ('o', 8), ('s', 16), ('p', 15)];
 
         for &(sym, num) in &aromatic_atoms {
             if ch == sym {
@@ -414,7 +415,9 @@ impl<'a> Parser<'a> {
             }
             '#' => {
                 self.pos += 1;
-                let num = self.parse_number().ok_or(SmartsError::InvalidAtomicNum { pos: self.pos })?;
+                let num = self
+                    .parse_number()
+                    .ok_or(SmartsError::InvalidAtomicNum { pos: self.pos })?;
                 if num == 0 || num > 118 {
                     return Err(SmartsError::InvalidAtomicNum { pos: self.pos });
                 }
@@ -593,9 +596,7 @@ impl<'a> Parser<'a> {
                 let inner_mol = parse(inner)?;
                 Ok(AtomExpr::Recursive(inner_mol))
             }
-            _ if ch.is_ascii_uppercase() || ch.is_ascii_lowercase() => {
-                self.parse_bracket_element()
-            }
+            _ if ch.is_ascii_uppercase() || ch.is_ascii_lowercase() => self.parse_bracket_element(),
             _ if ch.is_ascii_digit() => {
                 let n = self.parse_number().unwrap();
                 Ok(AtomExpr::Isotope(n as u16))

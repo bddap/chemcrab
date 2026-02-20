@@ -137,10 +137,8 @@ pub fn kekulize(mol: Mol<Atom, SmilesBond>) -> Result<Mol<Atom, Bond>, KekulizeE
         node_map.push(result.add_atom(atom));
     }
 
-    let matched_edges: std::collections::HashSet<EdgeIndex> = matched_edge
-        .iter()
-        .filter_map(|e| *e)
-        .collect();
+    let matched_edges: std::collections::HashSet<EdgeIndex> =
+        matched_edge.iter().filter_map(|e| *e).collect();
 
     for edge in mol.bonds() {
         let (a, b) = match mol.bond_endpoints(edge) {
@@ -160,11 +158,7 @@ pub fn kekulize(mol: Mol<Atom, SmilesBond>) -> Result<Mol<Atom, Bond>, KekulizeE
             SmilesBondOrder::Double => BondOrder::Double,
             SmilesBondOrder::Triple => BondOrder::Triple,
         };
-        result.add_bond(
-            node_map[a.index()],
-            node_map[b.index()],
-            Bond { order },
-        );
+        result.add_bond(node_map[a.index()], node_map[b.index()], Bond { order });
     }
 
     result.set_tetrahedral_stereo(mol.tetrahedral_stereo().to_vec());
@@ -401,10 +395,7 @@ mod tests {
             .map(|n| smiles_mol.atom(n).hydrogen_count)
             .collect();
         let mol = kekulize(smiles_mol).unwrap();
-        let actual: Vec<u8> = mol
-            .atoms()
-            .map(|n| mol.atom(n).hydrogen_count)
-            .collect();
+        let actual: Vec<u8> = mol.atoms().map(|n| mol.atom(n).hydrogen_count).collect();
         assert_eq!(expected, actual);
     }
 
@@ -426,7 +417,10 @@ mod tests {
         let mol = kekulize(smiles_mol).unwrap();
         let e = mol.bond_between(n(1), n(2)).unwrap();
         assert_eq!(mol.bond(e).order, BondOrder::Double);
-        assert!(mol.ez_stereo_for(n(1), n(2)).is_some(), "E/Z stereo lost in kekulize");
+        assert!(
+            mol.ez_stereo_for(n(1), n(2)).is_some(),
+            "E/Z stereo lost in kekulize"
+        );
     }
 
     #[test]
@@ -469,7 +463,10 @@ mod tests {
         let mol = crate::smiles::from_smiles("CC").unwrap();
         assert_eq!(mol.atom_count(), 2);
         assert_eq!(mol.bond_count(), 1);
-        assert_eq!(mol.bond(mol.bonds().next().unwrap()).order, BondOrder::Single);
+        assert_eq!(
+            mol.bond(mol.bonds().next().unwrap()).order,
+            BondOrder::Single
+        );
     }
 
     #[test]

@@ -126,10 +126,8 @@ fn parse_section(
     let components = split_on_dot(text);
     let mut mols = Vec::with_capacity(components.len());
     for comp in components {
-        let mol = from_smarts(comp).map_err(|e| ReactionSmartsError::InvalidComponent {
-            section,
-            detail: e,
-        })?;
+        let mol = from_smarts(comp)
+            .map_err(|e| ReactionSmartsError::InvalidComponent { section, detail: e })?;
         mols.push(mol);
     }
     Ok(mols)

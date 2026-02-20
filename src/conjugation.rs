@@ -58,9 +58,7 @@ where
     let nouter = outer_shell_electrons(anum);
     let total_degree = mol.neighbors(idx).count() as u8 + atom.hydrogen_count();
 
-    let row_check = anum <= 10
-        || (nouter != 5 && nouter != 6)
-        || (nouter == 6 && total_degree < 2);
+    let row_check = anum <= 10 || (nouter != 5 && nouter != 6) || (nouter == 6 && total_degree < 2);
 
     row_check && count_atom_elec(mol, idx) > 0
 }
@@ -176,8 +174,8 @@ mod tests {
         // The C=O and C-OH should be conjugated (through C)
         let c = conj("CC(=O)O");
         assert!(!c[0]); // CH3-C not conjugated
-        assert!(c[1]);  // C=O conjugated
-        assert!(c[2]);  // C-OH conjugated
+        assert!(c[1]); // C=O conjugated
+        assert!(c[2]); // C-OH conjugated
     }
 
     #[test]
@@ -185,8 +183,8 @@ mod tests {
         // CC(N)=O: bonds are C-C, C-N, C=O
         let c = conj("CC(N)=O");
         assert!(!c[0]); // CH3-C
-        assert!(c[1]);  // C-N conjugated
-        assert!(c[2]);  // C=O conjugated
+        assert!(c[1]); // C-N conjugated
+        assert!(c[2]); // C=O conjugated
     }
 
     #[test]

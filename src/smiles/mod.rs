@@ -325,26 +325,38 @@ mod tests {
         assert_eq!(mol.atom_count(), 4);
         let double_edge = mol.bond_between(n(1), n(2)).unwrap();
         assert_eq!(mol.bond(double_edge).order, SmilesBondOrder::Double);
-        assert!(mol.ez_stereo_for(n(1), n(2)).is_some(), "expected E/Z stereo");
+        assert!(
+            mol.ez_stereo_for(n(1), n(2)).is_some(),
+            "expected E/Z stereo"
+        );
     }
 
     #[test]
     fn ez_cis() {
         // F/C=C\F -> cis
         let mol = parse_smiles(r"F/C=C\F").unwrap();
-        assert!(mol.ez_stereo_for(n(1), n(2)).is_some(), "expected E/Z stereo");
+        assert!(
+            mol.ez_stereo_for(n(1), n(2)).is_some(),
+            "expected E/Z stereo"
+        );
     }
 
     #[test]
     fn ez_trans_chlorine() {
         let mol = parse_smiles(r"Cl/C=C/Cl").unwrap();
-        assert!(mol.ez_stereo_for(n(1), n(2)).is_some(), "expected E/Z stereo");
+        assert!(
+            mol.ez_stereo_for(n(1), n(2)).is_some(),
+            "expected E/Z stereo"
+        );
     }
 
     #[test]
     fn ez_cis_chlorine() {
         let mol = parse_smiles(r"Cl/C=C\Cl").unwrap();
-        assert!(mol.ez_stereo_for(n(1), n(2)).is_some(), "expected E/Z stereo");
+        assert!(
+            mol.ez_stereo_for(n(1), n(2)).is_some(),
+            "expected E/Z stereo"
+        );
     }
 
     // ---- Disconnected ----

@@ -4,8 +4,8 @@ pub mod query;
 mod writer;
 
 pub use error::SmartsError;
-pub use query::{AtomExpr, BondExpr, Hybridization, RangeKind};
 pub use query::compute_hybridization;
+pub use query::{AtomExpr, BondExpr, Hybridization, RangeKind};
 pub use writer::to_smarts;
 
 use std::collections::{HashMap, HashSet};
@@ -13,10 +13,10 @@ use std::collections::{HashMap, HashSet};
 use petgraph::graph::NodeIndex;
 
 use crate::atom::Atom;
-use crate::bond::Bond;
-use crate::mol::{AtomId, Mol, permutation_parity};
-use crate::rings::RingInfo;
 use crate::atom::Chirality;
+use crate::bond::Bond;
+use crate::mol::{permutation_parity, AtomId, Mol};
+use crate::rings::RingInfo;
 use crate::substruct::{
     get_substruct_match_with, get_substruct_match_with_filter, get_substruct_matches_with,
     get_substruct_matches_with_filter, uniquify_atom_mappings, AtomMapping,
@@ -259,8 +259,8 @@ fn validate_chirality(
             None => return false,
         };
 
-        let q_neighbor_count = query.neighbors(q_idx).count()
-            + if cqa.has_implicit_h { 1 } else { 0 };
+        let q_neighbor_count =
+            query.neighbors(q_idx).count() + if cqa.has_implicit_h { 1 } else { 0 };
         if q_neighbor_count < 3 {
             continue;
         }
@@ -287,7 +287,8 @@ fn validate_chirality(
             continue;
         }
 
-        let target_full: Vec<NeighborRef> = target_stereo.above
+        let target_full: Vec<NeighborRef> = target_stereo
+            .above
             .iter()
             .map(|aid| match aid {
                 AtomId::Node(idx) => NeighborRef::Atom(*idx),
@@ -358,12 +359,8 @@ fn match_atom_expr(expr: &AtomExpr, atom: &Atom, ctx: &MatchContext, idx: NodeIn
                 .get(&ptr)
                 .is_some_and(|set| set.contains(&idx))
         }
-        AtomExpr::And(exprs) => exprs
-            .iter()
-            .all(|e| match_atom_expr(e, atom, ctx, idx)),
-        AtomExpr::Or(exprs) => exprs
-            .iter()
-            .any(|e| match_atom_expr(e, atom, ctx, idx)),
+        AtomExpr::And(exprs) => exprs.iter().all(|e| match_atom_expr(e, atom, ctx, idx)),
+        AtomExpr::Or(exprs) => exprs.iter().any(|e| match_atom_expr(e, atom, ctx, idx)),
         AtomExpr::Not(inner) => !match_atom_expr(inner, atom, ctx, idx),
         _ => expr.matches(atom, ctx, idx),
     }
@@ -428,10 +425,7 @@ fn pre_evaluate_recursive(
     results
 }
 
-fn collect_recursive_refs<'a>(
-    expr: &'a AtomExpr,
-    ptrs: &mut Vec<RecursiveRef<'a>>,
-) {
+fn collect_recursive_refs<'a>(expr: &'a AtomExpr, ptrs: &mut Vec<RecursiveRef<'a>>) {
     match expr {
         AtomExpr::Recursive(inner) => {
             ptrs.push((inner as *const Mol<AtomExpr, BondExpr>, inner));
@@ -467,21 +461,39 @@ mod tests {
         let q = smarts("[#6]");
         assert_eq!(q.atom_count(), 1);
         let expr = q.atom(NodeIndex::new(0));
-        assert!(matches!(expr, AtomExpr::Element { atomic_num: 6, aromatic: None }));
+        assert!(matches!(
+            expr,
+            AtomExpr::Element {
+                atomic_num: 6,
+                aromatic: None
+            }
+        ));
     }
 
     #[test]
     fn parse_aliphatic_carbon() {
         let q = smarts("[C]");
         let expr = q.atom(NodeIndex::new(0));
-        assert!(matches!(expr, AtomExpr::Element { atomic_num: 6, aromatic: Some(false) }));
+        assert!(matches!(
+            expr,
+            AtomExpr::Element {
+                atomic_num: 6,
+                aromatic: Some(false)
+            }
+        ));
     }
 
     #[test]
     fn parse_aromatic_carbon() {
         let q = smarts("[c]");
         let expr = q.atom(NodeIndex::new(0));
-        assert!(matches!(expr, AtomExpr::Element { atomic_num: 6, aromatic: Some(true) }));
+        assert!(matches!(
+            expr,
+            AtomExpr::Element {
+                atomic_num: 6,
+                aromatic: Some(true)
+            }
+        ));
     }
 
     #[test]
@@ -504,8 +516,20 @@ mod tests {
         match expr {
             AtomExpr::Or(parts) => {
                 assert_eq!(parts.len(), 2);
-                assert!(matches!(parts[0], AtomExpr::Element { atomic_num: 6, aromatic: Some(false) }));
-                assert!(matches!(parts[1], AtomExpr::Element { atomic_num: 7, aromatic: Some(false) }));
+                assert!(matches!(
+                    parts[0],
+                    AtomExpr::Element {
+                        atomic_num: 6,
+                        aromatic: Some(false)
+                    }
+                ));
+                assert!(matches!(
+                    parts[1],
+                    AtomExpr::Element {
+                        atomic_num: 7,
+                        aromatic: Some(false)
+                    }
+                ));
             }
             _ => panic!("expected Or, got {expr:?}"),
         }
@@ -518,7 +542,13 @@ mod tests {
         match expr {
             AtomExpr::And(parts) => {
                 assert_eq!(parts.len(), 2);
-                assert!(matches!(parts[0], AtomExpr::Element { atomic_num: 6, aromatic: Some(false) }));
+                assert!(matches!(
+                    parts[0],
+                    AtomExpr::Element {
+                        atomic_num: 6,
+                        aromatic: Some(false)
+                    }
+                ));
                 assert!(matches!(parts[1], AtomExpr::InRing));
             }
             _ => panic!("expected And, got {expr:?}"),
@@ -531,7 +561,13 @@ mod tests {
         let expr = q.atom(NodeIndex::new(0));
         match expr {
             AtomExpr::Not(inner) => {
-                assert!(matches!(**inner, AtomExpr::Element { atomic_num: 6, aromatic: Some(false) }));
+                assert!(matches!(
+                    **inner,
+                    AtomExpr::Element {
+                        atomic_num: 6,
+                        aromatic: Some(false)
+                    }
+                ));
             }
             _ => panic!("expected Not, got {expr:?}"),
         }
@@ -571,19 +607,28 @@ mod tests {
     #[test]
     fn parse_connectivity() {
         let q = smarts("[X4]");
-        assert!(matches!(q.atom(NodeIndex::new(0)), AtomExpr::Connectivity(4)));
+        assert!(matches!(
+            q.atom(NodeIndex::new(0)),
+            AtomExpr::Connectivity(4)
+        ));
     }
 
     #[test]
     fn parse_total_h_count() {
         let q = smarts("[H1]");
-        assert!(matches!(q.atom(NodeIndex::new(0)), AtomExpr::TotalHCount(1)));
+        assert!(matches!(
+            q.atom(NodeIndex::new(0)),
+            AtomExpr::TotalHCount(1)
+        ));
     }
 
     #[test]
     fn parse_implicit_h_count() {
         let q = smarts("[h1]");
-        assert!(matches!(q.atom(NodeIndex::new(0)), AtomExpr::ImplicitHCount(1)));
+        assert!(matches!(
+            q.atom(NodeIndex::new(0)),
+            AtomExpr::ImplicitHCount(1)
+        ));
     }
 
     #[test]
@@ -601,19 +646,28 @@ mod tests {
     #[test]
     fn parse_ring_membership() {
         let q = smarts("[R2]");
-        assert!(matches!(q.atom(NodeIndex::new(0)), AtomExpr::RingMembership(2)));
+        assert!(matches!(
+            q.atom(NodeIndex::new(0)),
+            AtomExpr::RingMembership(2)
+        ));
     }
 
     #[test]
     fn parse_smallest_ring_size() {
         let q = smarts("[r6]");
-        assert!(matches!(q.atom(NodeIndex::new(0)), AtomExpr::SmallestRingSize(6)));
+        assert!(matches!(
+            q.atom(NodeIndex::new(0)),
+            AtomExpr::SmallestRingSize(6)
+        ));
     }
 
     #[test]
     fn parse_ring_bond_count() {
         let q = smarts("[x2]");
-        assert!(matches!(q.atom(NodeIndex::new(0)), AtomExpr::RingBondCount(2)));
+        assert!(matches!(
+            q.atom(NodeIndex::new(0)),
+            AtomExpr::RingBondCount(2)
+        ));
     }
 
     #[test]
@@ -633,35 +687,45 @@ mod tests {
         let q = smarts("CC");
         assert_eq!(q.atom_count(), 2);
         assert_eq!(q.bond_count(), 1);
-        let edge = q.bond_between(NodeIndex::new(0), NodeIndex::new(1)).unwrap();
+        let edge = q
+            .bond_between(NodeIndex::new(0), NodeIndex::new(1))
+            .unwrap();
         assert!(matches!(q.bond(edge), BondExpr::SingleOrAromatic));
     }
 
     #[test]
     fn parse_double_bond() {
         let q = smarts("C=C");
-        let edge = q.bond_between(NodeIndex::new(0), NodeIndex::new(1)).unwrap();
+        let edge = q
+            .bond_between(NodeIndex::new(0), NodeIndex::new(1))
+            .unwrap();
         assert!(matches!(q.bond(edge), BondExpr::Double));
     }
 
     #[test]
     fn parse_triple_bond() {
         let q = smarts("C#C");
-        let edge = q.bond_between(NodeIndex::new(0), NodeIndex::new(1)).unwrap();
+        let edge = q
+            .bond_between(NodeIndex::new(0), NodeIndex::new(1))
+            .unwrap();
         assert!(matches!(q.bond(edge), BondExpr::Triple));
     }
 
     #[test]
     fn parse_any_bond() {
         let q = smarts("C~C");
-        let edge = q.bond_between(NodeIndex::new(0), NodeIndex::new(1)).unwrap();
+        let edge = q
+            .bond_between(NodeIndex::new(0), NodeIndex::new(1))
+            .unwrap();
         assert!(matches!(q.bond(edge), BondExpr::True));
     }
 
     #[test]
     fn parse_aromatic_bond() {
         let q = smarts("C:C");
-        let edge = q.bond_between(NodeIndex::new(0), NodeIndex::new(1)).unwrap();
+        let edge = q
+            .bond_between(NodeIndex::new(0), NodeIndex::new(1))
+            .unwrap();
         assert!(matches!(q.bond(edge), BondExpr::Aromatic));
     }
 
@@ -940,7 +1004,13 @@ mod tests {
     fn parse_hydrogen_bracket() {
         let q = smarts("[H]");
         let expr = q.atom(NodeIndex::new(0));
-        assert!(matches!(expr, AtomExpr::Element { atomic_num: 1, aromatic: Some(false) }));
+        assert!(matches!(
+            expr,
+            AtomExpr::Element {
+                atomic_num: 1,
+                aromatic: Some(false)
+            }
+        ));
     }
 
     #[test]
@@ -1007,7 +1077,10 @@ mod tests {
 
     #[test]
     fn writer_round_trip_bracket() {
-        let cases = ["[#6]", "[D2]", "[v4]", "[X4]", "[H1]", "[h1]", "[R]", "[R0]", "[R2]", "[r6]", "[x2]", "[+1]", "[-1]"];
+        let cases = [
+            "[#6]", "[D2]", "[v4]", "[X4]", "[H1]", "[h1]", "[R]", "[R0]", "[R2]", "[r6]", "[x2]",
+            "[+1]", "[-1]",
+        ];
         for s in &cases {
             let q = smarts(s);
             let written = to_smarts(&q);
@@ -1065,9 +1138,13 @@ mod tests {
         let expr = query.atom(NodeIndex::new(0));
         match expr {
             AtomExpr::And(parts) => {
-                assert!(parts
-                    .iter()
-                    .any(|p| matches!(p, AtomExpr::Element { atomic_num: 11, aromatic: Some(false) })));
+                assert!(parts.iter().any(|p| matches!(
+                    p,
+                    AtomExpr::Element {
+                        atomic_num: 11,
+                        aromatic: Some(false)
+                    }
+                )));
                 assert!(parts.iter().any(|p| matches!(p, AtomExpr::Charge(1))));
             }
             _ => panic!("expected And for [Na+], got {expr:?}"),
@@ -1082,9 +1159,13 @@ mod tests {
         let expr = query.atom(NodeIndex::new(0));
         match expr {
             AtomExpr::And(parts) => {
-                assert!(parts
-                    .iter()
-                    .any(|p| matches!(p, AtomExpr::Element { atomic_num: 17, aromatic: Some(false) })));
+                assert!(parts.iter().any(|p| matches!(
+                    p,
+                    AtomExpr::Element {
+                        atomic_num: 17,
+                        aromatic: Some(false)
+                    }
+                )));
                 assert!(parts.iter().any(|p| matches!(p, AtomExpr::Charge(-1))));
             }
             _ => panic!("expected And for [Cl-], got {expr:?}"),
@@ -1112,11 +1193,23 @@ mod tests {
         match expr {
             AtomExpr::Or(parts) => {
                 assert_eq!(parts.len(), 2);
-                assert!(matches!(parts[0], AtomExpr::Element { atomic_num: 6, aromatic: Some(true) }));
+                assert!(matches!(
+                    parts[0],
+                    AtomExpr::Element {
+                        atomic_num: 6,
+                        aromatic: Some(true)
+                    }
+                ));
                 match &parts[1] {
                     AtomExpr::And(inner) => {
                         assert_eq!(inner.len(), 2);
-                        assert!(matches!(inner[0], AtomExpr::Element { atomic_num: 7, aromatic: Some(true) }));
+                        assert!(matches!(
+                            inner[0],
+                            AtomExpr::Element {
+                                atomic_num: 7,
+                                aromatic: Some(true)
+                            }
+                        ));
                         assert!(matches!(inner[1], AtomExpr::TotalHCount(1)));
                     }
                     _ => panic!("expected And in second Or part"),
@@ -1130,21 +1223,39 @@ mod tests {
     fn parse_element_as_in_bracket() {
         let q = smarts("[As]");
         let expr = q.atom(NodeIndex::new(0));
-        assert!(matches!(expr, AtomExpr::Element { atomic_num: 33, aromatic: Some(false) }));
+        assert!(matches!(
+            expr,
+            AtomExpr::Element {
+                atomic_num: 33,
+                aromatic: Some(false)
+            }
+        ));
     }
 
     #[test]
     fn parse_bare_bromine() {
         let q = smarts("Br");
         let expr = q.atom(NodeIndex::new(0));
-        assert!(matches!(expr, AtomExpr::Element { atomic_num: 35, aromatic: Some(false) }));
+        assert!(matches!(
+            expr,
+            AtomExpr::Element {
+                atomic_num: 35,
+                aromatic: Some(false)
+            }
+        ));
     }
 
     #[test]
     fn parse_bare_chlorine() {
         let q = smarts("Cl");
         let expr = q.atom(NodeIndex::new(0));
-        assert!(matches!(expr, AtomExpr::Element { atomic_num: 17, aromatic: Some(false) }));
+        assert!(matches!(
+            expr,
+            AtomExpr::Element {
+                atomic_num: 17,
+                aromatic: Some(false)
+            }
+        ));
     }
 
     #[test]
@@ -1188,7 +1299,13 @@ mod tests {
     fn bare_se_aromatic() {
         let q = smarts("[se]");
         let expr = q.atom(NodeIndex::new(0));
-        assert!(matches!(expr, AtomExpr::Element { atomic_num: 34, aromatic: Some(true) }));
+        assert!(matches!(
+            expr,
+            AtomExpr::Element {
+                atomic_num: 34,
+                aromatic: Some(true)
+            }
+        ));
     }
 
     // ---- Non-H degree (d) ----
@@ -1531,11 +1648,17 @@ mod tests {
         let q_implicit = smarts("[h{1-2}]");
         assert!(matches!(
             q_total.atom(NodeIndex::new(0)),
-            AtomExpr::Range { kind: RangeKind::TotalHCount, .. }
+            AtomExpr::Range {
+                kind: RangeKind::TotalHCount,
+                ..
+            }
         ));
         assert!(matches!(
             q_implicit.atom(NodeIndex::new(0)),
-            AtomExpr::Range { kind: RangeKind::ImplicitHCount, .. }
+            AtomExpr::Range {
+                kind: RangeKind::ImplicitHCount,
+                ..
+            }
         ));
     }
 
@@ -1608,7 +1731,10 @@ mod tests {
 
     #[test]
     fn writer_round_trip_range() {
-        for s in &["[D{2-3}]", "[D{2-}]", "[D{-2}]", "[d{1-3}]", "[z{0-1}]", "[v{3-4}]", "[H{1-2}]", "[h{1-2}]"] {
+        for s in &[
+            "[D{2-3}]", "[D{2-}]", "[D{-2}]", "[d{1-3}]", "[z{0-1}]", "[v{3-4}]", "[H{1-2}]",
+            "[h{1-2}]",
+        ] {
             let q = smarts(s);
             let written = to_smarts(&q);
             let reparsed = smarts(&written);
@@ -1628,8 +1754,12 @@ mod tests {
         let expr = q.atom(NodeIndex::new(0));
         match expr {
             AtomExpr::And(parts) => {
-                assert!(parts.iter().any(|p| matches!(p, AtomExpr::Chirality(Chirality::Cw | Chirality::Ccw))),
-                    "expected chirality variant, got {parts:?}");
+                assert!(
+                    parts
+                        .iter()
+                        .any(|p| matches!(p, AtomExpr::Chirality(Chirality::Cw | Chirality::Ccw))),
+                    "expected chirality variant, got {parts:?}"
+                );
             }
             _ => panic!("expected And, got {expr:?}"),
         }
@@ -1641,8 +1771,12 @@ mod tests {
         let expr = q.atom(NodeIndex::new(0));
         match expr {
             AtomExpr::And(parts) => {
-                assert!(parts.iter().any(|p| matches!(p, AtomExpr::Chirality(Chirality::Cw | Chirality::Ccw))),
-                    "expected chirality variant, got {parts:?}");
+                assert!(
+                    parts
+                        .iter()
+                        .any(|p| matches!(p, AtomExpr::Chirality(Chirality::Cw | Chirality::Ccw))),
+                    "expected chirality variant, got {parts:?}"
+                );
             }
             _ => panic!("expected And, got {expr:?}"),
         }
@@ -1672,8 +1806,16 @@ mod tests {
         let expr = q.atom(NodeIndex::new(0));
         match expr {
             AtomExpr::And(parts) => {
-                assert!(parts.iter().any(|p| matches!(p, AtomExpr::Element { atomic_num: 6, aromatic: Some(false) })));
-                assert!(parts.iter().any(|p| matches!(p, AtomExpr::Chirality(Chirality::Cw | Chirality::Ccw))));
+                assert!(parts.iter().any(|p| matches!(
+                    p,
+                    AtomExpr::Element {
+                        atomic_num: 6,
+                        aromatic: Some(false)
+                    }
+                )));
+                assert!(parts
+                    .iter()
+                    .any(|p| matches!(p, AtomExpr::Chirality(Chirality::Cw | Chirality::Ccw))));
                 assert!(parts.iter().any(|p| matches!(p, AtomExpr::TotalHCount(1))));
             }
             _ => panic!("expected And, got {expr:?}"),
@@ -1686,7 +1828,9 @@ mod tests {
         let expr = q.atom(NodeIndex::new(0));
         match expr {
             AtomExpr::And(parts) => {
-                assert!(parts.iter().any(|p| matches!(p, AtomExpr::Chirality(Chirality::Cw | Chirality::Ccw))));
+                assert!(parts
+                    .iter()
+                    .any(|p| matches!(p, AtomExpr::Chirality(Chirality::Cw | Chirality::Ccw))));
                 assert!(parts.iter().any(|p| matches!(p, AtomExpr::TotalHCount(1))));
             }
             _ => panic!("expected And, got {expr:?}"),
@@ -1857,7 +2001,11 @@ mod tests {
         let target = mol("[2H]C([2H])([2H])[2H]");
         let query = smarts("[H0]");
         let matches = get_smarts_matches(&target, &query);
-        assert_eq!(matches.len(), 4, "each deuterium has 0 total H, carbon has 4");
+        assert_eq!(
+            matches.len(),
+            4,
+            "each deuterium has 0 total H, carbon has 4"
+        );
         for m in &matches {
             let target_idx = m[0].1;
             assert_eq!(target.atom(target_idx).atomic_num, 1);

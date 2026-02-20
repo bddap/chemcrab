@@ -105,9 +105,7 @@ fn lookup_existing_dir(
         WriteDir::ParentToChild | WriteDir::RingOpen | WriteDir::RingClose => {
             dirs.get(&(db_atom, ref_atom)).copied()
         }
-        WriteDir::ChildToParent => {
-            dirs.get(&(ref_atom, db_atom)).copied()
-        }
+        WriteDir::ChildToParent => dirs.get(&(ref_atom, db_atom)).copied(),
     }
 }
 
@@ -130,7 +128,9 @@ fn compute_bond_directions(
 ) -> HashMap<(NodeIndex, NodeIndex), Direction> {
     let mut dirs: HashMap<(NodeIndex, NodeIndex), Direction> = HashMap::new();
 
-    let root = parent.iter().enumerate()
+    let root = parent
+        .iter()
+        .enumerate()
         .find(|(i, p)| p.is_none() && !children[*i].is_empty())
         .or_else(|| parent.iter().enumerate().find(|(_, p)| p.is_none()))
         .map(|(i, _)| NodeIndex::new(i))
@@ -158,16 +158,15 @@ fn compute_bond_directions(
             (ez.refs[1], ez.refs[0])
         };
 
-        let (left, right) =
-            if parent[ep_b.index()] == Some(ep_a) {
-                (ep_a, ep_b)
-            } else if parent[ep_a.index()] == Some(ep_b) {
-                (ep_b, ep_a)
-            } else if ep_a.index() < ep_b.index() {
-                (ep_a, ep_b)
-            } else {
-                (ep_b, ep_a)
-            };
+        let (left, right) = if parent[ep_b.index()] == Some(ep_a) {
+            (ep_a, ep_b)
+        } else if parent[ep_a.index()] == Some(ep_b) {
+            (ep_b, ep_a)
+        } else if ep_a.index() < ep_b.index() {
+            (ep_a, ep_b)
+        } else {
+            (ep_b, ep_a)
+        };
 
         let ref_l_id = if left == ep_a { ref_for_a } else { ref_for_b };
         let ref_r_id = if right == ep_a { ref_for_a } else { ref_for_b };
@@ -195,7 +194,13 @@ fn compute_bond_directions(
             write_direction(right, ref_r, parent, children, ring_opens, ring_closes);
 
         work.push(EZWork {
-            left, right, ref_l, ref_r, is_trans, left_write_dir, right_write_dir,
+            left,
+            right,
+            ref_l,
+            ref_r,
+            is_trans,
+            left_write_dir,
+            right_write_dir,
         });
     }
 
@@ -254,10 +259,16 @@ fn write_direction(
     if parent[db_atom.index()] == Some(ref_atom) {
         return WriteDir::ChildToParent;
     }
-    if ring_opens[db_atom.index()].iter().any(|rc| rc.other == ref_atom) {
+    if ring_opens[db_atom.index()]
+        .iter()
+        .any(|rc| rc.other == ref_atom)
+    {
         return WriteDir::RingOpen;
     }
-    if ring_closes[db_atom.index()].iter().any(|rc| rc.other == ref_atom) {
+    if ring_closes[db_atom.index()]
+        .iter()
+        .any(|rc| rc.other == ref_atom)
+    {
         return WriteDir::RingClose;
     }
     WriteDir::ParentToChild
@@ -286,10 +297,17 @@ fn set_bond_dir(
     }
 }
 
-fn write_fragment(mol: &Mol<Atom, Bond>, component: &[NodeIndex], ranks: Option<&[usize]>) -> String {
+fn write_fragment(
+    mol: &Mol<Atom, Bond>,
+    component: &[NodeIndex],
+    ranks: Option<&[usize]>,
+) -> String {
     let n = mol.atom_count();
     let start = match ranks {
-        Some(r) => *component.iter().min_by_key(|&&node| r[node.index()]).unwrap(),
+        Some(r) => *component
+            .iter()
+            .min_by_key(|&&node| r[node.index()])
+            .unwrap(),
         None => component[0],
     };
 
@@ -332,16 +350,15 @@ fn write_fragment(mol: &Mol<Atom, Bond>, component: &[NodeIndex], ranks: Option<
             children[node.index()].push(neighbor);
             stack.push((neighbor, 0));
         } else if parent[node.index()] != Some(neighbor) {
-            let already = ring_opens[neighbor.index()]
-                .iter()
-                .any(|rc| ring_closes[node.index()].iter().any(|rc2| rc2.ring_id == rc.ring_id))
-                || ring_opens[node.index()]
+            let already = ring_opens[neighbor.index()].iter().any(|rc| {
+                ring_closes[node.index()]
                     .iter()
-                    .any(|rc| {
-                        ring_closes[neighbor.index()]
-                            .iter()
-                            .any(|rc2| rc2.ring_id == rc.ring_id)
-                    });
+                    .any(|rc2| rc2.ring_id == rc.ring_id)
+            }) || ring_opens[node.index()].iter().any(|rc| {
+                ring_closes[neighbor.index()]
+                    .iter()
+                    .any(|rc2| rc2.ring_id == rc.ring_id)
+            });
             if !already {
                 let edge = mol.bond_between(node, neighbor).unwrap();
                 let order = mol.bond(edge).order;
@@ -361,8 +378,7 @@ fn write_fragment(mol: &Mol<Atom, Bond>, component: &[NodeIndex], ranks: Option<
         }
     }
 
-    let bond_dirs =
-        compute_bond_directions(mol, &parent, &children, &ring_opens, &ring_closes);
+    let bond_dirs = compute_bond_directions(mol, &parent, &children, &ring_opens, &ring_closes);
 
     let ctx = DfsContext {
         parent,
@@ -451,7 +467,15 @@ fn resolve_chirality_for_smiles(
         return SmilesChirality::None;
     }
 
-    let even = permutation_parity(&stereo.above, &[smiles_order[0], smiles_order[1], smiles_order[2], smiles_order[3]]);
+    let even = permutation_parity(
+        &stereo.above,
+        &[
+            smiles_order[0],
+            smiles_order[1],
+            smiles_order[2],
+            smiles_order[3],
+        ],
+    );
 
     if even {
         SmilesChirality::Ccw // @ — same chirality
@@ -460,12 +484,7 @@ fn resolve_chirality_for_smiles(
     }
 }
 
-fn write_node(
-    mol: &Mol<Atom, Bond>,
-    node: NodeIndex,
-    ctx: &DfsContext,
-    out: &mut String,
-) {
+fn write_node(mol: &Mol<Atom, Bond>, node: NodeIndex, ctx: &DfsContext, out: &mut String) {
     let chirality = resolve_chirality_for_smiles(mol, node, ctx);
     write_atom_symbol(mol, node, &chirality, out);
 
@@ -753,12 +772,18 @@ mod tests {
             let anum = mol1.atom(center).atomic_num;
             let center2 = mol2
                 .atoms()
-                .find(|&n| mol2.atom(n).atomic_num == anum
-                    && mol2.tetrahedral_stereo_for(n).is_some())
+                .find(|&n| {
+                    mol2.atom(n).atomic_num == anum && mol2.tetrahedral_stereo_for(n).is_some()
+                })
                 .unwrap_or_else(|| panic!("{ctx}: no matching chiral atom in mol2"));
             let p1 = canonical_parity(mol1, center);
             let p2 = canonical_parity(mol2, center2);
-            assert_eq!(p1, p2, "{ctx}: chirality mismatch for atom {}", center.index());
+            assert_eq!(
+                p1,
+                p2,
+                "{ctx}: chirality mismatch for atom {}",
+                center.index()
+            );
         }
     }
 
@@ -1114,8 +1139,16 @@ mod tests {
     #[test]
     fn canonical_round_trip_structure_preservation() {
         let cases = [
-            "CC", "C=C", "C#C", "C1CCCCC1", "c1ccccc1", "CC(=O)O",
-            "c1ccncc1", "c1ccc2ccccc2c1", "[Fe]", "[Na+].[Cl-]",
+            "CC",
+            "C=C",
+            "C#C",
+            "C1CCCCC1",
+            "c1ccccc1",
+            "CC(=O)O",
+            "c1ccncc1",
+            "c1ccc2ccccc2c1",
+            "[Fe]",
+            "[Na+].[Cl-]",
         ];
         for smiles in &cases {
             let (m1, m2, _) = canonical_round_trip(smiles);
@@ -1125,9 +1158,7 @@ mod tests {
 
     #[test]
     fn canonical_idempotent() {
-        let cases = [
-            "CCO", "c1ccccc1", "CC(=O)O", "[Na+].[Cl-]", "c1ccncc1",
-        ];
+        let cases = ["CCO", "c1ccccc1", "CC(=O)O", "[Na+].[Cl-]", "c1ccncc1"];
         for smiles in &cases {
             let first = canonical(smiles);
             let second = canonical(&first);
@@ -1142,7 +1173,10 @@ mod tests {
         let canon = to_canonical_smiles(&mol);
         let reparsed = from_smiles(&canon).unwrap();
         let canon2 = to_canonical_smiles(&reparsed);
-        assert_eq!(canon, canon2, "inositol round-trip: '{canon}' vs '{canon2}'");
+        assert_eq!(
+            canon, canon2,
+            "inositol round-trip: '{canon}' vs '{canon2}'"
+        );
     }
 
     #[test]
@@ -1188,10 +1222,7 @@ mod tests {
 
     #[test]
     fn canonical_triene_idempotent() {
-        let cases = [
-            r"F/C=C\C=C/C=C\F",
-            r"F/C=C/C=C\C=C/F",
-        ];
+        let cases = [r"F/C=C\C=C/C=C\F", r"F/C=C/C=C\C=C/F"];
         for smi in &cases {
             let mol = from_smiles(smi).unwrap();
             let c1 = to_canonical_smiles(&mol);
@@ -1223,10 +1254,7 @@ mod tests {
     #[test]
     fn canonical_conjugated_diene_permutation_invariant() {
         use crate::graph_ops::renumber_atoms;
-        let cases = [
-            r"F/C=C/C=C\F",
-            r"F/C=C\C=C\F",
-        ];
+        let cases = [r"F/C=C/C=C\F", r"F/C=C\C=C\F"];
         for smi in &cases {
             let mol = from_smiles(smi).unwrap();
             let c1 = to_canonical_smiles(&mol);
@@ -1235,7 +1263,10 @@ mod tests {
                 let perm: Vec<usize> = (0..n).map(|i| (i + offset) % n).collect();
                 let renum = renumber_atoms(&mol, &perm).unwrap();
                 let c2 = to_canonical_smiles(&renum);
-                assert_eq!(c1, c2, "permutation invariance failed for {smi} offset {offset}: '{c1}' vs '{c2}'");
+                assert_eq!(
+                    c1, c2,
+                    "permutation invariance failed for {smi} offset {offset}: '{c1}' vs '{c2}'"
+                );
             }
         }
     }

@@ -5,8 +5,7 @@ use petgraph::graph::NodeIndex;
 use crate::canonical::canonical_ordering;
 use crate::mol::{AtomId, EZStereo, Mol, TetrahedralStereo};
 use crate::traits::{
-    HasAromaticity, HasAtomicNum, HasBondOrder,
-    HasFormalCharge, HasHydrogenCount, HasIsotope,
+    HasAromaticity, HasAtomicNum, HasBondOrder, HasFormalCharge, HasHydrogenCount, HasIsotope,
 };
 
 pub fn adjacency_matrix<A, B>(mol: &Mol<A, B>) -> Vec<Vec<bool>> {
@@ -110,9 +109,7 @@ pub fn num_components<A, B>(mol: &Mol<A, B>) -> usize {
     connected_components(mol).len()
 }
 
-pub fn get_fragments<A: Clone, B: Clone>(
-    mol: &Mol<A, B>,
-) -> Vec<Mol<A, B>> {
+pub fn get_fragments<A: Clone, B: Clone>(mol: &Mol<A, B>) -> Vec<Mol<A, B>> {
     let components = connected_components(mol);
     let mut fragments = Vec::with_capacity(components.len());
     for component in &components {
@@ -251,27 +248,33 @@ fn remap_ez_stereo(s: &EZStereo, old_to_new: &[NodeIndex]) -> EZStereo {
     let new_a = old_to_new[s.bond.0.index()];
     let new_b = old_to_new[s.bond.1.index()];
     let (lo, hi, refs) = if new_a.index() < new_b.index() {
-        (new_a, new_b, [
-            remap_atom_id(s.refs[0], old_to_new),
-            remap_atom_id(s.refs[1], old_to_new),
-        ])
+        (
+            new_a,
+            new_b,
+            [
+                remap_atom_id(s.refs[0], old_to_new),
+                remap_atom_id(s.refs[1], old_to_new),
+            ],
+        )
     } else {
-        (new_b, new_a, [
-            remap_atom_id(s.refs[1], old_to_new),
-            remap_atom_id(s.refs[0], old_to_new),
-        ])
+        (
+            new_b,
+            new_a,
+            [
+                remap_atom_id(s.refs[1], old_to_new),
+                remap_atom_id(s.refs[0], old_to_new),
+            ],
+        )
     };
-    EZStereo { bond: (lo, hi), refs }
+    EZStereo {
+        bond: (lo, hi),
+        refs,
+    }
 }
 
 pub fn renumber_atoms_canonical<A, B>(mol: &Mol<A, B>) -> Mol<A, B>
 where
-    A: HasAtomicNum
-        + HasFormalCharge
-        + HasHydrogenCount
-        + HasIsotope
-        + HasAromaticity
-        + Clone,
+    A: HasAtomicNum + HasFormalCharge + HasHydrogenCount + HasIsotope + HasAromaticity + Clone,
     B: HasBondOrder + Clone,
 {
     let n = mol.atom_count();
@@ -306,10 +309,7 @@ mod tests {
         assert_eq!(renum.atom_count(), mol.atom_count());
         assert_eq!(renum.bond_count(), mol.bond_count());
         for i in 0..mol.atom_count() {
-            assert_eq!(
-                renum.atom(n(i)).atomic_num,
-                mol.atom(n(i)).atomic_num
-            );
+            assert_eq!(renum.atom(n(i)).atomic_num, mol.atom(n(i)).atomic_num);
         }
     }
 
@@ -343,13 +343,45 @@ mod tests {
     #[test]
     fn renumber_preserves_ez_stereo() {
         let mut mol = Mol::new();
-        let c0 = mol.add_atom(Atom { atomic_num: 6, hydrogen_count: 1, ..Atom::default() });
-        let c1 = mol.add_atom(Atom { atomic_num: 6, hydrogen_count: 1, ..Atom::default() });
-        let f2 = mol.add_atom(Atom { atomic_num: 9, ..Atom::default() });
-        let cl3 = mol.add_atom(Atom { atomic_num: 17, ..Atom::default() });
-        mol.add_bond(c0, c1, Bond { order: BondOrder::Double });
-        mol.add_bond(c0, f2, Bond { order: BondOrder::Single });
-        mol.add_bond(c1, cl3, Bond { order: BondOrder::Single });
+        let c0 = mol.add_atom(Atom {
+            atomic_num: 6,
+            hydrogen_count: 1,
+            ..Atom::default()
+        });
+        let c1 = mol.add_atom(Atom {
+            atomic_num: 6,
+            hydrogen_count: 1,
+            ..Atom::default()
+        });
+        let f2 = mol.add_atom(Atom {
+            atomic_num: 9,
+            ..Atom::default()
+        });
+        let cl3 = mol.add_atom(Atom {
+            atomic_num: 17,
+            ..Atom::default()
+        });
+        mol.add_bond(
+            c0,
+            c1,
+            Bond {
+                order: BondOrder::Double,
+            },
+        );
+        mol.add_bond(
+            c0,
+            f2,
+            Bond {
+                order: BondOrder::Single,
+            },
+        );
+        mol.add_bond(
+            c1,
+            cl3,
+            Bond {
+                order: BondOrder::Single,
+            },
+        );
         // Trans(f2, cl3) → store cis pair: f2 is neighbor of c0, virtualH is the OTHER neighbor of c1
         // For trans, the cis pair is (f2, VirtualH(c1, 0))
         mol.add_ez_stereo(EZStereo {
@@ -391,10 +423,22 @@ mod tests {
             hydrogen_count: 0,
             ..Atom::default()
         });
-        let f = mol.add_atom(Atom { atomic_num: 9, ..Atom::default() });
-        let cl = mol.add_atom(Atom { atomic_num: 17, ..Atom::default() });
-        let br = mol.add_atom(Atom { atomic_num: 35, ..Atom::default() });
-        let iodine = mol.add_atom(Atom { atomic_num: 53, ..Atom::default() });
+        let f = mol.add_atom(Atom {
+            atomic_num: 9,
+            ..Atom::default()
+        });
+        let cl = mol.add_atom(Atom {
+            atomic_num: 17,
+            ..Atom::default()
+        });
+        let br = mol.add_atom(Atom {
+            atomic_num: 35,
+            ..Atom::default()
+        });
+        let iodine = mol.add_atom(Atom {
+            atomic_num: 53,
+            ..Atom::default()
+        });
         mol.add_bond(c, f, Bond::default());
         mol.add_bond(c, cl, Bond::default());
         mol.add_bond(c, br, Bond::default());
@@ -432,7 +476,10 @@ mod tests {
         assert!(result.is_err());
         assert!(matches!(
             result.unwrap_err(),
-            RenumberError::LengthMismatch { expected: 2, got: 3 }
+            RenumberError::LengthMismatch {
+                expected: 2,
+                got: 3
+            }
         ));
     }
 

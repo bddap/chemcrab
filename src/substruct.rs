@@ -44,10 +44,7 @@ where
     Vf2::new(target, query, default_atom_match, default_bond_match).find_all()
 }
 
-pub fn get_substruct_matches_unique<A, B>(
-    target: &Mol<A, B>,
-    query: &Mol<A, B>,
-) -> Vec<AtomMapping>
+pub fn get_substruct_matches_unique<A, B>(target: &Mol<A, B>, query: &Mol<A, B>) -> Vec<AtomMapping>
 where
     A: HasAtomicNum + HasAromaticity + HasFormalCharge,
     B: HasBondOrder,
@@ -165,9 +162,7 @@ where
         bond_match: FB,
     ) -> Self {
         let mut query_order: Vec<NodeIndex> = query.atoms().collect();
-        query_order.sort_by(|&a, &b| {
-            query.neighbors(b).count().cmp(&query.neighbors(a).count())
-        });
+        query_order.sort_by(|&a, &b| query.neighbors(b).count().cmp(&query.neighbors(a).count()));
         Self {
             target,
             query,
@@ -191,12 +186,7 @@ where
         results
     }
 
-    fn recurse(
-        &mut self,
-        depth: usize,
-        results: &mut Vec<AtomMapping>,
-        first_only: bool,
-    ) {
+    fn recurse(&mut self, depth: usize, results: &mut Vec<AtomMapping>, first_only: bool) {
         if depth == self.query_order.len() {
             let mapping = self
                 .query_order
@@ -251,14 +241,10 @@ where
                     .expect("bond must exist between neighbors");
                 match self.target.bond_between(target_node, t_mapped) {
                     Some(t_bond) => {
-                        let target_endpoints = (
-                            self.target.atom(target_node),
-                            self.target.atom(t_mapped),
-                        );
-                        let query_endpoints = (
-                            self.query.atom(query_node),
-                            self.query.atom(q_neighbor),
-                        );
+                        let target_endpoints =
+                            (self.target.atom(target_node), self.target.atom(t_mapped));
+                        let query_endpoints =
+                            (self.query.atom(query_node), self.query.atom(q_neighbor));
                         if !(self.bond_match)(
                             self.target.bond(t_bond),
                             self.query.bond(q_bond),
@@ -302,9 +288,7 @@ where
         filter: FF,
     ) -> Self {
         let mut query_order: Vec<NodeIndex> = query.atoms().collect();
-        query_order.sort_by(|&a, &b| {
-            query.neighbors(b).count().cmp(&query.neighbors(a).count())
-        });
+        query_order.sort_by(|&a, &b| query.neighbors(b).count().cmp(&query.neighbors(a).count()));
         Self {
             target,
             query,
@@ -329,12 +313,7 @@ where
         results
     }
 
-    fn recurse(
-        &mut self,
-        depth: usize,
-        results: &mut Vec<AtomMapping>,
-        first_only: bool,
-    ) {
+    fn recurse(&mut self, depth: usize, results: &mut Vec<AtomMapping>, first_only: bool) {
         if depth == self.query_order.len() {
             let mapping: AtomMapping = self
                 .query_order
@@ -391,14 +370,10 @@ where
                     .expect("bond must exist between neighbors");
                 match self.target.bond_between(target_node, t_mapped) {
                     Some(t_bond) => {
-                        let target_endpoints = (
-                            self.target.atom(target_node),
-                            self.target.atom(t_mapped),
-                        );
-                        let query_endpoints = (
-                            self.query.atom(query_node),
-                            self.query.atom(q_neighbor),
-                        );
+                        let target_endpoints =
+                            (self.target.atom(target_node), self.target.atom(t_mapped));
+                        let query_endpoints =
+                            (self.query.atom(query_node), self.query.atom(q_neighbor));
                         if !(self.bond_match)(
                             self.target.bond(t_bond),
                             self.query.bond(q_bond),

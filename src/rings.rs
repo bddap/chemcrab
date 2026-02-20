@@ -195,10 +195,7 @@ fn bv_to_ring<A, B>(bv: &[u64], mol: &Mol<A, B>) -> Option<Vec<NodeIndex>> {
 
     loop {
         ring.push(NodeIndex::new(cur));
-        let next = adj[cur]
-            .iter()
-            .find(|&&nb| nb.index() != prev)?
-            .index();
+        let next = adj[cur].iter().find(|&&nb| nb.index() != prev)?.index();
         if next == start {
             break;
         }
@@ -303,11 +300,7 @@ fn paths_share_internal_node(path_u: &[NodeIndex], path_v: &[NodeIndex]) -> bool
     false
 }
 
-fn ring_to_edge_bitvector<A, B>(
-    ring: &[NodeIndex],
-    num_edges: usize,
-    mol: &Mol<A, B>,
-) -> Vec<u64> {
+fn ring_to_edge_bitvector<A, B>(ring: &[NodeIndex], num_edges: usize, mol: &Mol<A, B>) -> Vec<u64> {
     let num_words = num_edges.div_ceil(64);
     let mut bv = vec![0u64; num_words];
     let len = ring.len();
@@ -661,6 +654,4 @@ mod tests {
         let ri = RingInfo::symmetrized_sssr(&mol);
         assert_eq!(ri.num_rings(), 1);
     }
-
 }
-

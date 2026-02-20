@@ -37,7 +37,10 @@ pub enum RangeKind {
 #[derive(Debug, Clone, PartialEq)]
 pub enum AtomExpr {
     True,
-    Element { atomic_num: u8, aromatic: Option<bool> },
+    Element {
+        atomic_num: u8,
+        aromatic: Option<bool>,
+    },
     Aromatic,
     Aliphatic,
     Isotope(u16),
@@ -56,7 +59,11 @@ pub enum AtomExpr {
     HasHeteroNeighbor,
     HasAliphaticHeteroNeighbor,
     Hybridization(Hybridization),
-    Range { kind: RangeKind, low: Option<u8>, high: Option<u8> },
+    Range {
+        kind: RangeKind,
+        low: Option<u8>,
+        high: Option<u8>,
+    },
     InRing,
     NotInRing,
     Recursive(Mol<AtomExpr, BondExpr>),
@@ -208,10 +215,10 @@ impl AtomExpr {
     pub fn matches(&self, atom: &Atom, ctx: &MatchContext, idx: NodeIndex) -> bool {
         match self {
             AtomExpr::True => true,
-            AtomExpr::Element { atomic_num, aromatic } => {
-                atom.atomic_num == *atomic_num
-                    && aromatic.is_none_or(|a| atom.is_aromatic == a)
-            }
+            AtomExpr::Element {
+                atomic_num,
+                aromatic,
+            } => atom.atomic_num == *atomic_num && aromatic.is_none_or(|a| atom.is_aromatic == a),
             AtomExpr::Aromatic => atom.is_aromatic,
             AtomExpr::Aliphatic => !atom.is_aromatic,
             AtomExpr::Isotope(iso) => atom.isotope == *iso,
@@ -232,19 +239,15 @@ impl AtomExpr {
             AtomExpr::TotalHCount(h) => {
                 (atom.hydrogen_count + explicit_h_count(ctx.mol, idx)) == *h
             }
-            AtomExpr::ImplicitHCount(h) => {
-                atom.hydrogen_count == *h
-            }
+            AtomExpr::ImplicitHCount(h) => atom.hydrogen_count == *h,
             AtomExpr::RingMembership(n) => {
                 let count = ctx.ring_info.atom_rings(idx).len() as u8;
                 count == *n
             }
-            AtomExpr::SmallestRingSize(r) => {
-                match ctx.ring_info.smallest_ring_size(idx) {
-                    Some(size) => size as u8 == *r,
-                    None => *r == 0,
-                }
-            }
+            AtomExpr::SmallestRingSize(r) => match ctx.ring_info.smallest_ring_size(idx) {
+                Some(size) => size as u8 == *r,
+                None => *r == 0,
+            },
             AtomExpr::RingBondCount(x) => {
                 let count = ctx
                     .mol
@@ -274,9 +277,7 @@ impl AtomExpr {
                 use crate::atom::Chirality;
                 match q_chiral {
                     Chirality::None => true,
-                    Chirality::Cw | Chirality::Ccw => {
-                        ctx.mol.tetrahedral_stereo_for(idx).is_some()
-                    }
+                    Chirality::Cw | Chirality::Ccw => ctx.mol.tetrahedral_stereo_for(idx).is_some(),
                 }
             }
             AtomExpr::Recursive(ref _inner) => {
@@ -294,23 +295,18 @@ impl BondExpr {
         match self {
             BondExpr::True => true,
             BondExpr::Single => {
-                let both_aromatic =
-                    target_atoms.0.is_aromatic && target_atoms.1.is_aromatic;
+                let both_aromatic = target_atoms.0.is_aromatic && target_atoms.1.is_aromatic;
                 bond.order == BondOrder::Single && !both_aromatic
             }
             BondExpr::Double => {
-                let both_aromatic =
-                    target_atoms.0.is_aromatic && target_atoms.1.is_aromatic;
+                let both_aromatic = target_atoms.0.is_aromatic && target_atoms.1.is_aromatic;
                 bond.order == BondOrder::Double && !both_aromatic
             }
             BondExpr::Triple => bond.order == BondOrder::Triple,
-            BondExpr::Aromatic => {
-                target_atoms.0.is_aromatic && target_atoms.1.is_aromatic
-            }
+            BondExpr::Aromatic => target_atoms.0.is_aromatic && target_atoms.1.is_aromatic,
             BondExpr::Ring => false,
             BondExpr::SingleOrAromatic => {
-                let both_aromatic =
-                    target_atoms.0.is_aromatic && target_atoms.1.is_aromatic;
+                let both_aromatic = target_atoms.0.is_aromatic && target_atoms.1.is_aromatic;
                 bond.order == BondOrder::Single || both_aromatic
             }
             BondExpr::Up => bond.order == BondOrder::Single,

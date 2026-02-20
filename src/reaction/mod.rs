@@ -126,7 +126,11 @@ mod tests {
 
         let product_mol = &products[0][0];
         // CCBr -> CC + OH- -> CCO (ethanol) - 3 heavy atoms
-        assert_eq!(product_mol.atom_count(), 3, "ethanol should have 3 heavy atoms");
+        assert_eq!(
+            product_mol.atom_count(),
+            3,
+            "ethanol should have 3 heavy atoms"
+        );
     }
 
     #[test]
@@ -186,8 +190,14 @@ mod tests {
         let s = to_reaction_smarts(&rxn);
         assert!(s.contains(">>"));
         let rxn2 = from_reaction_smarts(&s).unwrap();
-        assert_eq!(rxn2.reactant_templates().len(), rxn.reactant_templates().len());
-        assert_eq!(rxn2.product_templates().len(), rxn.product_templates().len());
+        assert_eq!(
+            rxn2.reactant_templates().len(),
+            rxn.reactant_templates().len()
+        );
+        assert_eq!(
+            rxn2.product_templates().len(),
+            rxn.product_templates().len()
+        );
     }
 
     #[test]
@@ -237,7 +247,10 @@ mod tests {
         let products = rxn.run(&[&r]).unwrap();
         assert!(!products.is_empty());
         let product = &products[0][0];
-        let o_idx = product.atoms().find(|&i| product.atom(i).atomic_num == 8).unwrap();
+        let o_idx = product
+            .atoms()
+            .find(|&i| product.atom(i).atomic_num == 8)
+            .unwrap();
         assert_eq!(product.atom(o_idx).formal_charge, -1);
     }
 
@@ -250,7 +263,10 @@ mod tests {
         let product = &products[0][0];
         assert_eq!(product.atom_count(), 2);
         let c_idx = product.atoms().find(|&i| product.atom(i).atomic_num == 6);
-        assert!(c_idx.is_some(), "unmapped carbon should be created in product");
+        assert!(
+            c_idx.is_some(),
+            "unmapped carbon should be created in product"
+        );
     }
 
     #[test]
@@ -274,7 +290,10 @@ mod tests {
         let rxn = from_reaction_smarts("[C:1][Br:2]>>[C:1][OH]").unwrap();
         let r = mol("BrCCBr");
         let products = rxn.run(&[&r]).unwrap();
-        assert!(products.len() >= 2, "two C-Br bonds should give at least 2 match results");
+        assert!(
+            products.len() >= 2,
+            "two C-Br bonds should give at least 2 match results"
+        );
     }
 
     #[test]
@@ -288,10 +307,7 @@ mod tests {
 
     #[test]
     fn aromatic_substitution_kekulized_bonds() {
-        let rxn = from_reaction_smarts(
-            "[c:1][Br:2].[OH-:3]>>[c:1][O:3].[Br-:2]",
-        )
-        .unwrap();
+        let rxn = from_reaction_smarts("[c:1][Br:2].[OH-:3]>>[c:1][O:3].[Br-:2]").unwrap();
         let reactant = mol("c1ccc(Br)cc1");
         let hydroxide = mol("[OH-]");
         let products = rxn.run(&[&reactant, &hydroxide]).unwrap();
@@ -319,13 +335,27 @@ mod tests {
         for edge in phenol.bonds() {
             let order = phenol.bond(edge).order;
             assert!(
-                order == BondOrder::Single || order == BondOrder::Double || order == BondOrder::Triple,
+                order == BondOrder::Single
+                    || order == BondOrder::Double
+                    || order == BondOrder::Triple,
                 "no bond should remain un-kekulized"
             );
         }
-        let single_count = phenol.bonds().filter(|&e| phenol.bond(e).order == BondOrder::Single).count();
-        let double_count = phenol.bonds().filter(|&e| phenol.bond(e).order == BondOrder::Double).count();
-        assert!(double_count >= 3, "ring should have at least 3 double bonds, got {double_count}");
-        assert!(single_count >= 1, "should have at least 1 single bond (C-O), got {single_count}");
+        let single_count = phenol
+            .bonds()
+            .filter(|&e| phenol.bond(e).order == BondOrder::Single)
+            .count();
+        let double_count = phenol
+            .bonds()
+            .filter(|&e| phenol.bond(e).order == BondOrder::Double)
+            .count();
+        assert!(
+            double_count >= 3,
+            "ring should have at least 3 double bonds, got {double_count}"
+        );
+        assert!(
+            single_count >= 1,
+            "should have at least 1 single bond (C-O), got {single_count}"
+        );
     }
 }

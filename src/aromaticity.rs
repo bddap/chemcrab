@@ -175,14 +175,11 @@ where
         }
     }
 
-    ring.iter().all(|&atom_idx| is_sp2_in_fused_system(mol, atom_idx, aromatic))
+    ring.iter()
+        .all(|&atom_idx| is_sp2_in_fused_system(mol, atom_idx, aromatic))
 }
 
-fn is_sp2_in_fused_system<A, B>(
-    mol: &Mol<A, B>,
-    atom_idx: NodeIndex,
-    aromatic: &[bool],
-) -> bool
+fn is_sp2_in_fused_system<A, B>(mol: &Mol<A, B>, atom_idx: NodeIndex, aromatic: &[bool]) -> bool
 where
     A: HasAtomicNum + HasFormalCharge + HasHydrogenCount,
     B: HasBondOrder,
@@ -371,7 +368,11 @@ where
 }
 
 fn ring_neighbor_count(ring: &[NodeIndex]) -> u8 {
-    if ring.len() > 1 { 2 } else { 0 }
+    if ring.len() > 1 {
+        2
+    } else {
+        0
+    }
 }
 
 fn is_huckel(pi_electrons: u8) -> bool {
@@ -494,11 +495,7 @@ mod tests {
             } else {
                 BondOrder::Single
             };
-            mol.add_bond(
-                atoms[i],
-                atoms[(i + 1) % 6],
-                Bond { order },
-            );
+            mol.add_bond(atoms[i], atoms[(i + 1) % 6], Bond { order });
         }
 
         for idx in mol.atoms() {
@@ -540,7 +537,6 @@ mod tests {
         );
     }
 
-
     #[test]
     fn pyrene_all_aromatic() {
         let mol = from_smiles("c1cc2ccc3cccc4ccc(c1)c2c34").unwrap();
@@ -570,7 +566,10 @@ mod tests {
         let canonical = crate::to_canonical_smiles(&mol);
         let mol2 = from_smiles(&canonical).unwrap();
         let canonical2 = crate::to_canonical_smiles(&mol2);
-        assert_eq!(canonical, canonical2, "pyrene canonical SMILES not idempotent");
+        assert_eq!(
+            canonical, canonical2,
+            "pyrene canonical SMILES not idempotent"
+        );
     }
 
     #[test]

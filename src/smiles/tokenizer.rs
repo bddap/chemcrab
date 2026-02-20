@@ -230,10 +230,7 @@ fn try_consume_pending_bond(tokens: &mut Vec<Token>) -> Option<BondToken> {
     None
 }
 
-fn parse_percent_ring(
-    chars: &[char],
-    start: usize,
-) -> Result<(u16, usize), SmilesError> {
+fn parse_percent_ring(chars: &[char], start: usize) -> Result<(u16, usize), SmilesError> {
     let i = start + 1;
     if i + 1 >= chars.len() || !chars[i].is_ascii_digit() || !chars[i + 1].is_ascii_digit() {
         return Err(SmilesError::UnexpectedChar {
@@ -305,9 +302,7 @@ fn parse_bracket_element(
     bracket_start: usize,
 ) -> Result<(Element, bool), SmilesError> {
     if *i >= chars.len() {
-        return Err(SmilesError::UnclosedBracket {
-            pos: bracket_start,
-        });
+        return Err(SmilesError::UnclosedBracket { pos: bracket_start });
     }
 
     let aromatic_map: &[(&str, Element)] = &[
@@ -520,19 +515,13 @@ mod tests {
     fn tokenize_ring_closure() {
         let tokens = tokenize("C1CC1").unwrap();
         assert_eq!(tokens.len(), 5);
-        assert!(matches!(
-            &tokens[1],
-            Token::RingClosure { digit: 1, .. }
-        ));
+        assert!(matches!(&tokens[1], Token::RingClosure { digit: 1, .. }));
     }
 
     #[test]
     fn tokenize_percent_ring() {
         let tokens = tokenize("C%10CC%10").unwrap();
-        assert!(matches!(
-            &tokens[1],
-            Token::RingClosure { digit: 10, .. }
-        ));
+        assert!(matches!(&tokens[1], Token::RingClosure { digit: 10, .. }));
     }
 
     #[test]

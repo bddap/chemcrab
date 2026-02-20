@@ -115,7 +115,11 @@ pub fn build_parse_tree(tokens: &[Token]) -> Result<ParseTree, SmilesError> {
                 stack.push(cur);
             }
             Token::CloseParen(pos) => {
-                current = Some(stack.pop().ok_or(SmilesError::UnmatchedParen { pos: *pos })?);
+                current = Some(
+                    stack
+                        .pop()
+                        .ok_or(SmilesError::UnmatchedParen { pos: *pos })?,
+                );
                 pending_bond = None;
             }
             Token::Dot(_) => {
@@ -126,9 +130,7 @@ pub fn build_parse_tree(tokens: &[Token]) -> Result<ParseTree, SmilesError> {
     }
 
     if !stack.is_empty() {
-        return Err(SmilesError::UnmatchedParen {
-            pos: 0,
-        });
+        return Err(SmilesError::UnmatchedParen { pos: 0 });
     }
 
     for (digit, entry) in ring_opens.iter().enumerate() {

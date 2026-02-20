@@ -9,7 +9,10 @@ pub enum ReactionSmartsError {
     TooManySeparators,
     EmptyReactants,
     EmptyProducts,
-    InvalidComponent { section: &'static str, detail: SmartsError },
+    InvalidComponent {
+        section: &'static str,
+        detail: SmartsError,
+    },
 }
 
 impl fmt::Display for ReactionSmartsError {
@@ -46,7 +49,10 @@ impl fmt::Display for ReactionError {
                 write!(f, "match combination count exceeds limit")
             }
             Self::DuplicateAtomMap { map_num } => {
-                write!(f, "duplicate atom map number {map_num} in reactant templates")
+                write!(
+                    f,
+                    "duplicate atom map number {map_num} in reactant templates"
+                )
             }
             Self::Kekulize(e) => write!(f, "product kekulization failed: {e}"),
         }

@@ -1,4 +1,4 @@
-use chemcrab::{from_smiles, to_canonical_smiles, renumber_atoms};
+use chemcrab::{from_smiles, renumber_atoms, to_canonical_smiles};
 
 fn canonical(smiles: &str) -> String {
     let mol = from_smiles(smiles).unwrap();
@@ -123,5 +123,8 @@ fn caffeine_kekule_vs_aromatic() {
 fn glucose_idempotence() {
     let first = canonical("OC[C@H]1OC(O)[C@H](O)[C@@H](O)[C@@H]1O");
     let second = canonical(&first);
-    assert_eq!(first, second, "glucose idempotence: '{first}' vs '{second}'");
+    assert_eq!(
+        first, second,
+        "glucose idempotence: '{first}' vs '{second}'"
+    );
 }

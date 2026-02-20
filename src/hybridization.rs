@@ -2,7 +2,9 @@ use petgraph::graph::NodeIndex;
 
 use crate::element::outer_shell_electrons;
 use crate::mol::Mol;
-use crate::traits::{HasAromaticity, HasAtomicNum, HasBondOrder, HasFormalCharge, HasHydrogenCount};
+use crate::traits::{
+    HasAromaticity, HasAtomicNum, HasBondOrder, HasFormalCharge, HasHydrogenCount,
+};
 use crate::valence::total_valence;
 use crate::wrappers::Hybridization;
 
@@ -231,7 +233,7 @@ mod tests {
     fn sodium_chloride() {
         let h = hyb("[Cl-].[Na+]");
         assert_eq!(h[0], SP3); // Cl-
-        assert_eq!(h[1], S);   // Na+
+        assert_eq!(h[1], S); // Na+
     }
 
     #[test]
