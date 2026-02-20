@@ -4,7 +4,7 @@ use petgraph::graph::NodeIndex;
 
 use crate::bond::BondStereo;
 use crate::canonical::canonical_ordering;
-use crate::mol::{AtomId, Mol};
+use crate::mol::{AtomId, Mol, TetrahedralStereo};
 use crate::traits::{
     HasAromaticity, HasAtomicNum, HasBondOrder, HasBondStereoMut,
     HasFormalCharge, HasHydrogenCount, HasIsotope,
@@ -140,11 +140,11 @@ pub fn get_fragments<A: Clone, B: Clone + HasBondStereoMut>(
         let remapped_stereo = mol
             .tetrahedral_stereo()
             .iter()
-            .filter(|s| match s[0] {
-                AtomId::Node(idx) => component.contains(&idx),
-                AtomId::VirtualH(parent, _) => component.contains(&parent),
+            .filter(|s| component.contains(&s.center))
+            .map(|s| TetrahedralStereo {
+                center: index_map[s.center.index()],
+                above: s.above.map(|aid| remap_atom_id(aid, &index_map)),
             })
-            .map(|s| s.map(|aid| remap_atom_id(aid, &index_map)))
             .collect();
         frag.set_tetrahedral_stereo(remapped_stereo);
         fragments.push(frag);
@@ -221,7 +221,10 @@ pub fn renumber_atoms<A: Clone, B: HasBondStereoMut + Clone>(
     let remapped_stereo = mol
         .tetrahedral_stereo()
         .iter()
-        .map(|s| s.map(|aid| remap_atom_id(aid, &old_to_new_nodes)))
+        .map(|s| TetrahedralStereo {
+            center: old_to_new_nodes[s.center.index()],
+            above: s.above.map(|aid| remap_atom_id(aid, &old_to_new_nodes)),
+        })
         .collect();
     new_mol.set_tetrahedral_stereo(remapped_stereo);
 
@@ -279,7 +282,7 @@ mod tests {
     use super::*;
     use crate::atom::Atom;
     use crate::bond::{Bond, BondOrder, BondStereo};
-    use crate::mol::AtomId;
+    use crate::mol::{AtomId, TetrahedralStereo};
     use crate::smiles::{from_smiles, to_canonical_smiles};
 
     fn n(i: usize) -> NodeIndex {
@@ -391,12 +394,15 @@ mod tests {
         mol.add_bond(c, cl, Bond::default());
         mol.add_bond(c, br, Bond::default());
         mol.add_bond(c, iodine, Bond::default());
-        mol.add_tetrahedral_stereo([
-            AtomId::Node(c),
-            AtomId::Node(f),
-            AtomId::Node(cl),
-            AtomId::Node(br),
-        ]);
+        mol.add_tetrahedral_stereo(TetrahedralStereo {
+            center: c,
+            above: [
+                AtomId::Node(iodine),
+                AtomId::Node(f),
+                AtomId::Node(cl),
+                AtomId::Node(br),
+            ],
+        });
 
         // Identity renumber preserves chirality
         let id_order: Vec<usize> = (0..5).collect();

@@ -287,46 +287,13 @@ fn validate_chirality(
             continue;
         }
 
-        // Build the target's stored CCW triple
-        let stored_three: Vec<NeighborRef> = target_stereo[1..4]
+        let target_full: Vec<NeighborRef> = target_stereo.above
             .iter()
             .map(|aid| match aid {
                 AtomId::Node(idx) => NeighborRef::Atom(*idx),
                 AtomId::VirtualH(_, _) => NeighborRef::ImplicitH,
             })
             .collect();
-
-        // Find the target's excluded neighbor (the 4th not in stored_three)
-        let t_atom = target.atom(t_idx);
-        let all_target_neighbors: Vec<NeighborRef> = {
-            let mut v: Vec<NeighborRef> = target
-                .neighbors(t_idx)
-                .map(NeighborRef::Atom)
-                .collect();
-            for _ in 0..t_atom.hydrogen_count {
-                v.push(NeighborRef::ImplicitH);
-            }
-            v
-        };
-        let target_excluded = all_target_neighbors
-            .iter()
-            .find(|n| !stored_three.contains(n))
-            .copied();
-
-        // Build full 4-tuples for comparison: [excluded, ccw0, ccw1, ccw2].
-        // The parity of the permutation between the two 4-tuples tells us
-        // if they represent the same enantiomer (even) or opposite (odd).
-
-        // Target's full tuple: [excluded, stored[0], stored[1], stored[2]]
-        let target_full: Vec<NeighborRef> = {
-            let mut v = Vec::with_capacity(4);
-            // Use a sentinel for 3-neighbor case where there's no real excluded
-            if let Some(excl) = target_excluded {
-                v.push(excl);
-            }
-            v.extend_from_slice(&stored_three);
-            v
-        };
 
         // Query's full tuple from its perspective.
         // Ccw (@): looking from first mapped neighbor, the rest wind CCW.
@@ -352,19 +319,21 @@ fn validate_chirality(
         };
 
         if target_full.len() != query_full.len() {
-            // Different number of neighbors — can still compare if query is a subset.
-            // For now, if sizes differ, check the 3-neighbor overlap.
             if mapped.len() < target_full.len() {
-                // Query has fewer neighbors. Extract the 3 that overlap with stored_three.
-                let query_three: Vec<NeighborRef> = query_full
+                let target_overlap: Vec<NeighborRef> = target_full
                     .iter()
-                    .filter(|n| stored_three.contains(n))
+                    .filter(|n| query_full.contains(n))
                     .copied()
                     .collect();
-                if query_three.len() != 3 {
+                let query_overlap: Vec<NeighborRef> = query_full
+                    .iter()
+                    .filter(|n| target_full.contains(n))
+                    .copied()
+                    .collect();
+                if target_overlap.len() != query_overlap.len() || target_overlap.len() < 3 {
                     continue;
                 }
-                let even = permutation_parity(&stored_three, &query_three);
+                let even = permutation_parity(&target_overlap, &query_overlap);
                 if !even {
                     return false;
                 }

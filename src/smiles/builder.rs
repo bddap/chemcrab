@@ -3,7 +3,7 @@ use petgraph::graph::NodeIndex;
 use crate::atom::Atom;
 use crate::bond::{BondStereo, SmilesBond, SmilesBondOrder};
 use crate::element::Element;
-use crate::mol::{AtomId, Mol};
+use crate::mol::{AtomId, Mol, TetrahedralStereo};
 use crate::smiles::parse_tree::{ParseAtom, ParseTree};
 use crate::smiles::tokenizer::{BondToken, ChiralityToken};
 
@@ -107,25 +107,16 @@ fn resolve_chirality(mol: &mut Mol<Atom, SmilesBond>, tree: &ParseTree, indices:
             continue;
         }
 
-        // Our storage convention: [center, n1, n2, n3] where n1,n2,n3 wind CCW
-        // from the excluded viewpoint.
-        //
-        // 4 neighbors: smiles_order[0] is the prime (excluded) neighbor.
-        //   @ → n1,n2,n3 = smiles_order[1..4] wind CCW from prime.
-        //   @@ → swap two to flip winding.
-        //
-        // 3 neighbors: the excluded viewpoint is the implicit viewer direction
-        //   (no atom to reference). @ → the 3 neighbors wind CCW from viewer.
-        let mut stereo = if smiles_order.len() >= 4 {
+        let mut above = if smiles_order.len() >= 4 {
             [
-                AtomId::Node(center),
+                smiles_order[0],
                 smiles_order[1],
                 smiles_order[2],
                 smiles_order[3],
             ]
         } else {
             [
-                AtomId::Node(center),
+                AtomId::VirtualH(center, 0),
                 smiles_order[0],
                 smiles_order[1],
                 smiles_order[2],
@@ -133,10 +124,13 @@ fn resolve_chirality(mol: &mut Mol<Atom, SmilesBond>, tree: &ParseTree, indices:
         };
 
         if parse_atom.chirality == ChiralityToken::Clockwise {
-            stereo.swap(2, 3);
+            above.swap(2, 3);
         }
 
-        mol.add_tetrahedral_stereo(stereo);
+        mol.add_tetrahedral_stereo(TetrahedralStereo {
+            center,
+            above,
+        });
     }
 }
 

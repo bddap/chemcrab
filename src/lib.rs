@@ -37,7 +37,7 @@ pub use graph_ops::{
 };
 pub use hydrogen::{add_hs, remove_hs, remove_hs_with, RemoveHsOptions};
 pub use kekulize::{kekulize, KekulizeError};
-pub use mol::{AtomId, Mol};
+pub use mol::{AtomId, Mol, TetrahedralStereo};
 pub use reaction::{
     extract_atom_map_num, from_reaction_smarts, to_reaction_smarts, Reaction, ReactionError,
     ReactionSmartsError,

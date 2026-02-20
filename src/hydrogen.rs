@@ -2,7 +2,7 @@ use petgraph::graph::NodeIndex;
 
 use crate::atom::Atom;
 use crate::bond::{Bond, BondOrder, BondStereo};
-use crate::mol::{AtomId, Mol};
+use crate::mol::{AtomId, Mol, TetrahedralStereo};
 
 fn remap_stereo(stereo: BondStereo, map: &dyn Fn(NodeIndex) -> Option<NodeIndex>) -> BondStereo {
     match stereo {
@@ -30,7 +30,10 @@ fn stereo_referenced_atoms(mol: &Mol<Atom, Bond>) -> Vec<bool> {
         }
     }
     for stereo in mol.tetrahedral_stereo() {
-        for aid in stereo {
+        if stereo.center.index() < referenced.len() {
+            referenced[stereo.center.index()] = true;
+        }
+        for aid in &stereo.above {
             if let AtomId::Node(idx) = aid {
                 if idx.index() < referenced.len() {
                     referenced[idx.index()] = true;
@@ -92,11 +95,12 @@ pub fn add_hs(mol: &Mol<Atom, Bond>) -> Mol<Atom, Bond> {
         new_h_map[idx] = first_h;
     }
 
-    let new_stereo: Vec<[AtomId; 4]> = mol
+    let new_stereo: Vec<TetrahedralStereo> = mol
         .tetrahedral_stereo()
         .iter()
-        .map(|s| {
-            s.map(|aid| match aid {
+        .map(|s| TetrahedralStereo {
+            center: index_map[s.center.index()],
+            above: s.above.map(|aid| match aid {
                 AtomId::Node(idx) => AtomId::Node(index_map[idx.index()]),
                 AtomId::VirtualH(parent, _) => {
                     match new_h_map[parent.index()] {
@@ -104,7 +108,7 @@ pub fn add_hs(mol: &Mol<Atom, Bond>) -> Mol<Atom, Bond> {
                         None => aid,
                     }
                 }
-            })
+            }),
         })
         .collect();
     result.set_tetrahedral_stereo(new_stereo);
@@ -173,30 +177,32 @@ pub fn remove_hs_with(mol: &Mol<Atom, Bond>, opts: &RemoveHsOptions) -> Mol<Atom
         }
     }
 
-    let new_stereo: Vec<[AtomId; 4]> = mol
+    let remap_aid = |aid: AtomId| -> Option<AtomId> {
+        match aid {
+            AtomId::Node(idx) => {
+                if removable[idx.index()] {
+                    let parent = mol.neighbors(idx).next()?;
+                    Some(AtomId::VirtualH(index_map[parent.index()]?, 0))
+                } else {
+                    Some(AtomId::Node(index_map[idx.index()]?))
+                }
+            }
+            AtomId::VirtualH(parent, n) => {
+                Some(AtomId::VirtualH(index_map[parent.index()]?, n))
+            }
+        }
+    };
+
+    let new_stereo: Vec<TetrahedralStereo> = mol
         .tetrahedral_stereo()
         .iter()
         .filter_map(|s| {
-            let mapped: Option<[AtomId; 4]> = {
-                let mut arr = [AtomId::Node(NodeIndex::new(0)); 4];
-                for (i, &aid) in s.iter().enumerate() {
-                    arr[i] = match aid {
-                        AtomId::Node(idx) => {
-                            if removable[idx.index()] {
-                                let parent = mol.neighbors(idx).next()?;
-                                AtomId::VirtualH(index_map[parent.index()]?, 0)
-                            } else {
-                                AtomId::Node(index_map[idx.index()]?)
-                            }
-                        }
-                        AtomId::VirtualH(parent, n) => {
-                            AtomId::VirtualH(index_map[parent.index()]?, n)
-                        }
-                    };
-                }
-                Some(arr)
-            };
-            mapped
+            let center = index_map[s.center.index()]?;
+            let mut above = [AtomId::Node(NodeIndex::new(0)); 4];
+            for (i, &aid) in s.above.iter().enumerate() {
+                above[i] = remap_aid(aid)?;
+            }
+            Some(TetrahedralStereo { center, above })
         })
         .collect();
     result.set_tetrahedral_stereo(new_stereo);
@@ -208,7 +214,7 @@ pub fn remove_hs_with(mol: &Mol<Atom, Bond>, opts: &RemoveHsOptions) -> Mol<Atom
 mod tests {
     use super::*;
     use crate::bond::SmilesBondOrder;
-    use crate::mol::AtomId;
+    use crate::mol::{AtomId, TetrahedralStereo};
     use crate::smiles::{from_smiles, parse_smiles, to_smiles};
     use crate::SmilesBond;
     use petgraph::graph::NodeIndex;
@@ -318,12 +324,15 @@ mod tests {
             mol.add_bond(c, nbr, Bond::default());
             ns.push(nbr);
         }
-        mol.add_tetrahedral_stereo([
-            AtomId::Node(c),
-            AtomId::Node(ns[0]),
-            AtomId::Node(ns[1]),
-            AtomId::Node(ns[2]),
-        ]);
+        mol.add_tetrahedral_stereo(TetrahedralStereo {
+            center: c,
+            above: [
+                AtomId::Node(ns[0]),
+                AtomId::Node(ns[1]),
+                AtomId::Node(ns[2]),
+                AtomId::Node(ns[3]),
+            ],
+        });
         let explicit = add_hs(&mol);
         assert!(explicit.tetrahedral_stereo_for(n(0)).is_some());
     }
@@ -345,16 +354,19 @@ mod tests {
             mol.add_bond(c, nbr, Bond::default());
             ns.push(nbr);
         }
-        mol.add_tetrahedral_stereo([
-            AtomId::Node(c),
-            AtomId::Node(ns[0]),
-            AtomId::Node(ns[1]),
-            AtomId::VirtualH(c, 0),
-        ]);
+        mol.add_tetrahedral_stereo(TetrahedralStereo {
+            center: c,
+            above: [
+                AtomId::VirtualH(c, 0),
+                AtomId::Node(ns[0]),
+                AtomId::Node(ns[1]),
+                AtomId::Node(ns[2]),
+            ],
+        });
         let explicit = add_hs(&mol);
         let stereo = explicit.tetrahedral_stereo_for(n(0)).expect("chirality should exist");
         assert!(
-            stereo.iter().all(|id| matches!(id, AtomId::Node(_))),
+            stereo.above.iter().all(|id| matches!(id, AtomId::Node(_))),
             "VirtualH should have been replaced with Node"
         );
     }
@@ -376,12 +388,15 @@ mod tests {
             mol.add_bond(c, nbr, Bond::default());
             ns.push(nbr);
         }
-        mol.add_tetrahedral_stereo([
-            AtomId::Node(c),
-            AtomId::Node(ns[0]),
-            AtomId::Node(ns[1]),
-            AtomId::Node(ns[2]),
-        ]);
+        mol.add_tetrahedral_stereo(TetrahedralStereo {
+            center: c,
+            above: [
+                AtomId::Node(ns[0]),
+                AtomId::Node(ns[1]),
+                AtomId::Node(ns[2]),
+                AtomId::Node(ns[3]),
+            ],
+        });
         let result = remove_hs(&mol);
         assert!(result.tetrahedral_stereo_for(n(0)).is_some());
     }
@@ -403,12 +418,15 @@ mod tests {
             mol.add_bond(c, nbr, Bond::default());
             ns.push(nbr);
         }
-        mol.add_tetrahedral_stereo([
-            AtomId::Node(c),
-            AtomId::Node(ns[0]),
-            AtomId::Node(ns[1]),
-            AtomId::Node(ns[2]),
-        ]);
+        mol.add_tetrahedral_stereo(TetrahedralStereo {
+            center: c,
+            above: [
+                AtomId::Node(ns[0]),
+                AtomId::Node(ns[1]),
+                AtomId::Node(ns[2]),
+                AtomId::Node(ns[3]),
+            ],
+        });
         let explicit = add_hs(&mol);
         assert!(explicit.tetrahedral_stereo_for(n(0)).is_some());
         let collapsed = remove_hs(&explicit);
@@ -432,12 +450,15 @@ mod tests {
             mol.add_bond(c, nbr, Bond::default());
             ns.push(nbr);
         }
-        mol.add_tetrahedral_stereo([
-            AtomId::Node(c),
-            AtomId::Node(ns[0]),
-            AtomId::Node(ns[1]),
-            AtomId::VirtualH(c, 0),
-        ]);
+        mol.add_tetrahedral_stereo(TetrahedralStereo {
+            center: c,
+            above: [
+                AtomId::VirtualH(c, 0),
+                AtomId::Node(ns[0]),
+                AtomId::Node(ns[1]),
+                AtomId::Node(ns[2]),
+            ],
+        });
         let explicit = add_hs(&mol);
         assert!(explicit.tetrahedral_stereo_for(n(0)).is_some());
         let collapsed = remove_hs(&explicit);

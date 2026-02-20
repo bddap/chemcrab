@@ -155,30 +155,12 @@ where
     let mut any_stereo = false;
 
     for stereo in mol.tetrahedral_stereo() {
-        let center = match stereo[0] {
-            AtomId::Node(idx) => idx,
-            _ => continue,
-        };
+        let center = stereo.center;
         if center.index() >= n {
             continue;
         }
 
-        let stored_three = &stereo[1..4];
-
-        let mut all_neighbors: Vec<AtomId> = mol
-            .neighbors(center)
-            .map(AtomId::Node)
-            .collect();
-        for i in 0..mol.atom(center).hydrogen_count() {
-            all_neighbors.push(AtomId::VirtualH(center, i));
-        }
-
-        let excluded = match all_neighbors.iter().find(|id| !stored_three.contains(id)) {
-            Some(&id) => id,
-            None => continue,
-        };
-
-        let full = [excluded, stereo[1], stereo[2], stereo[3]];
+        let full = stereo.above;
 
         let rank_of = |id: &AtomId| -> usize {
             match id {

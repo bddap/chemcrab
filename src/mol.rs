@@ -7,9 +7,15 @@ pub enum AtomId {
     VirtualH(NodeIndex, u8),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct TetrahedralStereo {
+    pub center: NodeIndex,
+    pub above: [AtomId; 4],
+}
+
 pub struct Mol<A, B> {
     graph: UnGraph<A, B>,
-    tetrahedral_stereo: Vec<[AtomId; 4]>,
+    tetrahedral_stereo: Vec<TetrahedralStereo>,
 }
 
 impl<A, B> Mol<A, B> {
@@ -80,27 +86,27 @@ impl<A, B> Mol<A, B> {
         self.graph.edge_endpoints(idx)
     }
 
-    pub fn tetrahedral_stereo(&self) -> &[[AtomId; 4]] {
+    pub fn tetrahedral_stereo(&self) -> &[TetrahedralStereo] {
         &self.tetrahedral_stereo
     }
 
-    pub fn set_tetrahedral_stereo(&mut self, stereo: Vec<[AtomId; 4]>) {
+    pub fn set_tetrahedral_stereo(&mut self, stereo: Vec<TetrahedralStereo>) {
         self.tetrahedral_stereo = stereo;
     }
 
-    pub fn tetrahedral_stereo_for(&self, center: NodeIndex) -> Option<&[AtomId; 4]> {
+    pub fn tetrahedral_stereo_for(&self, center: NodeIndex) -> Option<&TetrahedralStereo> {
         self.tetrahedral_stereo
             .iter()
-            .find(|s| s[0] == AtomId::Node(center))
+            .find(|s| s.center == center)
     }
 
-    pub fn add_tetrahedral_stereo(&mut self, stereo: [AtomId; 4]) {
+    pub fn add_tetrahedral_stereo(&mut self, stereo: TetrahedralStereo) {
         self.tetrahedral_stereo.push(stereo);
     }
 
     pub fn remove_tetrahedral_stereo(&mut self, center: NodeIndex) {
         self.tetrahedral_stereo
-            .retain(|s| s[0] != AtomId::Node(center));
+            .retain(|s| s.center != center);
     }
 }
 

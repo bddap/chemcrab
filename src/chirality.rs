@@ -1,5 +1,5 @@
 use crate::atom::Atom;
-use crate::mol::{AtomId, Mol};
+use crate::mol::Mol;
 use crate::traits::HasBondOrder;
 
 pub fn cleanup_chirality<B>(mol: &mut Mol<Atom, B>)
@@ -10,10 +10,7 @@ where
         .tetrahedral_stereo()
         .iter()
         .filter_map(|s| {
-            let center = match s[0] {
-                AtomId::Node(idx) => idx,
-                _ => return Some(petgraph::graph::NodeIndex::new(usize::MAX)),
-            };
+            let center = s.center;
             let atom = mol.atom(center);
             let total_neighbors = mol.neighbors(center).count() as u8 + atom.hydrogen_count;
 
@@ -72,7 +69,7 @@ mod tests {
     use super::*;
     use crate::atom::Atom;
     use crate::bond::Bond;
-    use crate::mol::{AtomId, Mol};
+    use crate::mol::{AtomId, Mol, TetrahedralStereo};
     use crate::smiles::from_smiles;
 
     #[test]
@@ -99,12 +96,15 @@ mod tests {
             ..Atom::default()
         });
         mol.add_bond(c, f, Bond::default());
-        mol.add_tetrahedral_stereo([
-            AtomId::Node(c),
-            AtomId::Node(f),
-            AtomId::VirtualH(c, 0),
-            AtomId::VirtualH(c, 0),
-        ]);
+        mol.add_tetrahedral_stereo(TetrahedralStereo {
+            center: c,
+            above: [
+                AtomId::Node(f),
+                AtomId::VirtualH(c, 0),
+                AtomId::VirtualH(c, 0),
+                AtomId::VirtualH(c, 0),
+            ],
+        });
         // C has 1 explicit + 1 implicit H = 2 neighbors. < 3 → remove chirality.
         cleanup_chirality(&mut mol);
         assert!(mol.tetrahedral_stereo_for(c).is_none());
@@ -127,12 +127,15 @@ mod tests {
             mol.add_bond(c, f, Bond::default());
             fs.push(f);
         }
-        mol.add_tetrahedral_stereo([
-            AtomId::Node(c),
-            AtomId::Node(fs[0]),
-            AtomId::Node(fs[1]),
-            AtomId::Node(fs[2]),
-        ]);
+        mol.add_tetrahedral_stereo(TetrahedralStereo {
+            center: c,
+            above: [
+                AtomId::Node(fs[0]),
+                AtomId::Node(fs[1]),
+                AtomId::Node(fs[2]),
+                AtomId::Node(fs[3]),
+            ],
+        });
         cleanup_chirality(&mut mol);
         assert!(mol.tetrahedral_stereo_for(c).is_none());
     }
@@ -160,12 +163,15 @@ mod tests {
         mol.add_bond(c, f, Bond::default());
         mol.add_bond(c, cl, Bond::default());
         mol.add_bond(c, br, Bond::default());
-        mol.add_tetrahedral_stereo([
-            AtomId::Node(c),
-            AtomId::Node(f),
-            AtomId::Node(cl),
-            AtomId::Node(br),
-        ]);
+        mol.add_tetrahedral_stereo(TetrahedralStereo {
+            center: c,
+            above: [
+                AtomId::VirtualH(c, 0),
+                AtomId::Node(f),
+                AtomId::Node(cl),
+                AtomId::Node(br),
+            ],
+        });
         cleanup_chirality(&mut mol);
         assert!(mol.tetrahedral_stereo_for(c).is_some());
     }
@@ -187,12 +193,15 @@ mod tests {
             mol.add_bond(n, a, Bond::default());
             neighbors.push(a);
         }
-        mol.add_tetrahedral_stereo([
-            AtomId::Node(n),
-            AtomId::Node(neighbors[0]),
-            AtomId::Node(neighbors[1]),
-            AtomId::Node(neighbors[2]),
-        ]);
+        mol.add_tetrahedral_stereo(TetrahedralStereo {
+            center: n,
+            above: [
+                AtomId::Node(neighbors[0]),
+                AtomId::Node(neighbors[1]),
+                AtomId::Node(neighbors[2]),
+                AtomId::Node(neighbors[0]),
+            ],
+        });
         cleanup_chirality(&mut mol);
         assert!(mol.tetrahedral_stereo_for(n).is_some());
     }

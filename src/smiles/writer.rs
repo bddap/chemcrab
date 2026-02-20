@@ -296,8 +296,6 @@ fn resolve_chirality_for_smiles(
         None => return SmilesChirality::None,
     };
 
-    // stereo = [center, n1, n2, n3] in CCW order as viewed from excluded neighbor.
-    // Build the SMILES output neighbor order using AtomId.
     let atom = mol.atom(node);
     let has_h = atom.hydrogen_count > 0;
     let has_parent = ctx.parent[node.index()].is_some();
@@ -317,37 +315,11 @@ fn resolve_chirality_for_smiles(
         smiles_order.extend(smiles_explicit.iter().map(|&n| AtomId::Node(n)));
     }
 
-    if smiles_order.len() < 3 {
+    if smiles_order.len() < 4 {
         return SmilesChirality::None;
     }
 
-    // Build full 4-tuples: [excluded, ccw0, ccw1, ccw2] for both stored and output.
-    // The parity of the permutation between the two determines @/@@.
-    //
-    // Stored: [center, n1, n2, n3] = CCW from excluded.
-    // Full stored tuple = [excluded, n1, n2, n3].
-    let stored_three = &stereo[1..4];
-
-    let stored_full: Vec<AtomId> = if smiles_order.len() >= 4 {
-        let stored_excluded = smiles_order
-            .iter()
-            .find(|aid| !stored_three.contains(aid))
-            .copied()
-            .unwrap_or(smiles_order[0]);
-        vec![stored_excluded, stereo[1], stereo[2], stereo[3]]
-    } else {
-        vec![stereo[1], stereo[2], stereo[3]]
-    };
-
-    // Output: smiles_order[0] is the prime (excluded), the remaining 3 get written
-    // as @ (CCW) or @@ (CW). For @, the full CCW tuple = [prime, s[1], s[2], s[3]].
-    let output_ccw_full: Vec<AtomId> = smiles_order.clone();
-
-    if stored_full.len() != output_ccw_full.len() {
-        return SmilesChirality::None;
-    }
-
-    let even = permutation_parity(&stored_full, &output_ccw_full);
+    let even = permutation_parity(&stereo.above, &[smiles_order[0], smiles_order[1], smiles_order[2], smiles_order[3]]);
 
     if even {
         SmilesChirality::Ccw // @ — same chirality
@@ -620,23 +592,7 @@ mod tests {
                 AtomId::VirtualH(_, i) => (1, *i as u32),
             }
         };
-        let stored = &stereo[1..4];
-        let all_neighbors: Vec<AtomId> = {
-            let mut v: Vec<AtomId> = mol
-                .neighbors(node)
-                .map(AtomId::Node)
-                .collect();
-            for i in 0..mol.atom(node).hydrogen_count {
-                v.push(AtomId::VirtualH(node, i));
-            }
-            v
-        };
-        let excluded = all_neighbors
-            .iter()
-            .find(|id| !stored.contains(id))
-            .copied()
-            .unwrap_or(stored[0]);
-        let full = [excluded, stored[0], stored[1], stored[2]];
+        let full = stereo.above;
         let mut sorted = full;
         sorted.sort_by_key(|id| atom_id_key(id));
         let perm: Vec<usize> = full
@@ -663,10 +619,7 @@ mod tests {
 
     fn assert_same_chirality(mol1: &Mol<Atom, Bond>, mol2: &Mol<Atom, Bond>, ctx: &str) {
         for stereo in mol1.tetrahedral_stereo() {
-            let center = match stereo[0] {
-                AtomId::Node(n) => n,
-                _ => continue,
-            };
+            let center = stereo.center;
             let anum = mol1.atom(center).atomic_num;
             let center2 = mol2
                 .atoms()
