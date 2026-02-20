@@ -221,6 +221,69 @@ where
     *ranks = ranks_from_values(&values);
 }
 
+fn ez_refine<A, B>(mol: &Mol<A, B>, ranks: &mut Vec<usize>)
+where
+    A: HasHydrogenCount,
+{
+    let n = ranks.len();
+    let mut values = vec![0u64; n];
+    let mut any_stereo = false;
+
+    for ez in mol.ez_stereo() {
+        let a = ez.bond.0;
+        let b = ez.bond.1;
+        if a.index() >= n || b.index() >= n {
+            continue;
+        }
+
+        let highest_ref_a = mol.neighbors(a)
+            .filter(|&nb| nb != b)
+            .max_by_key(|nb| ranks[nb.index()]);
+        let highest_ref_b = mol.neighbors(b)
+            .filter(|&nb| nb != a)
+            .max_by_key(|nb| ranks[nb.index()]);
+
+        let (canon_ref_a, canon_ref_b) = match (highest_ref_a, highest_ref_b) {
+            (Some(ra), Some(rb)) => (ra, rb),
+            _ => continue,
+        };
+
+        let same_side_a = match &ez.refs[0] {
+            AtomId::Node(idx) => *idx == canon_ref_a,
+            AtomId::VirtualH(_, _) => false,
+        };
+        let same_side_b = match &ez.refs[1] {
+            AtomId::Node(idx) => *idx == canon_ref_b,
+            AtomId::VirtualH(_, _) => false,
+        };
+
+        let canon_refs_cis = same_side_a == same_side_b;
+        let parity: u64 = if canon_refs_cis { 1 } else { 2 };
+
+        for &atom in &[a, b] {
+            let mut h = Fnv1aHasher::new();
+            ranks[atom.index()].hash(&mut h);
+            parity.hash(&mut h);
+            values[atom.index()] = h.finish();
+            any_stereo = true;
+        }
+    }
+
+    if !any_stereo {
+        return;
+    }
+
+    for i in 0..n {
+        if values[i] == 0 {
+            let mut h = Fnv1aHasher::new();
+            ranks[i].hash(&mut h);
+            values[i] = h.finish();
+        }
+    }
+
+    *ranks = ranks_from_values(&values);
+}
+
 pub fn canonical_ordering<A, B>(mol: &Mol<A, B>) -> Vec<usize>
 where
     A: HasAtomicNum
@@ -289,6 +352,7 @@ where
             loop {
                 let prev_distinct = count_distinct(&trial);
                 chirality_refine(mol, &mut trial);
+                ez_refine(mol, &mut trial);
                 morgan_refine(mol, &mut trial);
                 if count_distinct(&trial) <= prev_distinct {
                     break;

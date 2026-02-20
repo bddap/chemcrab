@@ -38,7 +38,7 @@ struct RingClosure {
     other: NodeIndex,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum Direction {
     Up,
     Down,
@@ -68,6 +68,59 @@ fn find_explicit_neighbor(
     mol.neighbors(db_atom).find(|&n| n != db_partner)
 }
 
+struct EZWork {
+    left: NodeIndex,
+    right: NodeIndex,
+    ref_l: NodeIndex,
+    ref_r: NodeIndex,
+    is_trans: bool,
+    left_write_dir: WriteDir,
+    right_write_dir: WriteDir,
+}
+
+fn dfs_order(children: &[Vec<NodeIndex>], root: NodeIndex) -> Vec<usize> {
+    let mut order = vec![usize::MAX; children.len()];
+    let mut idx = 0;
+    let mut stack = vec![root];
+    while let Some(node) = stack.pop() {
+        if order[node.index()] != usize::MAX {
+            continue;
+        }
+        order[node.index()] = idx;
+        idx += 1;
+        for &child in children[node.index()].iter().rev() {
+            stack.push(child);
+        }
+    }
+    order
+}
+
+fn lookup_existing_dir(
+    dirs: &HashMap<(NodeIndex, NodeIndex), Direction>,
+    db_atom: NodeIndex,
+    ref_atom: NodeIndex,
+    write_dir: WriteDir,
+) -> Option<Direction> {
+    match write_dir {
+        WriteDir::ParentToChild | WriteDir::RingOpen | WriteDir::RingClose => {
+            dirs.get(&(db_atom, ref_atom)).copied()
+        }
+        WriteDir::ChildToParent => {
+            dirs.get(&(ref_atom, db_atom)).copied()
+        }
+    }
+}
+
+fn flip_smiles_directions(s: &str) -> String {
+    s.chars()
+        .map(|c| match c {
+            '/' => '\\',
+            '\\' => '/',
+            other => other,
+        })
+        .collect()
+}
+
 fn compute_bond_directions(
     mol: &Mol<Atom, Bond>,
     parent: &[Option<NodeIndex>],
@@ -76,6 +129,16 @@ fn compute_bond_directions(
     ring_closes: &[Vec<RingClosure>],
 ) -> HashMap<(NodeIndex, NodeIndex), Direction> {
     let mut dirs: HashMap<(NodeIndex, NodeIndex), Direction> = HashMap::new();
+
+    let root = parent.iter().enumerate()
+        .find(|(i, p)| p.is_none() && !children[*i].is_empty())
+        .or_else(|| parent.iter().enumerate().find(|(_, p)| p.is_none()))
+        .map(|(i, _)| NodeIndex::new(i))
+        .unwrap_or(NodeIndex::new(0));
+
+    let visit_order = dfs_order(children, root);
+
+    let mut work: Vec<EZWork> = Vec::new();
 
     for edge in mol.bonds() {
         let bond = mol.bond(edge);
@@ -109,9 +172,6 @@ fn compute_bond_directions(
         let ref_l_id = if left == ep_a { ref_for_a } else { ref_for_b };
         let ref_r_id = if right == ep_a { ref_for_a } else { ref_for_b };
 
-        // Find explicit neighbor atoms we'll assign directions to.
-        // Track whether each explicit atom is on the same side as the cis refs (flip=false)
-        // or the opposite side (flip=true, because we substituted a VirtualH).
         let (ref_l, flip_l) = match ref_l_id {
             AtomId::Node(n) => (n, false),
             AtomId::VirtualH(_, _) => match find_explicit_neighbor(mol, left, right) {
@@ -127,8 +187,6 @@ fn compute_bond_directions(
             },
         };
 
-        // Determine the geometric relationship between the two explicit atoms we chose.
-        // The stored refs are cis. Each flip inverts the relationship.
         let is_trans = flip_l ^ flip_r;
 
         let left_write_dir =
@@ -136,11 +194,39 @@ fn compute_bond_directions(
         let right_write_dir =
             write_direction(right, ref_r, parent, children, ring_opens, ring_closes);
 
-        let left_char = Direction::Up;
-        let right_char = if is_trans { left_char } else { left_char.flip() };
+        work.push(EZWork {
+            left, right, ref_l, ref_r, is_trans, left_write_dir, right_write_dir,
+        });
+    }
 
-        set_bond_dir(&mut dirs, left, ref_l, left_char, left_write_dir);
-        set_bond_dir(&mut dirs, right, ref_r, right_char, right_write_dir);
+    work.sort_by_key(|w| visit_order[w.left.index()]);
+
+    for w in &work {
+        let existing_left = lookup_existing_dir(&dirs, w.left, w.ref_l, w.left_write_dir);
+        let existing_right = lookup_existing_dir(&dirs, w.right, w.ref_r, w.right_write_dir);
+
+        let (left_char, right_char) = match (existing_left, existing_right) {
+            (Some(l), _) => {
+                let r = if w.is_trans { l } else { l.flip() };
+                (l, r)
+            }
+            (_, Some(r)) => {
+                let l = if w.is_trans { r } else { r.flip() };
+                (l, r)
+            }
+            (None, None) => {
+                let l = Direction::Up;
+                let r = if w.is_trans { l } else { l.flip() };
+                (l, r)
+            }
+        };
+
+        if existing_left.is_none() {
+            set_bond_dir(&mut dirs, w.left, w.ref_l, left_char, w.left_write_dir);
+        }
+        if existing_right.is_none() {
+            set_bond_dir(&mut dirs, w.right, w.ref_r, right_char, w.right_write_dir);
+        }
     }
 
     dirs
@@ -288,6 +374,14 @@ fn write_fragment(mol: &Mol<Atom, Bond>, component: &[NodeIndex], ranks: Option<
 
     let mut out = String::new();
     write_node(mol, start, &ctx, &mut out);
+
+    if ranks.is_some() {
+        let flipped = flip_smiles_directions(&out);
+        if flipped < out {
+            return flipped;
+        }
+    }
+
     out
 }
 
@@ -381,8 +475,13 @@ fn write_node(
     }
 
     for rc in &ctx.ring_closes[node.index()] {
-        write_bond_between(mol, rc.order, node, rc.other, &ctx.bond_dirs, out);
-        write_ring_digit(rc.ring_id, out);
+        let has_open_dir = ctx.bond_dirs.contains_key(&(rc.other, node));
+        if has_open_dir {
+            write_ring_digit(rc.ring_id, out);
+        } else {
+            write_bond_between(mol, rc.order, node, rc.other, &ctx.bond_dirs, out);
+            write_ring_digit(rc.ring_id, out);
+        }
     }
 
     let kids = &ctx.children[node.index()];
@@ -1068,5 +1167,76 @@ mod tests {
         let c = canonical("c1ccc(C)cc1");
         assert_eq!(a, b);
         assert_eq!(b, c);
+    }
+
+    #[test]
+    fn canonical_conjugated_diene_idempotent() {
+        let cases = [
+            r"F/C=C/C=C\F",
+            r"F/C=C\C=C\F",
+            r"Cl/C=C\C=C\Cl",
+            r"Br/C=C\C=C\Br",
+        ];
+        for smi in &cases {
+            let mol = from_smiles(smi).unwrap();
+            let c1 = to_canonical_smiles(&mol);
+            let reparsed = from_smiles(&c1).unwrap();
+            let c2 = to_canonical_smiles(&reparsed);
+            assert_eq!(c1, c2, "round-trip failed for {smi}: '{c1}' vs '{c2}'");
+        }
+    }
+
+    #[test]
+    fn canonical_triene_idempotent() {
+        let cases = [
+            r"F/C=C\C=C/C=C\F",
+            r"F/C=C/C=C\C=C/F",
+        ];
+        for smi in &cases {
+            let mol = from_smiles(smi).unwrap();
+            let c1 = to_canonical_smiles(&mol);
+            let reparsed = from_smiles(&c1).unwrap();
+            let c2 = to_canonical_smiles(&reparsed);
+            assert_eq!(c1, c2, "round-trip failed for {smi}: '{c1}' vs '{c2}'");
+        }
+    }
+
+    #[test]
+    fn canonical_ring_ez_idempotent() {
+        let cases = [
+            r"C1/C=C\CCC1",
+            r"C/1=C\CCC/C1",
+            r"C/1=C/C=C\CC1",
+            r"C/1=C\C=C/CC1",
+        ];
+        for smi in &cases {
+            let mol = from_smiles(smi).unwrap();
+            let c1 = to_canonical_smiles(&mol);
+            let reparsed = from_smiles(&c1).unwrap_or_else(|e| {
+                panic!("reparse of '{c1}' from '{smi}' failed: {e}");
+            });
+            let c2 = to_canonical_smiles(&reparsed);
+            assert_eq!(c1, c2, "round-trip failed for {smi}: '{c1}' vs '{c2}'");
+        }
+    }
+
+    #[test]
+    fn canonical_conjugated_diene_permutation_invariant() {
+        use crate::graph_ops::renumber_atoms;
+        let cases = [
+            r"F/C=C/C=C\F",
+            r"F/C=C\C=C\F",
+        ];
+        for smi in &cases {
+            let mol = from_smiles(smi).unwrap();
+            let c1 = to_canonical_smiles(&mol);
+            let n = mol.atom_count();
+            for offset in 1..n {
+                let perm: Vec<usize> = (0..n).map(|i| (i + offset) % n).collect();
+                let renum = renumber_atoms(&mol, &perm).unwrap();
+                let c2 = to_canonical_smiles(&renum);
+                assert_eq!(c1, c2, "permutation invariance failed for {smi} offset {offset}: '{c1}' vs '{c2}'");
+            }
+        }
     }
 }
