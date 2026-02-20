@@ -1,4 +1,4 @@
-use crate::bond::{BondOrder, BondStereo};
+use crate::bond::BondOrder;
 use crate::wrappers::Hybridization;
 
 pub trait HasAtomicNum {
@@ -37,14 +37,6 @@ pub trait HasPosition3D {
 
 pub trait HasBondOrder {
     fn bond_order(&self) -> BondOrder;
-}
-
-pub trait HasBondStereo {
-    fn bond_stereo(&self) -> BondStereo;
-}
-
-pub trait HasBondStereoMut: HasBondStereo {
-    fn bond_stereo_mut(&mut self) -> &mut BondStereo;
 }
 
 pub trait HasValence {

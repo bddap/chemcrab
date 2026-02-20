@@ -25,7 +25,7 @@ pub mod wrappers;
 pub use aromaticity::{find_aromatic_atoms, set_aromaticity, AromaticityModel};
 pub use atom::{Atom, Chirality};
 pub use canonical::canonical_ordering;
-pub use bond::{Bond, BondOrder, BondStereo, SmilesBond, SmilesBondOrder};
+pub use bond::{Bond, BondOrder, SmilesBond, SmilesBondOrder};
 pub use chirality::cleanup_chirality;
 pub use conjugation::assign_conjugation;
 pub use hybridization::assign_hybridization;
@@ -37,7 +37,7 @@ pub use graph_ops::{
 };
 pub use hydrogen::{add_hs, remove_hs, remove_hs_with, RemoveHsOptions};
 pub use kekulize::{kekulize, KekulizeError};
-pub use mol::{AtomId, Mol, TetrahedralStereo};
+pub use mol::{AtomId, EZStereo, Mol, TetrahedralStereo};
 pub use reaction::{
     extract_atom_map_num, from_reaction_smarts, to_reaction_smarts, Reaction, ReactionError,
     ReactionSmartsError,
@@ -57,7 +57,7 @@ pub use substruct::{
     has_substruct_match_with, uniquify_atom_mappings, AtomMapping,
 };
 pub use traits::{
-    HasAromaticity, HasAtomicNum, HasBondOrder, HasBondStereo, HasBondStereoMut,
+    HasAromaticity, HasAtomicNum, HasBondOrder,
     HasFormalCharge, HasHybridization, HasHydrogenCount, HasIsotope,
     HasIsotopeMut, HasPosition2D, HasPosition3D, HasValence,
 };

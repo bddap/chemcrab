@@ -13,9 +13,16 @@ pub struct TetrahedralStereo {
     pub above: [AtomId; 4],
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct EZStereo {
+    pub bond: (NodeIndex, NodeIndex),
+    pub refs: [AtomId; 2],
+}
+
 pub struct Mol<A, B> {
     graph: UnGraph<A, B>,
     tetrahedral_stereo: Vec<TetrahedralStereo>,
+    ez_stereo: Vec<EZStereo>,
 }
 
 impl<A, B> Mol<A, B> {
@@ -23,6 +30,7 @@ impl<A, B> Mol<A, B> {
         Self {
             graph: UnGraph::default(),
             tetrahedral_stereo: Vec::new(),
+            ez_stereo: Vec::new(),
         }
     }
 
@@ -108,6 +116,28 @@ impl<A, B> Mol<A, B> {
         self.tetrahedral_stereo
             .retain(|s| s.center != center);
     }
+
+    pub fn ez_stereo(&self) -> &[EZStereo] {
+        &self.ez_stereo
+    }
+
+    pub fn set_ez_stereo(&mut self, stereo: Vec<EZStereo>) {
+        self.ez_stereo = stereo;
+    }
+
+    pub fn ez_stereo_for(&self, a: NodeIndex, b: NodeIndex) -> Option<&EZStereo> {
+        let (lo, hi) = if a.index() < b.index() { (a, b) } else { (b, a) };
+        self.ez_stereo.iter().find(|s| s.bond == (lo, hi))
+    }
+
+    pub fn add_ez_stereo(&mut self, stereo: EZStereo) {
+        self.ez_stereo.push(stereo);
+    }
+
+    pub fn remove_ez_stereo(&mut self, a: NodeIndex, b: NodeIndex) {
+        let (lo, hi) = if a.index() < b.index() { (a, b) } else { (b, a) };
+        self.ez_stereo.retain(|s| s.bond != (lo, hi));
+    }
 }
 
 impl<A: Clone, B: Clone> Clone for Mol<A, B> {
@@ -115,6 +145,7 @@ impl<A: Clone, B: Clone> Clone for Mol<A, B> {
         Self {
             graph: self.graph.clone(),
             tetrahedral_stereo: self.tetrahedral_stereo.clone(),
+            ez_stereo: self.ez_stereo.clone(),
         }
     }
 }
@@ -150,6 +181,7 @@ impl<A: PartialEq, B: PartialEq> PartialEq for Mol<A, B> {
             }
         }
         self.tetrahedral_stereo == other.tetrahedral_stereo
+            && self.ez_stereo == other.ez_stereo
     }
 }
 
@@ -159,6 +191,7 @@ impl<A: std::fmt::Debug, B: std::fmt::Debug> std::fmt::Debug for Mol<A, B> {
             .field("atom_count", &self.atom_count())
             .field("bond_count", &self.bond_count())
             .field("tetrahedral_stereo", &self.tetrahedral_stereo)
+            .field("ez_stereo", &self.ez_stereo)
             .finish()
     }
 }

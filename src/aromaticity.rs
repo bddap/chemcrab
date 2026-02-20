@@ -497,10 +497,7 @@ mod tests {
             mol.add_bond(
                 atoms[i],
                 atoms[(i + 1) % 6],
-                Bond {
-                    order,
-                    ..Bond::default()
-                },
+                Bond { order },
             );
         }
 

@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use petgraph::graph::NodeIndex;
 
 use crate::atom::Atom;
-use crate::bond::{Bond, BondOrder, BondStereo, SmilesBond, SmilesBondOrder};
+use crate::bond::{Bond, BondOrder, SmilesBond, SmilesBondOrder};
 use crate::kekulize::kekulize;
 use crate::mol::Mol;
 use crate::smarts::{get_smarts_matches, AtomExpr, BondExpr};
@@ -140,7 +140,6 @@ fn bond_to_smiles_bond(bond: &Bond) -> SmilesBond {
             BondOrder::Double => SmilesBondOrder::Double,
             BondOrder::Triple => SmilesBondOrder::Triple,
         },
-        stereo: bond.stereo,
     }
 }
 
@@ -396,10 +395,7 @@ fn smiles_bond_from_expr(expr: &BondExpr) -> SmilesBond {
         | BondExpr::Up
         | BondExpr::Down => SmilesBondOrder::Single,
     };
-    SmilesBond {
-        order,
-        stereo: BondStereo::None,
-    }
+    SmilesBond { order }
 }
 
 pub fn extract_atom_map_num(expr: &AtomExpr) -> Option<u16> {

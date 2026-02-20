@@ -4,7 +4,7 @@ use petgraph::graph::NodeIndex;
 
 use crate::aromaticity::{set_aromaticity, AromaticityModel};
 use crate::atom::Atom;
-use crate::bond::{Bond, BondOrder, BondStereo};
+use crate::bond::{Bond, BondOrder};
 use crate::canonical::canonical_ordering;
 use crate::element::Element;
 use crate::graph_ops::connected_components;
@@ -60,6 +60,14 @@ impl Direction {
     }
 }
 
+fn find_explicit_neighbor(
+    mol: &Mol<Atom, Bond>,
+    db_atom: NodeIndex,
+    db_partner: NodeIndex,
+) -> Option<NodeIndex> {
+    mol.neighbors(db_atom).find(|&n| n != db_partner)
+}
+
 fn compute_bond_directions(
     mol: &Mol<Atom, Bond>,
     parent: &[Option<NodeIndex>],
@@ -74,24 +82,54 @@ fn compute_bond_directions(
         if bond.order != BondOrder::Double {
             continue;
         }
-        let (ref_left, ref_right, is_trans) = match bond.stereo {
-            BondStereo::Trans(l, r) => (l, r, true),
-            BondStereo::Cis(l, r) => (l, r, false),
-            BondStereo::None => continue,
-        };
-
         let (ep_a, ep_b) = mol.bond_endpoints(edge).unwrap();
 
-        let (left, right, ref_l, ref_r) =
+        let ez = match mol.ez_stereo_for(ep_a, ep_b) {
+            Some(ez) => ez,
+            None => continue,
+        };
+
+        let (ref_for_a, ref_for_b) = if ep_a == ez.bond.0 {
+            (ez.refs[0], ez.refs[1])
+        } else {
+            (ez.refs[1], ez.refs[0])
+        };
+
+        let (left, right) =
             if parent[ep_b.index()] == Some(ep_a) {
-                (ep_a, ep_b, ref_left, ref_right)
+                (ep_a, ep_b)
             } else if parent[ep_a.index()] == Some(ep_b) {
-                (ep_b, ep_a, ref_right, ref_left)
+                (ep_b, ep_a)
             } else if ep_a.index() < ep_b.index() {
-                (ep_a, ep_b, ref_left, ref_right)
+                (ep_a, ep_b)
             } else {
-                (ep_b, ep_a, ref_right, ref_left)
+                (ep_b, ep_a)
             };
+
+        let ref_l_id = if left == ep_a { ref_for_a } else { ref_for_b };
+        let ref_r_id = if right == ep_a { ref_for_a } else { ref_for_b };
+
+        // Find explicit neighbor atoms we'll assign directions to.
+        // Track whether each explicit atom is on the same side as the cis refs (flip=false)
+        // or the opposite side (flip=true, because we substituted a VirtualH).
+        let (ref_l, flip_l) = match ref_l_id {
+            AtomId::Node(n) => (n, false),
+            AtomId::VirtualH(_, _) => match find_explicit_neighbor(mol, left, right) {
+                Some(n) => (n, true),
+                None => continue,
+            },
+        };
+        let (ref_r, flip_r) = match ref_r_id {
+            AtomId::Node(n) => (n, false),
+            AtomId::VirtualH(_, _) => match find_explicit_neighbor(mol, right, left) {
+                Some(n) => (n, true),
+                None => continue,
+            },
+        };
+
+        // Determine the geometric relationship between the two explicit atoms we chose.
+        // The stored refs are cis. Each flip inverts the relationship.
+        let is_trans = flip_l ^ flip_r;
 
         let left_write_dir =
             write_direction(left, ref_l, parent, children, ring_opens, ring_closes);
@@ -546,7 +584,6 @@ fn write_bracket_atom(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bond::BondStereo;
     use crate::mol::AtomId;
     use crate::smiles::from_smiles;
 
@@ -574,14 +611,8 @@ mod tests {
         !mol.tetrahedral_stereo().is_empty()
     }
 
-    fn find_double_bond_stereo(mol: &Mol<Atom, Bond>) -> Option<bool> {
-        mol.bonds().find_map(|e| {
-            match mol.bond(e).stereo {
-                BondStereo::Trans(_, _) => Some(true),
-                BondStereo::Cis(_, _) => Some(false),
-                BondStereo::None => None,
-            }
-        })
+    fn has_ez_stereo(mol: &Mol<Atom, Bond>) -> bool {
+        !mol.ez_stereo().is_empty()
     }
 
     fn canonical_parity(mol: &Mol<Atom, Bond>, node: NodeIndex) -> Option<bool> {
@@ -781,9 +812,8 @@ mod tests {
             s.contains('/') || s.contains('\\'),
             "expected directional bonds in '{s}'"
         );
-        let is_trans1 = find_double_bond_stereo(&m1).expect("m1 should have E/Z stereo");
-        let is_trans2 = find_double_bond_stereo(&m2).expect("m2 should have E/Z stereo");
-        assert_eq!(is_trans1, is_trans2);
+        assert!(has_ez_stereo(&m1), "m1 should have E/Z stereo");
+        assert!(has_ez_stereo(&m2), "m2 should have E/Z stereo");
     }
 
     #[test]
@@ -794,18 +824,16 @@ mod tests {
             s.contains('/') || s.contains('\\'),
             "expected directional bonds in '{s}'"
         );
-        let is_trans1 = find_double_bond_stereo(&m1).expect("m1 should have E/Z stereo");
-        let is_trans2 = find_double_bond_stereo(&m2).expect("m2 should have E/Z stereo");
-        assert_eq!(is_trans1, is_trans2);
+        assert!(has_ez_stereo(&m1), "m1 should have E/Z stereo");
+        assert!(has_ez_stereo(&m2), "m2 should have E/Z stereo");
     }
 
     #[test]
     fn ez_trans_chlorine_round_trip() {
         let (m1, m2, _s) = round_trip("Cl/C=C/Cl");
         assert_same_structure(&m1, &m2, "ez_trans_cl");
-        let is_trans1 = find_double_bond_stereo(&m1).expect("m1 should have E/Z stereo");
-        let is_trans2 = find_double_bond_stereo(&m2).expect("m2 should have E/Z stereo");
-        assert_eq!(is_trans1, is_trans2);
+        assert!(has_ez_stereo(&m1), "m1 should have E/Z stereo");
+        assert!(has_ez_stereo(&m2), "m2 should have E/Z stereo");
     }
 
     #[test]
@@ -819,9 +847,8 @@ mod tests {
         assert!(has_chiral_atom(&m1));
         assert!(has_chiral_atom(&m2));
         assert_same_chirality(&m1, &m2, "combined_stereo");
-        let is_trans1 = find_double_bond_stereo(&m1).expect("m1 should have E/Z stereo");
-        let is_trans2 = find_double_bond_stereo(&m2).expect("m2 should have E/Z stereo");
-        assert_eq!(is_trans1, is_trans2);
+        assert!(has_ez_stereo(&m1), "m1 should have E/Z stereo");
+        assert!(has_ez_stereo(&m2), "m2 should have E/Z stereo");
     }
 
     fn canonical(smiles: &str) -> String {
@@ -916,9 +943,8 @@ mod tests {
             s.contains('/') || s.contains('\\'),
             "expected stereo bonds in canonical '{s}'"
         );
-        let t1 = find_double_bond_stereo(&m1).expect("m1 E/Z");
-        let t2 = find_double_bond_stereo(&m2).expect("m2 E/Z");
-        assert_eq!(t1, t2);
+        assert!(has_ez_stereo(&m1), "m1 E/Z");
+        assert!(has_ez_stereo(&m2), "m2 E/Z");
     }
 
     #[test]
@@ -929,9 +955,8 @@ mod tests {
             s.contains('/') || s.contains('\\'),
             "expected stereo bonds in canonical '{s}'"
         );
-        let t1 = find_double_bond_stereo(&m1).expect("m1 E/Z");
-        let t2 = find_double_bond_stereo(&m2).expect("m2 E/Z");
-        assert_eq!(t1, t2);
+        assert!(has_ez_stereo(&m1), "m1 E/Z");
+        assert!(has_ez_stereo(&m2), "m2 E/Z");
     }
 
     // -- Edge cases --

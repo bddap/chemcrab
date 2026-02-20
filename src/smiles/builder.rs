@@ -1,9 +1,9 @@
 use petgraph::graph::NodeIndex;
 
 use crate::atom::Atom;
-use crate::bond::{BondStereo, SmilesBond, SmilesBondOrder};
+use crate::bond::{SmilesBond, SmilesBondOrder};
 use crate::element::Element;
-use crate::mol::{AtomId, Mol, TetrahedralStereo};
+use crate::mol::{AtomId, EZStereo, Mol, TetrahedralStereo};
 use crate::smiles::parse_tree::{ParseAtom, ParseTree};
 use crate::smiles::tokenizer::{BondToken, ChiralityToken};
 
@@ -33,10 +33,7 @@ pub fn build_mol(tree: &ParseTree) -> Mol<Atom, SmilesBond> {
                     parse_atom.is_aromatic,
                     tree.atoms[j].is_aromatic,
                 );
-                let bond = SmilesBond {
-                    order,
-                    stereo: BondStereo::None,
-                };
+                let bond = SmilesBond { order };
                 mol.add_bond(node_indices[i], node_indices[j], bond);
                 added_edges[i].push(j);
                 added_edges[j].push(i);
@@ -147,11 +144,7 @@ fn resolve_ez_stereo(mol: &mut Mol<Atom, SmilesBond>, tree: &ParseTree, indices:
                 None => continue,
             };
 
-            let is_double = matches!(
-                mol.bond(edge_idx).order,
-                SmilesBondOrder::Double
-            );
-            if !is_double {
+            if mol.bond(edge_idx).order != SmilesBondOrder::Double {
                 continue;
             }
 
@@ -167,16 +160,43 @@ fn resolve_ez_stereo(mol: &mut Mol<Atom, SmilesBond>, tree: &ParseTree, indices:
                     _ => continue,
                 };
 
-                let stereo = if same_direction {
-                    BondStereo::Trans(indices[left_atom], indices[right_atom])
+                let (cis_left, cis_right) = if same_direction {
+                    let other = other_substituent(mol, indices[j], indices[i], indices[right_atom]);
+                    (AtomId::Node(indices[left_atom]), other)
                 } else {
-                    BondStereo::Cis(indices[left_atom], indices[right_atom])
+                    (AtomId::Node(indices[left_atom]), AtomId::Node(indices[right_atom]))
                 };
 
-                mol.bond_mut(edge_idx).stereo = stereo;
+                let (lo, hi) = if indices[i].index() < indices[j].index() {
+                    (indices[i], indices[j])
+                } else {
+                    (indices[j], indices[i])
+                };
+
+                let refs = if lo == indices[i] {
+                    [cis_left, cis_right]
+                } else {
+                    [cis_right, cis_left]
+                };
+
+                mol.add_ez_stereo(EZStereo { bond: (lo, hi), refs });
             }
         }
     }
+}
+
+fn other_substituent(
+    mol: &Mol<Atom, SmilesBond>,
+    db_atom: NodeIndex,
+    db_partner: NodeIndex,
+    known_ref: NodeIndex,
+) -> AtomId {
+    for neighbor in mol.neighbors(db_atom) {
+        if neighbor != db_partner && neighbor != known_ref {
+            return AtomId::Node(neighbor);
+        }
+    }
+    AtomId::VirtualH(db_atom, 0)
 }
 
 fn find_directional_neighbor(

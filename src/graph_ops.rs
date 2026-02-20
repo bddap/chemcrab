@@ -2,11 +2,10 @@ use std::collections::VecDeque;
 
 use petgraph::graph::NodeIndex;
 
-use crate::bond::BondStereo;
 use crate::canonical::canonical_ordering;
-use crate::mol::{AtomId, Mol, TetrahedralStereo};
+use crate::mol::{AtomId, EZStereo, Mol, TetrahedralStereo};
 use crate::traits::{
-    HasAromaticity, HasAtomicNum, HasBondOrder, HasBondStereoMut,
+    HasAromaticity, HasAtomicNum, HasBondOrder,
     HasFormalCharge, HasHydrogenCount, HasIsotope,
 };
 
@@ -111,7 +110,7 @@ pub fn num_components<A, B>(mol: &Mol<A, B>) -> usize {
     connected_components(mol).len()
 }
 
-pub fn get_fragments<A: Clone, B: Clone + HasBondStereoMut>(
+pub fn get_fragments<A: Clone, B: Clone>(
     mol: &Mol<A, B>,
 ) -> Vec<Mol<A, B>> {
     let components = connected_components(mol);
@@ -136,7 +135,6 @@ pub fn get_fragments<A: Clone, B: Clone + HasBondStereoMut>(
                 }
             }
         }
-        remap_bond_stereo(&mut frag, &index_map);
         let remapped_stereo = mol
             .tetrahedral_stereo()
             .iter()
@@ -147,6 +145,13 @@ pub fn get_fragments<A: Clone, B: Clone + HasBondStereoMut>(
             })
             .collect();
         frag.set_tetrahedral_stereo(remapped_stereo);
+        let remapped_ez = mol
+            .ez_stereo()
+            .iter()
+            .filter(|s| component.contains(&s.bond.0))
+            .map(|s| remap_ez_stereo(s, &index_map))
+            .collect();
+        frag.set_ez_stereo(remapped_ez);
         fragments.push(frag);
     }
     fragments
@@ -188,7 +193,7 @@ fn validate_permutation(new_order: &[usize], n: usize) -> Result<(), RenumberErr
     Ok(())
 }
 
-pub fn renumber_atoms<A: Clone, B: HasBondStereoMut + Clone>(
+pub fn renumber_atoms<A: Clone, B: Clone>(
     mol: &Mol<A, B>,
     new_order: &[usize],
 ) -> Result<Mol<A, B>, RenumberError> {
@@ -197,12 +202,10 @@ pub fn renumber_atoms<A: Clone, B: HasBondStereoMut + Clone>(
 
     let mut new_mol = Mol::new();
 
-    // new_order[new_idx] = old_idx
     for &old_idx in new_order {
         new_mol.add_atom(mol.atom(NodeIndex::new(old_idx)).clone());
     }
 
-    // old_to_new[old_idx] = new_idx
     let mut old_to_new = vec![0usize; n];
     for (new_idx, &old_idx) in new_order.iter().enumerate() {
         old_to_new[old_idx] = new_idx;
@@ -216,7 +219,6 @@ pub fn renumber_atoms<A: Clone, B: HasBondStereoMut + Clone>(
     }
 
     let old_to_new_nodes: Vec<NodeIndex> = old_to_new.iter().map(|&i| NodeIndex::new(i)).collect();
-    remap_bond_stereo(&mut new_mol, &old_to_new_nodes);
 
     let remapped_stereo = mol
         .tetrahedral_stereo()
@@ -228,6 +230,13 @@ pub fn renumber_atoms<A: Clone, B: HasBondStereoMut + Clone>(
         .collect();
     new_mol.set_tetrahedral_stereo(remapped_stereo);
 
+    let remapped_ez = mol
+        .ez_stereo()
+        .iter()
+        .map(|s| remap_ez_stereo(s, &old_to_new_nodes))
+        .collect();
+    new_mol.set_ez_stereo(remapped_ez);
+
     Ok(new_mol)
 }
 
@@ -238,21 +247,21 @@ fn remap_atom_id(aid: AtomId, old_to_new: &[NodeIndex]) -> AtomId {
     }
 }
 
-fn remap_bond_stereo<A, B>(mol: &mut Mol<A, B>, old_to_new: &[NodeIndex])
-where
-    B: HasBondStereoMut,
-{
-    for edge in mol.bonds().collect::<Vec<_>>() {
-        let stereo = mol.bond(edge).bond_stereo();
-        let remapped = match stereo {
-            BondStereo::None => BondStereo::None,
-            BondStereo::Cis(a, b) => BondStereo::Cis(old_to_new[a.index()], old_to_new[b.index()]),
-            BondStereo::Trans(a, b) => {
-                BondStereo::Trans(old_to_new[a.index()], old_to_new[b.index()])
-            }
-        };
-        *mol.bond_mut(edge).bond_stereo_mut() = remapped;
-    }
+fn remap_ez_stereo(s: &EZStereo, old_to_new: &[NodeIndex]) -> EZStereo {
+    let new_a = old_to_new[s.bond.0.index()];
+    let new_b = old_to_new[s.bond.1.index()];
+    let (lo, hi, refs) = if new_a.index() < new_b.index() {
+        (new_a, new_b, [
+            remap_atom_id(s.refs[0], old_to_new),
+            remap_atom_id(s.refs[1], old_to_new),
+        ])
+    } else {
+        (new_b, new_a, [
+            remap_atom_id(s.refs[1], old_to_new),
+            remap_atom_id(s.refs[0], old_to_new),
+        ])
+    };
+    EZStereo { bond: (lo, hi), refs }
 }
 
 pub fn renumber_atoms_canonical<A, B>(mol: &Mol<A, B>) -> Mol<A, B>
@@ -263,7 +272,7 @@ where
         + HasIsotope
         + HasAromaticity
         + Clone,
-    B: HasBondOrder + HasBondStereoMut + Clone,
+    B: HasBondOrder + Clone,
 {
     let n = mol.atom_count();
     if n == 0 {
@@ -281,8 +290,8 @@ where
 mod tests {
     use super::*;
     use crate::atom::Atom;
-    use crate::bond::{Bond, BondOrder, BondStereo};
-    use crate::mol::{AtomId, TetrahedralStereo};
+    use crate::bond::{Bond, BondOrder};
+    use crate::mol::{AtomId, EZStereo, TetrahedralStereo};
     use crate::smiles::{from_smiles, to_canonical_smiles};
 
     fn n(i: usize) -> NodeIndex {
@@ -332,40 +341,36 @@ mod tests {
     }
 
     #[test]
-    fn renumber_preserves_bond_stereo() {
-        // Build a molecule with E/Z stereo manually
+    fn renumber_preserves_ez_stereo() {
         let mut mol = Mol::new();
         let c0 = mol.add_atom(Atom { atomic_num: 6, hydrogen_count: 1, ..Atom::default() });
         let c1 = mol.add_atom(Atom { atomic_num: 6, hydrogen_count: 1, ..Atom::default() });
         let f2 = mol.add_atom(Atom { atomic_num: 9, ..Atom::default() });
         let cl3 = mol.add_atom(Atom { atomic_num: 17, ..Atom::default() });
-        mol.add_bond(c0, c1, Bond { order: BondOrder::Double, stereo: BondStereo::Trans(n(2), n(3)) });
-        mol.add_bond(c0, f2, Bond { order: BondOrder::Single, stereo: BondStereo::None });
-        mol.add_bond(c1, cl3, Bond { order: BondOrder::Single, stereo: BondStereo::None });
+        mol.add_bond(c0, c1, Bond { order: BondOrder::Double });
+        mol.add_bond(c0, f2, Bond { order: BondOrder::Single });
+        mol.add_bond(c1, cl3, Bond { order: BondOrder::Single });
+        // Trans(f2, cl3) → store cis pair: f2 is neighbor of c0, virtualH is the OTHER neighbor of c1
+        // For trans, the cis pair is (f2, VirtualH(c1, 0))
+        mol.add_ez_stereo(EZStereo {
+            bond: (n(0), n(1)),
+            refs: [AtomId::Node(n(2)), AtomId::VirtualH(n(1), 0)],
+        });
 
         // Renumber: reverse [3, 2, 1, 0]
         // old_to_new: 0→3, 1→2, 2→1, 3→0
         let new_order = vec![3, 2, 1, 0];
-        let renum_basic = renumber_atoms(&mol, &new_order).unwrap();
+        let renum = renumber_atoms(&mol, &new_order).unwrap();
 
-        // The basic renumber clones bonds without remapping stereo refs
-        // Use renumber_atoms_canonical which does the full remap
-        let canonical = renumber_atoms_canonical(&mol);
-        // Verify stereo still references valid atoms
-        for edge in canonical.bonds() {
-            let bond = canonical.bond(edge);
-            match bond.stereo {
-                BondStereo::Cis(a, b) | BondStereo::Trans(a, b) => {
-                    assert!(a.index() < canonical.atom_count());
-                    assert!(b.index() < canonical.atom_count());
-                }
-                BondStereo::None => {}
-            }
-        }
-        let double_edge = renum_basic.bonds().find(|&e| renum_basic.bond(e).order == BondOrder::Double).unwrap();
-        let stereo = renum_basic.bond(double_edge).stereo;
-        // old_to_new: 0→3, 1→2, 2→1, 3→0. Trans(2,3) → Trans(1,0)
-        assert_eq!(stereo, BondStereo::Trans(n(1), n(0)));
+        assert_eq!(renum.ez_stereo().len(), 1);
+        let ez = &renum.ez_stereo()[0];
+        // old bond (0,1) → new (3,2) → canonical (2,3)
+        assert_eq!(ez.bond, (n(2), n(3)));
+        // old refs: [Node(2), VirtualH(1,0)] → new [Node(1), VirtualH(2,0)]
+        // But bond was flipped (old 0→new 3, old 1→new 2), so refs swap:
+        // refs[0] corresponds to bond.0=2 (was old 1), refs[1] to bond.1=3 (was old 0)
+        assert_eq!(ez.refs[0], AtomId::VirtualH(n(2), 0));
+        assert_eq!(ez.refs[1], AtomId::Node(n(1)));
     }
 
     #[test]
