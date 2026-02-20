@@ -76,6 +76,7 @@ const MOLECULES: &[&str] = &[
     "C1=CC=CC=C1",
     "c1cnc2ccccc2n1",
     "[O-][N+](=O)c1ccccc1",
+    "c1cc2ccc3cccc4ccc(c1)c2c34",
 ];
 
 fn canonical(smiles: &str) -> String {
