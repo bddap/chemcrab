@@ -1,6 +1,5 @@
 use std::fmt;
 
-use crate::kekulize::KekulizeError;
 use crate::smarts::SmartsError;
 
 /// Error returned when parsing a reaction SMARTS string.
@@ -46,8 +45,6 @@ pub enum ReactionError {
     TooManyCombinations,
     /// An atom map number appears more than once in the reactant templates.
     DuplicateAtomMap { map_num: u16 },
-    /// The product molecule could not be kekulized.
-    Kekulize(KekulizeError),
 }
 
 impl fmt::Display for ReactionError {
@@ -65,22 +62,8 @@ impl fmt::Display for ReactionError {
                     "duplicate atom map number {map_num} in reactant templates"
                 )
             }
-            Self::Kekulize(e) => write!(f, "product kekulization failed: {e}"),
         }
     }
 }
 
-impl std::error::Error for ReactionError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            Self::Kekulize(e) => Some(e),
-            _ => None,
-        }
-    }
-}
-
-impl From<KekulizeError> for ReactionError {
-    fn from(e: KekulizeError) -> Self {
-        Self::Kekulize(e)
-    }
-}
+impl std::error::Error for ReactionError {}

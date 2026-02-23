@@ -61,7 +61,8 @@ pub fn from_reaction_smarts(s: &str) -> Result<Reaction, ReactionSmartsError> {
 mod tests {
     use super::*;
     use crate::atom::Atom;
-    use crate::bond::Bond;
+    use crate::bond::{AromaticBond, Bond};
+    use crate::kekulize::kekulize;
     use crate::mol::Mol;
     use crate::smiles::from_smiles;
 
@@ -200,7 +201,10 @@ mod tests {
         let product = &products[0][0];
         assert_eq!(product.bond_count(), 1);
         let edge = product.bonds().next().unwrap();
-        assert_eq!(product.bond(edge).order, crate::bond::BondOrder::Double);
+        assert_eq!(
+            product.bond(edge).order,
+            crate::bond::AromaticBondOrder::Known(crate::bond::BondOrder::Double)
+        );
     }
 
     // --- Writer tests ---
@@ -298,7 +302,10 @@ mod tests {
         assert!(!products.is_empty());
         let product = &products[0][0];
         let edge = product.bonds().next().unwrap();
-        assert_eq!(product.bond(edge).order, crate::bond::BondOrder::Triple);
+        assert_eq!(
+            product.bond(edge).order,
+            crate::bond::AromaticBondOrder::Known(crate::bond::BondOrder::Triple)
+        );
     }
 
     #[test]
@@ -333,7 +340,7 @@ mod tests {
         let hydroxide = mol("[OH-]");
         let products = rxn.run(&[&reactant, &hydroxide]).unwrap();
         assert!(!products.is_empty());
-        let phenol = &products[0][0];
+        let phenol = kek(&products[0][0]);
         let double_count = phenol
             .bonds()
             .filter(|&e| phenol.bond(e).order == crate::bond::BondOrder::Double)
@@ -352,7 +359,7 @@ mod tests {
         let hydroxide = mol("[OH-]");
         let products = rxn.run(&[&reactant, &hydroxide]).unwrap();
         assert!(!products.is_empty());
-        let phenol = &products[0][0];
+        let phenol = kek(&products[0][0]);
         for edge in phenol.bonds() {
             let order = phenol.bond(edge).order;
             assert!(
@@ -390,8 +397,13 @@ mod tests {
         to_canonical_smiles(&mol(smiles))
     }
 
+    fn kek(m: &Mol<Atom, AromaticBond>) -> Mol<Atom, Bond> {
+        let k = kekulize(m.clone()).expect("kekulization failed in test");
+        crate::hydrogen::remove_hs(&k)
+    }
+
     fn assert_product_sets(
-        products: &[Vec<Mol<Atom, Bond>>],
+        products: &[Vec<Mol<Atom, AromaticBond>>],
         expected_count: usize,
         expected_sets: &[&[&str]],
     ) {
@@ -402,8 +414,10 @@ mod tests {
             products.len()
         );
         for (i, (actual, expected)) in products.iter().zip(expected_sets.iter()).enumerate() {
-            let mut actual_smiles: Vec<String> =
-                actual.iter().map(|m| to_canonical_smiles(m)).collect();
+            let mut actual_smiles: Vec<String> = actual
+                .iter()
+                .map(|m| to_canonical_smiles(&kek(m)))
+                .collect();
             actual_smiles.sort();
             let mut expected_smiles: Vec<String> = expected.iter().map(|s| canon(s)).collect();
             expected_smiles.sort();
@@ -523,7 +537,8 @@ mod tests {
         let products = rxn.run(&[&r1, &r2]).unwrap();
         assert_eq!(products.len(), 2);
         for set in &products {
-            let mut smiles: Vec<String> = set.iter().map(|m| to_canonical_smiles(m)).collect();
+            let mut smiles: Vec<String> =
+                set.iter().map(|m| to_canonical_smiles(&kek(m))).collect();
             smiles.sort();
             let mut expected: Vec<String> = vec![canon("CNC(=O)C(C)C(=O)O")];
             expected.sort();
@@ -541,7 +556,8 @@ mod tests {
         let products = rxn.run(&[&r1, &r2]).unwrap();
         assert_eq!(products.len(), 2);
         for set in &products {
-            let mut smiles: Vec<String> = set.iter().map(|m| to_canonical_smiles(m)).collect();
+            let mut smiles: Vec<String> =
+                set.iter().map(|m| to_canonical_smiles(&kek(m))).collect();
             smiles.sort();
             let mut expected: Vec<String> = vec![canon("CC(=O)NCN")];
             expected.sort();
@@ -682,7 +698,7 @@ mod tests {
         let products = rxn.run(&[&r]).unwrap();
         assert_eq!(products.len(), 6);
         for set in &products {
-            let smiles: Vec<String> = set.iter().map(|m| to_canonical_smiles(m)).collect();
+            let smiles: Vec<String> = set.iter().map(|m| to_canonical_smiles(&kek(m))).collect();
             assert_eq!(smiles.len(), 1);
             assert_eq!(smiles[0], canon("C[N+](C)(C)C"));
         }
@@ -697,7 +713,7 @@ mod tests {
         let products = rxn.run(&[&r]).unwrap();
         assert_eq!(products.len(), 6);
         for set in &products {
-            let smiles: Vec<String> = set.iter().map(|m| to_canonical_smiles(m)).collect();
+            let smiles: Vec<String> = set.iter().map(|m| to_canonical_smiles(&kek(m))).collect();
             assert_eq!(smiles.len(), 1);
             assert_eq!(smiles[0], canon("Brc1ccccc1"));
         }
@@ -711,7 +727,7 @@ mod tests {
         let products = rxn.run(&[&r]).unwrap();
         assert_eq!(products.len(), 6);
         for set in &products {
-            let smiles: Vec<String> = set.iter().map(|m| to_canonical_smiles(m)).collect();
+            let smiles: Vec<String> = set.iter().map(|m| to_canonical_smiles(&kek(m))).collect();
             assert_eq!(smiles.len(), 1);
             assert_eq!(smiles[0], canon("O=[N+]([O-])c1ccccc1"));
         }
@@ -748,7 +764,7 @@ mod tests {
         let products = rxn.run(&[&r]).unwrap();
         assert_eq!(products.len(), 6);
         for set in &products {
-            let smiles: Vec<String> = set.iter().map(|m| to_canonical_smiles(m)).collect();
+            let smiles: Vec<String> = set.iter().map(|m| to_canonical_smiles(&kek(m))).collect();
             assert_eq!(smiles.len(), 1);
             assert_eq!(smiles[0], canon("Clc1ccccc1"));
         }
@@ -771,7 +787,7 @@ mod tests {
         let products = rxn.run(&[&r]).unwrap();
         assert_eq!(products.len(), 2);
         for set in &products {
-            let smiles: Vec<String> = set.iter().map(|m| to_canonical_smiles(m)).collect();
+            let smiles: Vec<String> = set.iter().map(|m| to_canonical_smiles(&kek(m))).collect();
             assert_eq!(smiles.len(), 1);
             assert_eq!(smiles[0], canon("C[13CH3]"));
         }
@@ -824,7 +840,7 @@ mod tests {
         let products = rxn.run(&[&r]).unwrap();
         assert_eq!(products.len(), 2);
         for set in &products {
-            let smiles: Vec<String> = set.iter().map(|m| to_canonical_smiles(m)).collect();
+            let smiles: Vec<String> = set.iter().map(|m| to_canonical_smiles(&kek(m))).collect();
             assert_eq!(smiles.len(), 1);
             assert_eq!(smiles[0], canon("CCO"));
         }
@@ -965,7 +981,8 @@ mod tests {
         let products = rxn.run(&[&r]).unwrap();
         assert_eq!(products.len(), 2);
         for set in &products {
-            let mut smiles: Vec<String> = set.iter().map(|m| to_canonical_smiles(m)).collect();
+            let mut smiles: Vec<String> =
+                set.iter().map(|m| to_canonical_smiles(&kek(m))).collect();
             smiles.sort();
             let mut expected: Vec<String> = vec![canon("C"), canon("C")];
             expected.sort();
@@ -1014,7 +1031,7 @@ mod tests {
         let products = rxn.run(&[&r1, &r2]).unwrap();
         assert_eq!(products.len(), 2);
         for set in &products {
-            let smiles: Vec<String> = set.iter().map(|m| to_canonical_smiles(m)).collect();
+            let smiles: Vec<String> = set.iter().map(|m| to_canonical_smiles(&kek(m))).collect();
             assert_eq!(smiles.len(), 1);
             assert_eq!(smiles[0], canon("c1ccc(-c2ccccc2)cc1"));
         }

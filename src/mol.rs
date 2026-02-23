@@ -79,9 +79,8 @@ pub struct EZStereo {
 /// bonds — because it describes spatial *relationships* between neighbors.
 ///
 /// The standard concrete type after SMILES parsing is `Mol<Atom, Bond>`,
-/// where every bond has a definite Kekulé order. During parsing, the
-/// intermediate type `Mol<Atom, SmilesBond>` exists briefly before
-/// kekulization resolves aromatic bonds.
+/// where every bond has a definite Kekulé order. Before kekulization, the
+/// intermediate type `Mol<Atom, AromaticBond>` preserves aromatic bonds.
 ///
 /// Generic algorithms can accept `Mol<A, B>` with trait bounds on `A` and
 /// `B` (e.g. `A: HasAtomicNum`) so they work with custom atom types too.

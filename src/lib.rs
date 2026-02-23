@@ -36,7 +36,8 @@
 //!
 //! - **[`Bond`]** stores a [`BondOrder`] (`Single`, `Double`, or `Triple`).
 //!   There is no `Aromatic` bond order — every bond in a `Mol<Atom, Bond>` has
-//!   a concrete Kekulé assignment.
+//!   a concrete Kekulé assignment. Before kekulization, [`AromaticBond`] with
+//!   [`AromaticBondOrder`] represents bonds that may still be aromatic.
 //!
 //! Algorithms declare their requirements via trait bounds
 //! (`HasAtomicNum`, `HasBondOrder`, etc.) so they work with any atom/bond
@@ -126,7 +127,7 @@ pub mod graph {
 // `use chemcrab::{Mol, Atom, Bond}` works without diving into modules.
 
 pub use atom::Atom;
-pub use bond::{Bond, BondOrder};
+pub use bond::{AromaticBond, AromaticBondOrder, Bond, BondOrder};
 pub use element::Element;
 pub use mol::{AtomId, EZStereo, Mol, TetrahedralStereo};
 

@@ -211,13 +211,13 @@ mod tests {
 
     #[test]
     fn empty_mol_formula() {
-        let mol: Mol<crate::atom::Atom, crate::bond::SmilesBond> = Mol::new();
+        let mol: Mol<crate::atom::Atom, crate::bond::AromaticBond> = Mol::new();
         assert_eq!(mol_formula(&mol), "");
     }
 
     #[test]
     fn empty_mol_weight() {
-        let mol: Mol<crate::atom::Atom, crate::bond::SmilesBond> = Mol::new();
+        let mol: Mol<crate::atom::Atom, crate::bond::AromaticBond> = Mol::new();
         assert_eq!(average_mol_weight(&mol), 0.0);
         assert_eq!(exact_mol_weight(&mol), 0.0);
     }

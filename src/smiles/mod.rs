@@ -21,7 +21,7 @@
 //! | Function | Returns | Use case |
 //! |---|---|---|
 //! | [`from_smiles`] | `Mol<Atom, Bond>` | Normal usage — fully kekulized molecule |
-//! | [`parse_smiles`] | `Mol<Atom, SmilesBond>` | Low-level — aromatic bonds preserved |
+//! | [`parse_smiles`] | `Mol<Atom, AromaticBond>` | Low-level — aromatic bonds preserved |
 //! | [`to_smiles`] | `String` | Non-canonical SMILES output |
 //! | [`to_canonical_smiles`] | `String` | Canonical SMILES output |
 
@@ -32,7 +32,7 @@ mod tokenizer;
 mod writer;
 
 use crate::atom::Atom;
-use crate::bond::{Bond, SmilesBond};
+use crate::bond::{AromaticBond, Bond};
 use crate::kekulize;
 use crate::mol::Mol;
 pub use error::SmilesError;
@@ -40,7 +40,7 @@ pub use writer::{to_canonical_smiles, to_smiles};
 
 /// Parses a SMILES string without kekulization.
 ///
-/// Returns a `Mol<Atom, SmilesBond>` with aromatic and implicit bonds intact.
+/// Returns a `Mol<Atom, AromaticBond>` with aromatic bonds intact.
 /// This is rarely needed outside internal use; prefer [`from_smiles`] for
 /// normal molecule construction.
 ///
@@ -48,7 +48,7 @@ pub use writer::{to_canonical_smiles, to_smiles};
 ///
 /// Returns [`SmilesError`] on invalid syntax, unclosed rings, or mismatched
 /// parentheses.
-pub fn parse_smiles(s: &str) -> Result<Mol<Atom, SmilesBond>, SmilesError> {
+pub fn parse_smiles(s: &str) -> Result<Mol<Atom, AromaticBond>, SmilesError> {
     let trimmed = s.trim();
     if trimmed.is_empty() {
         return Err(SmilesError::EmptyInput);
@@ -88,14 +88,14 @@ pub fn from_smiles(s: &str) -> Result<Mol<Atom, Bond>, SmilesError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bond::SmilesBondOrder;
+    use crate::bond::{AromaticBondOrder, BondOrder};
     use petgraph::graph::NodeIndex;
 
     fn n(i: usize) -> NodeIndex {
         NodeIndex::new(i)
     }
 
-    fn atom(mol: &Mol<Atom, SmilesBond>, i: usize) -> &Atom {
+    fn atom(mol: &Mol<Atom, AromaticBond>, i: usize) -> &Atom {
         mol.atom(n(i))
     }
 
@@ -127,7 +127,10 @@ mod tests {
         assert_eq!(atom(&mol, 0).hydrogen_count, 2);
         assert_eq!(atom(&mol, 1).hydrogen_count, 2);
         let edge = mol.bond_between(n(0), n(1)).unwrap();
-        assert_eq!(mol.bond(edge).order, SmilesBondOrder::Double);
+        assert_eq!(
+            mol.bond(edge).order,
+            AromaticBondOrder::Known(BondOrder::Double)
+        );
     }
 
     #[test]
@@ -138,7 +141,10 @@ mod tests {
         assert_eq!(atom(&mol, 0).hydrogen_count, 1);
         assert_eq!(atom(&mol, 1).hydrogen_count, 1);
         let edge = mol.bond_between(n(0), n(1)).unwrap();
-        assert_eq!(mol.bond(edge).order, SmilesBondOrder::Triple);
+        assert_eq!(
+            mol.bond(edge).order,
+            AromaticBondOrder::Known(BondOrder::Triple)
+        );
     }
 
     #[test]
@@ -311,7 +317,7 @@ mod tests {
             assert_eq!(atom(&mol, i).hydrogen_count, 1);
         }
         for edge in mol.bonds() {
-            assert_eq!(mol.bond(edge).order, SmilesBondOrder::Aromatic);
+            assert_eq!(mol.bond(edge).order, AromaticBondOrder::Aromatic);
         }
     }
 
@@ -380,7 +386,10 @@ mod tests {
         let mol = parse_smiles("F/C=C/F").unwrap();
         assert_eq!(mol.atom_count(), 4);
         let double_edge = mol.bond_between(n(1), n(2)).unwrap();
-        assert_eq!(mol.bond(double_edge).order, SmilesBondOrder::Double);
+        assert_eq!(
+            mol.bond(double_edge).order,
+            AromaticBondOrder::Known(BondOrder::Double)
+        );
         assert!(
             mol.ez_stereo_for(n(1), n(2)).is_some(),
             "expected E/Z stereo"
@@ -515,7 +524,10 @@ mod tests {
         assert_eq!(mol.atom_count(), 2);
         assert_eq!(mol.bond_count(), 1);
         let edge = mol.bond_between(n(0), n(1)).unwrap();
-        assert_eq!(mol.bond(edge).order, SmilesBondOrder::Single);
+        assert_eq!(
+            mol.bond(edge).order,
+            AromaticBondOrder::Known(BondOrder::Single)
+        );
         assert_eq!(atom(&mol, 0).hydrogen_count, 3);
     }
 
@@ -608,7 +620,10 @@ mod tests {
         assert_eq!(mol.atom_count(), 7);
         assert_eq!(atom(&mol, 0).hydrogen_count, 1); // OH
         let bond_o_c = mol.bond_between(n(0), n(1)).unwrap();
-        assert_eq!(mol.bond(bond_o_c).order, SmilesBondOrder::Implicit);
+        assert_eq!(
+            mol.bond(bond_o_c).order,
+            AromaticBondOrder::Known(BondOrder::Single)
+        );
     }
 
     // ---- Phosphorus with 5 bonds ----
@@ -641,7 +656,10 @@ mod tests {
         assert_eq!(mol.atom_count(), 12);
         assert_eq!(mol.bond_count(), 13);
         let inter_ring = mol.bond_between(n(3), n(4)).unwrap();
-        assert_eq!(mol.bond(inter_ring).order, SmilesBondOrder::Single);
+        assert_eq!(
+            mol.bond(inter_ring).order,
+            AromaticBondOrder::Known(BondOrder::Single)
+        );
     }
 
     #[test]
@@ -650,7 +668,7 @@ mod tests {
         assert_eq!(mol.atom_count(), 12);
         assert_eq!(mol.bond_count(), 13);
         let inter_ring = mol.bond_between(n(3), n(4)).unwrap();
-        assert_eq!(mol.bond(inter_ring).order, SmilesBondOrder::Aromatic);
+        assert_eq!(mol.bond(inter_ring).order, AromaticBondOrder::Aromatic);
     }
 
     #[test]
@@ -658,7 +676,10 @@ mod tests {
         let mol = parse_smiles("c1ccc(=O)cc1").unwrap();
         assert_eq!(mol.atom_count(), 7);
         let bond_c_o = mol.bond_between(n(3), n(4)).unwrap();
-        assert_eq!(mol.bond(bond_c_o).order, SmilesBondOrder::Double);
+        assert_eq!(
+            mol.bond(bond_c_o).order,
+            AromaticBondOrder::Known(BondOrder::Double)
+        );
         assert_eq!(atom(&mol, 4).atomic_num, 8);
     }
 
@@ -668,6 +689,9 @@ mod tests {
         assert_eq!(mol.atom_count(), 12);
         assert_eq!(mol.bond_count(), 13);
         let inter_ring = mol.bond_between(n(3), n(4)).unwrap();
-        assert_eq!(mol.bond(inter_ring).order, SmilesBondOrder::Single);
+        assert_eq!(
+            mol.bond(inter_ring).order,
+            AromaticBondOrder::Known(BondOrder::Single)
+        );
     }
 }

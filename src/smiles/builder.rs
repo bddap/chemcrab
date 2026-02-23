@@ -1,13 +1,25 @@
 use petgraph::graph::NodeIndex;
 
 use crate::atom::Atom;
-use crate::bond::{SmilesBond, SmilesBondOrder};
+use crate::bond::{AromaticBond, AromaticBondOrder, BondOrder, SmilesBondOrder};
 use crate::element::Element;
 use crate::mol::{AtomId, EZStereo, Mol, TetrahedralStereo};
 use crate::smiles::parse_tree::{ParseAtom, ParseTree};
 use crate::smiles::tokenizer::{BondToken, ChiralityToken};
 
-pub fn build_mol(tree: &ParseTree) -> Mol<Atom, SmilesBond> {
+fn smiles_to_aromatic_bond(order: SmilesBondOrder) -> AromaticBond {
+    let ab_order = match order {
+        SmilesBondOrder::Single | SmilesBondOrder::Implicit => {
+            AromaticBondOrder::Known(BondOrder::Single)
+        }
+        SmilesBondOrder::Double => AromaticBondOrder::Known(BondOrder::Double),
+        SmilesBondOrder::Triple => AromaticBondOrder::Known(BondOrder::Triple),
+        SmilesBondOrder::Aromatic => AromaticBondOrder::Aromatic,
+    };
+    AromaticBond { order: ab_order }
+}
+
+pub fn build_mol(tree: &ParseTree) -> Mol<Atom, AromaticBond> {
     let mut mol = Mol::new();
     let mut node_indices: Vec<NodeIndex> = Vec::with_capacity(tree.atoms.len());
 
@@ -33,7 +45,7 @@ pub fn build_mol(tree: &ParseTree) -> Mol<Atom, SmilesBond> {
                     parse_atom.is_aromatic,
                     tree.atoms[j].is_aromatic,
                 );
-                let bond = SmilesBond { order };
+                let bond = smiles_to_aromatic_bond(order);
                 mol.add_bond(node_indices[i], node_indices[j], bond);
                 added_edges[i].push(j);
                 added_edges[j].push(i);
@@ -69,7 +81,7 @@ fn resolve_bond_order(
     }
 }
 
-fn resolve_chirality(mol: &mut Mol<Atom, SmilesBond>, tree: &ParseTree, indices: &[NodeIndex]) {
+fn resolve_chirality(mol: &mut Mol<Atom, AromaticBond>, tree: &ParseTree, indices: &[NodeIndex]) {
     for (i, parse_atom) in tree.atoms.iter().enumerate() {
         if parse_atom.chirality == ChiralityToken::None {
             continue;
@@ -128,7 +140,7 @@ fn resolve_chirality(mol: &mut Mol<Atom, SmilesBond>, tree: &ParseTree, indices:
     }
 }
 
-fn resolve_ez_stereo(mol: &mut Mol<Atom, SmilesBond>, tree: &ParseTree, indices: &[NodeIndex]) {
+fn resolve_ez_stereo(mol: &mut Mol<Atom, AromaticBond>, tree: &ParseTree, indices: &[NodeIndex]) {
     for (i, parse_atom) in tree.atoms.iter().enumerate() {
         for neighbor in &parse_atom.neighbors {
             let j = neighbor.atom_idx;
@@ -141,7 +153,7 @@ fn resolve_ez_stereo(mol: &mut Mol<Atom, SmilesBond>, tree: &ParseTree, indices:
                 None => continue,
             };
 
-            if mol.bond(edge_idx).order != SmilesBondOrder::Double {
+            if mol.bond(edge_idx).order != AromaticBondOrder::Known(BondOrder::Double) {
                 continue;
             }
 
@@ -189,7 +201,7 @@ fn resolve_ez_stereo(mol: &mut Mol<Atom, SmilesBond>, tree: &ParseTree, indices:
 }
 
 fn other_substituent(
-    mol: &Mol<Atom, SmilesBond>,
+    mol: &Mol<Atom, AromaticBond>,
     db_atom: NodeIndex,
     db_partner: NodeIndex,
     known_ref: NodeIndex,
@@ -243,7 +255,7 @@ fn find_directional_neighbor(
 }
 
 fn resolve_hydrogen_counts(
-    mol: &mut Mol<Atom, SmilesBond>,
+    mol: &mut Mol<Atom, AromaticBond>,
     tree: &ParseTree,
     indices: &[NodeIndex],
 ) {
@@ -257,7 +269,11 @@ fn resolve_hydrogen_counts(
     }
 }
 
-fn compute_implicit_h(mol: &Mol<Atom, SmilesBond>, node: NodeIndex, parse_atom: &ParseAtom) -> u8 {
+fn compute_implicit_h(
+    mol: &Mol<Atom, AromaticBond>,
+    node: NodeIndex,
+    parse_atom: &ParseAtom,
+) -> u8 {
     let valences = parse_atom.element.default_valences();
     if valences.is_empty() {
         return 0;
@@ -287,15 +303,14 @@ fn compute_implicit_h(mol: &Mol<Atom, SmilesBond>, node: NodeIndex, parse_atom: 
     h
 }
 
-fn bond_order_sum(mol: &Mol<Atom, SmilesBond>, node: NodeIndex) -> u8 {
+fn bond_order_sum(mol: &Mol<Atom, AromaticBond>, node: NodeIndex) -> u8 {
     let mut sum: u8 = 0;
     for edge_idx in mol.bonds_of(node) {
         let order = match mol.bond(edge_idx).order {
-            SmilesBondOrder::Single => 1,
-            SmilesBondOrder::Double => 2,
-            SmilesBondOrder::Triple => 3,
-            SmilesBondOrder::Aromatic => 1,
-            SmilesBondOrder::Implicit => 1,
+            AromaticBondOrder::Known(BondOrder::Single) => 1,
+            AromaticBondOrder::Known(BondOrder::Double) => 2,
+            AromaticBondOrder::Known(BondOrder::Triple) => 3,
+            AromaticBondOrder::Aromatic => 1,
         };
         sum = sum.saturating_add(order);
     }
@@ -313,7 +328,7 @@ mod tests {
     use crate::smiles::parse_tree::build_parse_tree;
     use crate::smiles::tokenizer::tokenize;
 
-    fn parse(s: &str) -> Mol<Atom, SmilesBond> {
+    fn parse(s: &str) -> Mol<Atom, AromaticBond> {
         let tokens = tokenize(s).unwrap();
         let tree = build_parse_tree(&tokens).unwrap();
         build_mol(&tree)

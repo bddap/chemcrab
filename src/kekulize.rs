@@ -1,6 +1,6 @@
 //! Kekulization assigns alternating single and double bonds to aromatic ring systems.
 //!
-//! The input is a `Mol<Atom, SmilesBond>` whose aromatic bonds come from
+//! The input is a `Mol<Atom, AromaticBond>` whose aromatic bonds come from
 //! SMILES lowercase atoms (e.g., `c1ccccc1`). The output is a
 //! `Mol<Atom, Bond>` with concrete single/double bonds forming a valid
 //! Kekulé structure. Implemented via augmenting-path maximum matching.
@@ -14,7 +14,7 @@ use std::fmt;
 use petgraph::graph::{EdgeIndex, NodeIndex};
 
 use crate::atom::Atom;
-use crate::bond::{Bond, BondOrder, SmilesBond, SmilesBondOrder};
+use crate::bond::{AromaticBond, AromaticBondOrder, Bond, BondOrder};
 use crate::element::Element;
 use crate::mol::Mol;
 
@@ -49,14 +49,14 @@ impl std::error::Error for KekulizeError {}
 
 /// Convert a molecule with aromatic bonds into one with explicit Kekulé bonds.
 ///
-/// Aromatic bonds (`SmilesBondOrder::Aromatic`) are replaced with
+/// Aromatic bonds (`AromaticBondOrder::Aromatic`) are replaced with
 /// `BondOrder::Single` or `BondOrder::Double` such that every atom that
 /// needs a double bond receives exactly one. Non-aromatic bonds and
 /// stereochemistry are preserved unchanged.
-pub fn kekulize(mol: Mol<Atom, SmilesBond>) -> Result<Mol<Atom, Bond>, KekulizeError> {
+pub fn kekulize(mol: Mol<Atom, AromaticBond>) -> Result<Mol<Atom, Bond>, KekulizeError> {
     let aromatic_edges: Vec<EdgeIndex> = mol
         .bonds()
-        .filter(|&e| mol.bond(e).order == SmilesBondOrder::Aromatic)
+        .filter(|&e| mol.bond(e).order == AromaticBondOrder::Aromatic)
         .collect();
 
     let n = mol.atom_count();
@@ -105,11 +105,10 @@ pub fn kekulize(mol: Mol<Atom, SmilesBond>) -> Result<Mol<Atom, Bond>, KekulizeE
             let bond_order_sum: u8 = mol
                 .bonds_of(node)
                 .map(|e| match mol.bond(e).order {
-                    SmilesBondOrder::Single => 1,
-                    SmilesBondOrder::Double => 2,
-                    SmilesBondOrder::Triple => 3,
-                    SmilesBondOrder::Aromatic => 1,
-                    SmilesBondOrder::Implicit => 1,
+                    AromaticBondOrder::Known(BondOrder::Single) => 1,
+                    AromaticBondOrder::Known(BondOrder::Double) => 2,
+                    AromaticBondOrder::Known(BondOrder::Triple) => 3,
+                    AromaticBondOrder::Aromatic => 1,
                 })
                 .sum();
 
@@ -169,18 +168,16 @@ pub fn kekulize(mol: Mol<Atom, SmilesBond>) -> Result<Mol<Atom, Bond>, KekulizeE
             Some(pair) => pair,
             None => continue,
         };
-        let smiles_bond = mol.bond(edge);
-        let order = match smiles_bond.order {
-            SmilesBondOrder::Aromatic => {
+        let aromatic_bond = mol.bond(edge);
+        let order = match aromatic_bond.order {
+            AromaticBondOrder::Aromatic => {
                 if matched_edges.contains(&edge) {
                     BondOrder::Double
                 } else {
                     BondOrder::Single
                 }
             }
-            SmilesBondOrder::Implicit | SmilesBondOrder::Single => BondOrder::Single,
-            SmilesBondOrder::Double => BondOrder::Double,
-            SmilesBondOrder::Triple => BondOrder::Triple,
+            AromaticBondOrder::Known(bo) => bo,
         };
         result.add_bond(node_map[a.index()], node_map[b.index()], Bond { order });
     }
@@ -211,7 +208,7 @@ fn target_valence(elem: Element, current_used: u8, formal_charge: i8) -> Option<
 }
 
 fn augment(
-    mol: &Mol<Atom, SmilesBond>,
+    mol: &Mol<Atom, AromaticBond>,
     aromatic_adj: &[Vec<(NodeIndex, EdgeIndex)>],
     needs_double: &[bool],
     matched_edge: &mut [Option<EdgeIndex>],
@@ -256,7 +253,7 @@ fn augment(
 }
 
 fn flip_path(
-    _mol: &Mol<Atom, SmilesBond>,
+    _mol: &Mol<Atom, AromaticBond>,
     matched_edge: &mut [Option<EdgeIndex>],
     prev: &[Option<(NodeIndex, EdgeIndex)>],
     start: NodeIndex,

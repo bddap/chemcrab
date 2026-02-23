@@ -256,8 +256,7 @@ pub fn remove_hs_with(mol: &Mol<Atom, Bond>, opts: &RemoveHsOptions) -> Mol<Atom
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bond::SmilesBond;
-    use crate::bond::SmilesBondOrder;
+    use crate::bond::{AromaticBond, AromaticBondOrder};
     use crate::mol::{AtomId, TetrahedralStereo};
     use crate::smiles::{from_smiles, parse_smiles, to_smiles};
     use petgraph::graph::NodeIndex;
@@ -271,12 +270,10 @@ mod tests {
         }
         for edge in smol.bonds() {
             let (a, b) = smol.bond_endpoints(edge).unwrap();
-            let sb: &SmilesBond = smol.bond(edge);
+            let sb: &AromaticBond = smol.bond(edge);
             let order = match sb.order {
-                SmilesBondOrder::Single | SmilesBondOrder::Implicit => BondOrder::Single,
-                SmilesBondOrder::Double => BondOrder::Double,
-                SmilesBondOrder::Triple => BondOrder::Triple,
-                SmilesBondOrder::Aromatic => BondOrder::Single,
+                AromaticBondOrder::Known(bo) => bo,
+                AromaticBondOrder::Aromatic => BondOrder::Single,
             };
             mol.add_bond(map[a.index()], map[b.index()], Bond { order });
         }

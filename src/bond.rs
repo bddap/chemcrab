@@ -2,7 +2,7 @@
 ///
 /// Every bond in a [`Mol<Atom, Bond>`](crate::Mol) has one of these three
 /// orders. There is no `Aromatic` variant — aromatic bonds only exist in the
-/// intermediate [`SmilesBond`] type before kekulization resolves them to
+/// intermediate [`AromaticBond`] type before kekulization resolves them to
 /// alternating single and double bonds.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum BondOrder {
@@ -39,44 +39,44 @@ impl crate::traits::HasBondOrder for Bond {
     }
 }
 
-/// Bond order set used during SMILES parsing, before kekulization.
+/// Bond order that may contain unresolved aromatic bonds.
 ///
-/// SMILES encodes bonds between lowercase (aromatic) atoms as [`Aromatic`](SmilesBondOrder::Aromatic),
-/// and bonds written without an explicit symbol as [`Implicit`](SmilesBondOrder::Implicit)
-/// (single between aliphatic atoms, aromatic between aromatic atoms).
-/// Kekulization resolves these to concrete [`BondOrder`] values (single or
-/// double).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
-pub enum SmilesBondOrder {
-    /// Explicit single bond (`-` in SMILES).
-    Single,
-    /// Explicit double bond (`=` in SMILES).
-    Double,
-    /// Explicit triple bond (`#` in SMILES).
-    Triple,
-    /// Bond between two aromatic atoms (lowercase letters in SMILES).
+/// Before kekulization, bonds between aromatic atoms are represented as
+/// [`Aromatic`](Self::Aromatic). After kekulization, every bond has a
+/// concrete [`BondOrder`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum AromaticBondOrder {
+    /// A resolved bond order (single, double, or triple).
+    Known(BondOrder),
+    /// An aromatic bond awaiting kekulization.
     Aromatic,
-    /// No explicit bond symbol between adjacent atoms.
-    ///
-    /// Resolves to single for aliphatic pairs, aromatic for aromatic pairs.
-    #[default]
-    Implicit,
 }
 
-/// Pre-kekulization bond type used during SMILES parsing.
+/// Pre-kekulization bond type.
 ///
-/// This is the bond type in `Mol<Atom, SmilesBond>`, the intermediate
-/// representation before kekulization converts it to `Mol<Atom, Bond>`.
+/// This is the bond type in molecules that may still contain aromatic bonds.
+/// Call [`kekulize`](crate::kekulize::kekulize) to resolve aromatic bonds
+/// and obtain a `Mol<Atom, Bond>`.
 #[derive(Debug, Clone, PartialEq)]
-pub struct SmilesBond {
-    /// The pre-kekulization bond order.
-    pub order: SmilesBondOrder,
+pub struct AromaticBond {
+    /// The bond order, which may be aromatic.
+    pub order: AromaticBondOrder,
 }
 
-impl Default for SmilesBond {
+impl Default for AromaticBond {
     fn default() -> Self {
         Self {
-            order: SmilesBondOrder::Implicit,
+            order: AromaticBondOrder::Known(BondOrder::Single),
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub(crate) enum SmilesBondOrder {
+    Single,
+    Double,
+    Triple,
+    Aromatic,
+    #[default]
+    Implicit,
 }

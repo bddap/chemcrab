@@ -3,10 +3,9 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use petgraph::graph::NodeIndex;
 
 use crate::atom::Atom;
-use crate::bond::{Bond, BondOrder, SmilesBond, SmilesBondOrder};
+use crate::bond::{AromaticBond, AromaticBondOrder, Bond, BondOrder};
 use crate::element::Element;
 use crate::hydrogen;
-use crate::kekulize::kekulize;
 use crate::mol::Mol;
 use crate::smarts::{get_smarts_matches_all, AtomExpr, BondExpr};
 
@@ -40,7 +39,7 @@ impl Reaction {
     pub fn run(
         &self,
         reactants: &[&Mol<Atom, Bond>],
-    ) -> Result<Vec<Vec<Mol<Atom, Bond>>>, ReactionError> {
+    ) -> Result<Vec<Vec<Mol<Atom, AromaticBond>>>, ReactionError> {
         if reactants.len() != self.reactant_templates.len() {
             return Err(ReactionError::WrongReactantCount {
                 expected: self.reactant_templates.len(),
@@ -85,21 +84,10 @@ impl Reaction {
 
         let combinations = cartesian_product(&per_template_matches, MAX_COMBINATIONS)?;
 
-        let any_explicit = needs_explicit.iter().any(|&b| b);
-
         let mut results = Vec::new();
         for combo in &combinations {
             let products = self.generate_products(combo, &effective_reactants)?;
-            if any_explicit {
-                results.push(
-                    products
-                        .into_iter()
-                        .map(|p| hydrogen::remove_hs(&p))
-                        .collect(),
-                );
-            } else {
-                results.push(products);
-            }
+            results.push(products);
         }
 
         Ok(results)
@@ -109,7 +97,7 @@ impl Reaction {
         &self,
         match_combo: &[&HashMap<NodeIndex, NodeIndex>],
         reactants: &[&Mol<Atom, Bond>],
-    ) -> Result<Vec<Mol<Atom, Bond>>, ReactionError> {
+    ) -> Result<Vec<Mol<Atom, AromaticBond>>, ReactionError> {
         let reactant_atom_map = build_reactant_atom_map(&self.reactant_templates, match_combo)?;
 
         let matched_target_atoms = collect_matched_atoms(match_combo);
@@ -181,27 +169,23 @@ fn collect_template_bonds(templates: &[Mol<AtomExpr, BondExpr>]) -> Vec<HashSet<
         .collect()
 }
 
-fn bond_to_smiles_bond(bond: &Bond) -> SmilesBond {
-    SmilesBond {
-        order: match bond.order {
-            BondOrder::Single => SmilesBondOrder::Single,
-            BondOrder::Double => SmilesBondOrder::Double,
-            BondOrder::Triple => SmilesBondOrder::Triple,
-        },
+fn bond_to_aromatic_bond(bond: &Bond) -> AromaticBond {
+    AromaticBond {
+        order: AromaticBondOrder::Known(bond.order),
     }
 }
 
-fn bond_to_smiles_bond_aromatic_aware(
+fn bond_to_aromatic_bond_aromatic_aware(
     bond: &Bond,
     src_aromatic: bool,
     dst_aromatic: bool,
-) -> SmilesBond {
+) -> AromaticBond {
     if src_aromatic && dst_aromatic {
-        SmilesBond {
-            order: SmilesBondOrder::Aromatic,
+        AromaticBond {
+            order: AromaticBondOrder::Aromatic,
         }
     } else {
-        bond_to_smiles_bond(bond)
+        bond_to_aromatic_bond(bond)
     }
 }
 
@@ -211,8 +195,8 @@ fn generate_single_product(
     matched_target_atoms: &[HashSet<NodeIndex>],
     reactant_template_bonds: &[HashSet<(u16, u16)>],
     reactants: &[&Mol<Atom, Bond>],
-) -> Result<Mol<Atom, Bond>, ReactionError> {
-    let mut product: Mol<Atom, SmilesBond> = Mol::new();
+) -> Result<Mol<Atom, AromaticBond>, ReactionError> {
+    let mut product: Mol<Atom, AromaticBond> = Mol::new();
 
     let mut product_node_map: HashMap<NodeIndex, NodeIndex> = HashMap::new();
     let mut map_num_to_product_node: HashMap<u16, NodeIndex> = HashMap::new();
@@ -246,7 +230,7 @@ fn generate_single_product(
     for edge in product_tmpl.bonds() {
         if let Some((a, b)) = product_tmpl.bond_endpoints(edge) {
             let bond_expr = product_tmpl.bond(edge);
-            let bond = smiles_bond_from_expr(bond_expr);
+            let bond = aromatic_bond_from_expr(bond_expr);
             let pa = product_node_map[&a];
             let pb = product_node_map[&b];
             product.add_bond(pa, pb, bond);
@@ -297,7 +281,7 @@ fn generate_single_product(
                                 if let Some(edge) = reactant_mol.bond_between(t_idx, neighbor) {
                                     let src_arom = reactant_mol.atom(t_idx).is_aromatic;
                                     let dst_arom = reactant_mol.atom(neighbor).is_aromatic;
-                                    let bond = bond_to_smiles_bond_aromatic_aware(
+                                    let bond = bond_to_aromatic_bond_aromatic_aware(
                                         reactant_mol.bond(edge),
                                         src_arom,
                                         dst_arom,
@@ -327,12 +311,12 @@ fn generate_single_product(
     let carried_product_nodes: HashSet<NodeIndex> = carried_atom_map.values().copied().collect();
     recalculate_hydrogen_counts(&mut product, &explicit_h_atoms, &carried_product_nodes);
 
-    Ok(kekulize(product)?)
+    Ok(product)
 }
 
 #[allow(clippy::too_many_arguments)]
 fn carry_substituents(
-    product: &mut Mol<Atom, SmilesBond>,
+    product: &mut Mol<Atom, AromaticBond>,
     reactant_mol: &Mol<Atom, Bond>,
     matched: &HashSet<NodeIndex>,
     anchor: NodeIndex,
@@ -353,7 +337,11 @@ fn carry_substituents(
                 product.add_bond(
                     product_anchor,
                     carried_node,
-                    bond_to_smiles_bond_aromatic_aware(reactant_mol.bond(edge), src_arom, dst_arom),
+                    bond_to_aromatic_bond_aromatic_aware(
+                        reactant_mol.bond(edge),
+                        src_arom,
+                        dst_arom,
+                    ),
                 );
             }
         }
@@ -369,7 +357,7 @@ fn carry_substituents(
         product.add_bond(
             product_anchor,
             new_node,
-            bond_to_smiles_bond_aromatic_aware(reactant_mol.bond(edge), src_arom, dst_arom),
+            bond_to_aromatic_bond_aromatic_aware(reactant_mol.bond(edge), src_arom, dst_arom),
         );
     }
 
@@ -389,7 +377,7 @@ fn carry_substituents(
                         product.add_bond(
                             p_node,
                             existing,
-                            bond_to_smiles_bond_aromatic_aware(
+                            bond_to_aromatic_bond_aromatic_aware(
                                 reactant_mol.bond(edge),
                                 src_arom,
                                 dst_arom,
@@ -409,7 +397,11 @@ fn carry_substituents(
                 product.add_bond(
                     p_node,
                     nb_product,
-                    bond_to_smiles_bond_aromatic_aware(reactant_mol.bond(edge), src_arom, dst_arom),
+                    bond_to_aromatic_bond_aromatic_aware(
+                        reactant_mol.bond(edge),
+                        src_arom,
+                        dst_arom,
+                    ),
                 );
             }
 
@@ -495,21 +487,23 @@ fn apply_expr_to_atom(atom: &mut Atom, expr: &AtomExpr) {
     }
 }
 
-fn smiles_bond_from_expr(expr: &BondExpr) -> SmilesBond {
+fn aromatic_bond_from_expr(expr: &BondExpr) -> AromaticBond {
     let order = match expr {
-        BondExpr::Single | BondExpr::SingleOrAromatic => SmilesBondOrder::Single,
-        BondExpr::Double => SmilesBondOrder::Double,
-        BondExpr::Triple => SmilesBondOrder::Triple,
-        BondExpr::Aromatic => SmilesBondOrder::Aromatic,
+        BondExpr::Single | BondExpr::SingleOrAromatic => {
+            AromaticBondOrder::Known(BondOrder::Single)
+        }
+        BondExpr::Double => AromaticBondOrder::Known(BondOrder::Double),
+        BondExpr::Triple => AromaticBondOrder::Known(BondOrder::Triple),
+        BondExpr::Aromatic => AromaticBondOrder::Aromatic,
         BondExpr::And(_)
         | BondExpr::Or(_)
         | BondExpr::Not(_)
         | BondExpr::Ring
         | BondExpr::True
         | BondExpr::Up
-        | BondExpr::Down => SmilesBondOrder::Single,
+        | BondExpr::Down => AromaticBondOrder::Known(BondOrder::Single),
     };
-    SmilesBond { order }
+    AromaticBond { order }
 }
 
 /// Extract the atom map number from a SMARTS atom expression, if present.
@@ -531,7 +525,7 @@ fn expr_has_explicit_h(expr: &AtomExpr) -> bool {
 }
 
 fn recalculate_hydrogen_counts(
-    product: &mut Mol<Atom, SmilesBond>,
+    product: &mut Mol<Atom, AromaticBond>,
     explicit_h_atoms: &HashSet<NodeIndex>,
     carried_atoms: &HashSet<NodeIndex>,
 ) {
@@ -559,10 +553,10 @@ fn recalculate_hydrogen_counts(
         let bond_order_sum: u16 = product
             .bonds_of(idx)
             .map(|ei| match product.bond(ei).order {
-                SmilesBondOrder::Single => 1u16,
-                SmilesBondOrder::Double => 2,
-                SmilesBondOrder::Triple => 3,
-                SmilesBondOrder::Aromatic | SmilesBondOrder::Implicit => 1,
+                AromaticBondOrder::Known(BondOrder::Single) => 1u16,
+                AromaticBondOrder::Known(BondOrder::Double) => 2,
+                AromaticBondOrder::Known(BondOrder::Triple) => 3,
+                AromaticBondOrder::Aromatic => 1,
             })
             .sum();
 
