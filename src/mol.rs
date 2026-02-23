@@ -1,3 +1,4 @@
+use petgraph::algo::connected_components;
 use petgraph::graph::{EdgeIndex, NodeIndex, UnGraph};
 use petgraph::visit::EdgeRef;
 
@@ -110,9 +111,9 @@ impl<A, B> Mol<A, B> {
         }
     }
 
-    /// Returns a reference to the underlying petgraph [`UnGraph`].
-    pub fn graph(&self) -> &UnGraph<A, B> {
-        &self.graph
+    /// Returns the number of connected components in the molecular graph.
+    pub fn connected_component_count(&self) -> usize {
+        connected_components(&self.graph)
     }
 
     /// Returns a reference to the atom at `idx`.
