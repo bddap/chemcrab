@@ -125,6 +125,18 @@ pub fn get_smarts_matches(
     target: &Mol<Atom, Bond>,
     query: &Mol<AtomExpr, BondExpr>,
 ) -> Vec<AtomMapping> {
+    uniquify_atom_mappings(&get_smarts_matches_all(target, query))
+}
+
+/// Returns all matches of `query` in `target`, including symmetric permutations.
+///
+/// Unlike [`get_smarts_matches`], this does not deduplicate matches that
+/// map to the same set of target atoms in different order — useful for
+/// reactions where each permutation produces a distinct product.
+pub fn get_smarts_matches_all(
+    target: &Mol<Atom, Bond>,
+    query: &Mol<AtomExpr, BondExpr>,
+) -> Vec<AtomMapping> {
     let ring_info = RingInfo::sssr(target);
     let recursive_matches = pre_evaluate_recursive(target, query, &ring_info);
 
@@ -134,7 +146,7 @@ pub fn get_smarts_matches(
         recursive_matches,
     };
 
-    let all = get_substruct_matches_with(
+    get_substruct_matches_with(
         target,
         query,
         |t_atom: &Atom, q_expr: &AtomExpr| {
@@ -155,8 +167,7 @@ pub fn get_smarts_matches(
                 .unwrap();
             q_bond.matches_with_ring_info(t_bond, t_endpoints, &ring_info, (t_a, t_b))
         },
-    );
-    uniquify_atom_mappings(&all)
+    )
 }
 
 /// Returns `true` if `target` contains a chirality-aware match for `query`.

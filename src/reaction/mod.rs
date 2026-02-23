@@ -492,7 +492,7 @@ mod tests {
     // --- Amide tests ---
 
     #[test]
-    #[ignore = "runner H-count bug: mapped atoms get wrong hydrogen_count"]
+
     fn test_rxn_amide_simple() {
         let rxn =
             from_reaction_smarts("[C:1](=[O:2])O.[N:3][C:4]>>[C:1](=[O:2])[N:3][C:4]").unwrap();
@@ -503,7 +503,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "runner H-count bug: mapped atoms get wrong hydrogen_count"]
+
     fn test_rxn_amide_acetic_acid() {
         let rxn =
             from_reaction_smarts("[C:1](=[O:2])O.[N:3][C:4]>>[C:1](=[O:2])[N:3][C:4]").unwrap();
@@ -514,7 +514,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "runner H-count bug: mapped atoms get wrong hydrogen_count"]
+
     fn test_rxn_amide_two_acid_groups() {
         let rxn =
             from_reaction_smarts("[C:1](=[O:2])O.[N:3][C:4]>>[C:1](=[O:2])[N:3][C:4]").unwrap();
@@ -532,7 +532,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "runner H-count bug: mapped atoms get wrong hydrogen_count"]
+
     fn test_rxn_amide_two_amine_groups() {
         let rxn =
             from_reaction_smarts("[C:1](=[O:2])O.[N:3][C:4]>>[C:1](=[O:2])[N:3][C:4]").unwrap();
@@ -552,7 +552,7 @@ mod tests {
     // --- Simple transform tests ---
 
     #[test]
-    #[ignore = "runner H-count bug: mapped atoms get wrong hydrogen_count"]
+
     fn test_rxn_dehydroxylation() {
         let rxn = from_reaction_smarts("[C:1]-O>>[C:1]").unwrap();
         let r = mol("CCO");
@@ -561,7 +561,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "runner H-count bug: mapped atoms get wrong hydrogen_count"]
+
     fn test_rxn_oh_to_sh() {
         let rxn = from_reaction_smarts("[C:1]-O>>[C:1]-S").unwrap();
         let r = mol("CCO");
@@ -578,7 +578,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "runner H-count bug: mapped atoms get wrong hydrogen_count"]
+
     fn test_rxn_carboxylic_acid_reduction() {
         let rxn = from_reaction_smarts("[C:1](=[O:2])[OH]>>[C:1][OH:2]").unwrap();
         let r = mol("CC(=O)O");
@@ -589,7 +589,7 @@ mod tests {
     // --- Substituent tests ---
 
     #[test]
-    #[ignore = "runner H-count bug: mapped atoms get wrong hydrogen_count"]
+
     fn test_rxn_carry_methyl() {
         let rxn = from_reaction_smarts("[C:1](=[O:2])[N:3]>>[C:1](=[O:2])[N:3]C").unwrap();
         let r = mol("CC(=O)NC");
@@ -598,7 +598,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "runner H-count bug: mapped atoms get wrong hydrogen_count"]
+
     fn test_rxn_carry_ring() {
         let rxn = from_reaction_smarts("[c:1][NH2:2]>>[c:1][N:2](C)C").unwrap();
         let r = mol("c1ccc(N)cc1");
@@ -607,7 +607,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "runner H-count + aromaticity bug: products lose aromaticity and have wrong H counts"]
+
     fn test_rxn_carry_large_substituent() {
         let rxn = from_reaction_smarts("[C:1](=O)[OH]>>[C:1](=O)OCC").unwrap();
         let r = mol("c1ccc(C(=O)O)cc1");
@@ -618,7 +618,7 @@ mod tests {
     // --- Bond tests ---
 
     #[test]
-    #[ignore = "runner H-count bug: mapped atoms get wrong hydrogen_count"]
+
     fn test_rxn_bond_formation_c_n() {
         let rxn = from_reaction_smarts("[C:1](=[O:2])O.[N:3]>>[C:1](=[O:2])[N:3]").unwrap();
         let r1 = mol("CC(=O)O");
@@ -628,7 +628,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "runner H-count bug: mapped atoms get wrong hydrogen_count"]
+
     fn test_rxn_bond_breaking_ester() {
         let rxn =
             from_reaction_smarts("[C:1](=[O:2])[O:3][C:4]>>[C:1](=[O:2])O.[O:3][C:4]").unwrap();
@@ -638,7 +638,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "runner H-count bug: mapped atoms get wrong hydrogen_count"]
+
     fn test_rxn_lactol_formation() {
         let rxn = from_reaction_smarts(
             "[OH:1][C:2][C:3][C:4][C:5]=[O:6]>>[O:1]1[C:2][C:3][C:4][C:5]1[OH:6]",
@@ -674,7 +674,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "runner match-count bug: symmetric N(C)(C)C yields 1 match instead of 6 permutations"]
+
     fn test_rxn_quaternization() {
         let rxn =
             from_reaction_smarts("[N:1]([C:2])([C:3])[C:4]>>[N+:1]([C:2])([C:3])([C:4])C").unwrap();
@@ -703,7 +703,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "runner aromaticity bug: product aromatic atoms written with wrong H counts"]
+
     fn test_rxn_aromatic_nitration() {
         let rxn = from_reaction_smarts("[cH:1]>>[c:1][N+](=O)[O-]").unwrap();
         let r = mol("c1ccccc1");
@@ -717,7 +717,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "runner H-count bug: mapped atoms get wrong hydrogen_count"]
+
     fn test_rxn_phenol_methylation() {
         let rxn = from_reaction_smarts("[c:1][OH:2]>>[c:1][O:2]C").unwrap();
         let r = mol("c1ccc(O)cc1");
@@ -728,7 +728,7 @@ mod tests {
     // --- Multi-product tests ---
 
     #[test]
-    #[ignore = "runner H-count bug: mapped atoms get wrong hydrogen_count"]
+
     fn test_rxn_ester_hydrolysis_two_products() {
         let rxn =
             from_reaction_smarts("[C:1](=[O:2])[O:3][C:4]>>[C:1](=[O:2])[OH].[C:4][O:3]").unwrap();
@@ -740,7 +740,7 @@ mod tests {
     // --- Multi-match tests ---
 
     #[test]
-    #[ignore = "runner aromaticity bug: product aromatic atoms written with wrong H counts"]
+
     fn test_rxn_disubstituted_benzene() {
         let rxn = from_reaction_smarts("[cH:1]>>[c:1]Cl").unwrap();
         let r = mol("c1ccccc1");
@@ -791,7 +791,7 @@ mod tests {
     // --- Unmapped atom tests ---
 
     #[test]
-    #[ignore = "runner H-count bug: mapped atoms get wrong hydrogen_count"]
+
     fn test_rxn_add_methyl() {
         let rxn = from_reaction_smarts("[N:1]>>[N:1]C").unwrap();
         let r = mol("NC");
@@ -800,7 +800,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "runner H-count bug: unmapped product atoms get wrong hydrogen_count"]
+
     fn test_rxn_add_functional_group() {
         let rxn = from_reaction_smarts("[C:1](=[O:2])O>>[C:1](=[O:2])NCCN").unwrap();
         let r = mol("CC(=O)O");
@@ -811,7 +811,7 @@ mod tests {
     // --- Hcount tests ---
 
     #[test]
-    #[ignore = "runner H-count + aromaticity bug: products lose aromaticity and have wrong H counts"]
+
     fn test_rxn_explicit_h_in_product() {
         let rxn = from_reaction_smarts("[NH2:1]>>[NH:1]C").unwrap();
         let r = mol("Nc1ccccc1");
@@ -820,7 +820,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "runner H-count bug: mapped atoms get wrong hydrogen_count"]
+
     fn test_rxn_remove_h() {
         let rxn = from_reaction_smarts("[CH3:1]>>[CH2:1]O").unwrap();
         let r = mol("CC");
@@ -961,7 +961,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "runner match-count bug: symmetric CC bond gives 1 match instead of 2 direction permutations"]
+
     fn test_rxn_empty_product_bonds() {
         let rxn = from_reaction_smarts("[C:1][C:2]>>[C:1].[C:2]").unwrap();
         let r = mol("CC");
@@ -979,7 +979,7 @@ mod tests {
     // --- Named reaction tests ---
 
     #[test]
-    #[ignore = "runner H-count bug: mapped atoms get wrong hydrogen_count"]
+
     fn test_rxn_fischer_esterification() {
         let rxn =
             from_reaction_smarts("[C:1](=[O:2])[OH].[OH:3][C:4]>>[C:1](=[O:2])[O:3][C:4]").unwrap();
@@ -990,7 +990,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "runner H-count bug: mapped atoms get wrong hydrogen_count"]
+
     fn test_rxn_williamson_ether() {
         let rxn = from_reaction_smarts("[C:1][OH:2].[Cl:3][C:4]>>[C:1][O:2][C:4]").unwrap();
         let r1 = mol("CO");
@@ -1009,7 +1009,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "runner match-count bug: boronic acid B(O)O gives 1 match instead of 2"]
+
     fn test_rxn_suzuki_coupling_simplified() {
         let rxn = from_reaction_smarts("[c:1][Br].[c:2]B(O)O>>[c:1][c:2]").unwrap();
         let r1 = mol("c1ccc(Br)cc1");
@@ -1032,7 +1032,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "runner H-count bug: unmapped product atoms get wrong hydrogen_count"]
+
     fn test_rxn_boc_protection() {
         let rxn = from_reaction_smarts("[NH2:1]>>[NH:1]C(=O)OC(C)(C)C").unwrap();
         let r = mol("NCC");
