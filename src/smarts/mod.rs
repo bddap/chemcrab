@@ -552,9 +552,10 @@ fn pre_evaluate_recursive(
             },
         );
 
+        let root = NodeIndex::new(0);
         for mapping in &matches {
-            if let Some(&(_q_first, t_first)) = mapping.first() {
-                matching_atoms.insert(t_first);
+            if let Some(&(_, t_root)) = mapping.iter().find(|&&(q, _)| q == root) {
+                matching_atoms.insert(t_root);
             }
         }
         results.insert(key, matching_atoms);
@@ -2465,5 +2466,33 @@ mod tests {
         let methane = mol("C");
         let q = smarts("[H]");
         assert_eq!(get_smarts_matches(&methane, &q).len(), 4);
+    }
+
+    #[test]
+    fn recursive_smarts_acetone_both_methyls() {
+        let target = mol("CC(=O)C");
+        let q = smarts("[$([CX4][CX3](=O))]");
+        assert_eq!(get_smarts_matches(&target, &q).len(), 2);
+    }
+
+    #[test]
+    fn recursive_smarts_mek_both_alphas() {
+        let target = mol("CCC(=O)C");
+        let q = smarts("[$([CX4][CX3](=O))]");
+        assert_eq!(get_smarts_matches(&target, &q).len(), 2);
+    }
+
+    #[test]
+    fn recursive_smarts_single_atom_unchanged() {
+        let target = mol("c1ccccc1");
+        let q = smarts("[$([cH1])]");
+        assert_eq!(get_smarts_matches(&target, &q).len(), 6);
+    }
+
+    #[test]
+    fn recursive_smarts_ethanol_oxygen() {
+        let target = mol("CCO");
+        let q = smarts("[$([OX2])]");
+        assert_eq!(get_smarts_matches(&target, &q).len(), 1);
     }
 }
