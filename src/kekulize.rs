@@ -115,9 +115,12 @@ pub fn kekulize(mol: Mol<Atom, SmilesBond>) -> Result<Mol<Atom, Bond>, KekulizeE
 
             let total_used = bond_order_sum + atom.hydrogen_count;
 
-            let target = target_valence(elem, total_used);
+            let target = target_valence(elem, total_used, atom.formal_charge);
             if let Some(tv) = target {
-                if tv > total_used && tv - total_used == 1 {
+                let gap = tv - total_used;
+                let is_bare_charged =
+                    gap == 2 && atom.hydrogen_count == 0 && atom.formal_charge != 0;
+                if gap == 1 || is_bare_charged {
                     needs_double[node.index()] = true;
                 }
             }
@@ -188,12 +191,23 @@ pub fn kekulize(mol: Mol<Atom, SmilesBond>) -> Result<Mol<Atom, Bond>, KekulizeE
     Ok(result)
 }
 
-fn target_valence(elem: Element, current_used: u8) -> Option<u8> {
+fn target_valence(elem: Element, current_used: u8, formal_charge: i8) -> Option<u8> {
     let valences = elem.default_valences();
     if valences.is_empty() {
         return None;
     }
-    valences.iter().copied().find(|&v| v >= current_used)
+    let charge = formal_charge as i16;
+    valences
+        .iter()
+        .filter_map(|&v| {
+            let adjusted = v as i16 + charge;
+            if adjusted > 0 {
+                Some(adjusted as u8)
+            } else {
+                None
+            }
+        })
+        .find(|&v| v >= current_used)
 }
 
 fn augment(
@@ -360,12 +374,19 @@ mod tests {
 
     #[test]
     fn cyclopentadienyl_anion() {
-        let smiles_mol = parse_smiles("[c-]1cccc1").unwrap();
+        let smiles_mol = parse_smiles("[cH-]1cccc1").unwrap();
         let mol = kekulize(smiles_mol).unwrap();
         assert_eq!(mol.atom_count(), 5);
         assert_eq!(mol.bond_count(), 5);
         assert_eq!(count_double_bonds(&mol), 2);
         assert!(is_valid_kekulization(&mol));
+    }
+
+    #[test]
+    fn cyclopentadienyl_anion_bare_fails() {
+        let smiles_mol = parse_smiles("[c-]1cccc1").unwrap();
+        let result = kekulize(smiles_mol);
+        assert!(result.is_err());
     }
 
     #[test]
@@ -497,12 +518,77 @@ mod tests {
     }
 
     #[test]
-    fn pyridinium() {
+    fn bare_pyridinium() {
         let smiles_mol = parse_smiles("[n+]1ccccc1").unwrap();
         let mol = kekulize(smiles_mol).unwrap();
         assert_eq!(mol.atom_count(), 6);
         assert_eq!(count_double_bonds(&mol), 3);
         assert!(is_valid_kekulization(&mol));
+    }
+
+    #[test]
+    fn methylpyridinium() {
+        let smiles_mol = parse_smiles("C[n+]1ccccc1").unwrap();
+        let mol = kekulize(smiles_mol).unwrap();
+        assert_eq!(mol.atom_count(), 7);
+        assert_eq!(count_double_bonds(&mol), 3);
+        assert!(is_valid_kekulization(&mol));
+    }
+
+    #[test]
+    fn pyridinium_ion() {
+        let smiles_mol = parse_smiles("c1cc[nH+]cc1").unwrap();
+        let mol = kekulize(smiles_mol).unwrap();
+        assert_eq!(mol.atom_count(), 6);
+        assert_eq!(count_double_bonds(&mol), 3);
+        assert!(is_valid_kekulization(&mol));
+    }
+
+    #[test]
+    fn imidazolium() {
+        let smiles_mol = parse_smiles("C[n+]1cc[nH]c1").unwrap();
+        let mol = kekulize(smiles_mol).unwrap();
+        assert_eq!(mol.atom_count(), 6);
+        assert_eq!(count_double_bonds(&mol), 2);
+        assert!(is_valid_kekulization(&mol));
+    }
+
+    #[test]
+    fn benzothiazolium() {
+        let smiles_mol = parse_smiles("Cc1sc2ccccc2[n+]1C").unwrap();
+        let mol = kekulize(smiles_mol).unwrap();
+        assert_eq!(mol.atom_count(), 11);
+        assert!(is_valid_kekulization(&mol));
+    }
+
+    #[test]
+    fn quinolinium() {
+        let smiles_mol = parse_smiles("c1ccc2[nH+]cccc2c1").unwrap();
+        let mol = kekulize(smiles_mol).unwrap();
+        assert_eq!(mol.atom_count(), 10);
+        assert_eq!(count_double_bonds(&mol), 5);
+        assert!(is_valid_kekulization(&mol));
+    }
+
+    #[test]
+    fn from_smiles_methylpyridinium() {
+        let mol = crate::smiles::from_smiles("C[n+]1ccccc1").unwrap();
+        assert_eq!(mol.atom_count(), 7);
+        assert_eq!(count_double_bonds(&mol), 3);
+    }
+
+    #[test]
+    fn from_smiles_pyridinium_ion() {
+        let mol = crate::smiles::from_smiles("c1cc[nH+]cc1").unwrap();
+        assert_eq!(mol.atom_count(), 6);
+        assert_eq!(count_double_bonds(&mol), 3);
+    }
+
+    #[test]
+    fn from_smiles_bare_pyridinium() {
+        let mol = crate::smiles::from_smiles("[n+]1ccccc1").unwrap();
+        assert_eq!(mol.atom_count(), 6);
+        assert_eq!(count_double_bonds(&mol), 3);
     }
 
     #[test]
