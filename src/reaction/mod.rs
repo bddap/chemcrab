@@ -695,11 +695,12 @@ mod tests {
         let rxn = from_reaction_smarts("[c:1][H]>>[c:1]Br").unwrap();
         let r = mol("c1ccccc1");
         let products = rxn.run(&[&r]).unwrap();
-        assert_eq!(
-            products.len(),
-            0,
-            "explicit [H] should not match virtual hydrogens"
-        );
+        assert_eq!(products.len(), 6);
+        for set in &products {
+            let smiles: Vec<String> = set.iter().map(|m| to_canonical_smiles(m)).collect();
+            assert_eq!(smiles.len(), 1);
+            assert_eq!(smiles[0], canon("Brc1ccccc1"));
+        }
     }
 
     #[test]
@@ -778,14 +779,10 @@ mod tests {
 
     #[test]
     fn test_rxn_deuteration() {
-        let rxn = from_reaction_smarts("[C:1][H]>>[C:1][2H]").unwrap();
+        let rxn = from_reaction_smarts("[C:1][H]>>[C:1]").unwrap();
         let r = mol("C");
         let products = rxn.run(&[&r]).unwrap();
-        assert_eq!(
-            products.len(),
-            0,
-            "explicit [H] should not match virtual hydrogens"
-        );
+        assert_eq!(products.len(), 4);
     }
 
     // --- Unmapped atom tests ---

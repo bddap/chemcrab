@@ -5,6 +5,7 @@ use petgraph::graph::NodeIndex;
 use crate::atom::Atom;
 use crate::bond::{Bond, BondOrder, SmilesBond, SmilesBondOrder};
 use crate::element::Element;
+use crate::hydrogen;
 use crate::kekulize::kekulize;
 use crate::mol::Mol;
 use crate::smarts::{get_smarts_matches_all, AtomExpr, BondExpr};
@@ -13,6 +14,22 @@ use super::error::ReactionError;
 use super::Reaction;
 
 const MAX_COMBINATIONS: usize = 1000;
+
+fn template_references_hydrogen(tmpl: &Mol<AtomExpr, BondExpr>) -> bool {
+    tmpl.atoms()
+        .any(|idx| expr_references_hydrogen_atom(tmpl.atom(idx)))
+}
+
+fn expr_references_hydrogen_atom(expr: &AtomExpr) -> bool {
+    match expr {
+        AtomExpr::Element { atomic_num: 1, .. } => true,
+        AtomExpr::And(parts) | AtomExpr::Or(parts) => {
+            parts.iter().any(expr_references_hydrogen_atom)
+        }
+        AtomExpr::Not(inner) => expr_references_hydrogen_atom(inner),
+        _ => false,
+    }
+}
 
 impl Reaction {
     /// Apply this reaction to a set of reactant molecules.
@@ -31,10 +48,29 @@ impl Reaction {
             });
         }
 
+        let needs_explicit: Vec<bool> = self
+            .reactant_templates
+            .iter()
+            .map(template_references_hydrogen)
+            .collect();
+
+        let explicit_mols: Vec<Mol<Atom, Bond>> = needs_explicit
+            .iter()
+            .zip(reactants.iter())
+            .map(|(&needs, mol)| {
+                if needs {
+                    hydrogen::add_hs(mol)
+                } else {
+                    (*mol).clone()
+                }
+            })
+            .collect();
+        let effective_reactants: Vec<&Mol<Atom, Bond>> = explicit_mols.iter().collect();
+
         let per_template_matches: Vec<Vec<HashMap<NodeIndex, NodeIndex>>> = self
             .reactant_templates
             .iter()
-            .zip(reactants.iter())
+            .zip(effective_reactants.iter())
             .map(|(tmpl, mol)| {
                 get_smarts_matches_all(mol, tmpl)
                     .into_iter()
@@ -49,10 +85,21 @@ impl Reaction {
 
         let combinations = cartesian_product(&per_template_matches, MAX_COMBINATIONS)?;
 
+        let any_explicit = needs_explicit.iter().any(|&b| b);
+
         let mut results = Vec::new();
         for combo in &combinations {
-            let products = self.generate_products(combo, reactants)?;
-            results.push(products);
+            let products = self.generate_products(combo, &effective_reactants)?;
+            if any_explicit {
+                results.push(
+                    products
+                        .into_iter()
+                        .map(|p| hydrogen::remove_hs(&p))
+                        .collect(),
+                );
+            } else {
+                results.push(products);
+            }
         }
 
         Ok(results)
