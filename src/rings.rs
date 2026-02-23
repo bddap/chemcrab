@@ -15,7 +15,6 @@
 
 use std::collections::VecDeque;
 
-use petgraph::algo::connected_components;
 use petgraph::graph::NodeIndex;
 
 use crate::mol::Mol;
@@ -164,7 +163,7 @@ impl RingInfo {
     pub fn expected_ring_count<A, B>(mol: &Mol<A, B>) -> usize {
         let v = mol.atom_count();
         let e = mol.bond_count();
-        let c = connected_components(mol.graph());
+        let c = mol.connected_component_count();
         (e + c).saturating_sub(v)
     }
 }

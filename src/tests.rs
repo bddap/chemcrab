@@ -223,8 +223,8 @@ fn mol_default() {
 }
 
 #[test]
-fn mol_graph_access() {
+fn mol_atom_count_after_add() {
     let mut mol = Mol::<Atom, Bond>::new();
     mol.add_atom(Atom::default());
-    assert_eq!(mol.graph().node_count(), 1);
+    assert_eq!(mol.atom_count(), 1);
 }
