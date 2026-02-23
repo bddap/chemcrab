@@ -58,9 +58,7 @@ use query::MatchContext;
 fn expr_references_hydrogen(expr: &AtomExpr) -> bool {
     match expr {
         AtomExpr::Element { atomic_num: 1, .. } => true,
-        AtomExpr::And(parts) | AtomExpr::Or(parts) => {
-            parts.iter().any(expr_references_hydrogen)
-        }
+        AtomExpr::And(parts) | AtomExpr::Or(parts) => parts.iter().any(expr_references_hydrogen),
         AtomExpr::Not(inner) => expr_references_hydrogen(inner),
         AtomExpr::Recursive(mol) => mol
             .atoms()
