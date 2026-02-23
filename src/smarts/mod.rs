@@ -55,6 +55,26 @@ use crate::substruct::{
 
 use query::MatchContext;
 
+fn expr_references_hydrogen(expr: &AtomExpr) -> bool {
+    match expr {
+        AtomExpr::Element { atomic_num: 1, .. } => true,
+        AtomExpr::And(parts) | AtomExpr::Or(parts) => {
+            parts.iter().any(expr_references_hydrogen)
+        }
+        AtomExpr::Not(inner) => expr_references_hydrogen(inner),
+        AtomExpr::Recursive(mol) => mol
+            .atoms()
+            .any(|idx| expr_references_hydrogen(mol.atom(idx))),
+        _ => false,
+    }
+}
+
+fn query_references_hydrogen(query: &Mol<AtomExpr, BondExpr>) -> bool {
+    query
+        .atoms()
+        .any(|idx| expr_references_hydrogen(query.atom(idx)))
+}
+
 type RecursiveRef<'a> = (*const Mol<AtomExpr, BondExpr>, &'a Mol<AtomExpr, BondExpr>);
 
 /// Parses a SMARTS pattern string into a query molecule.
@@ -81,6 +101,17 @@ pub fn has_smarts_match(target: &Mol<Atom, Bond>, query: &Mol<AtomExpr, BondExpr
 /// The returned [`AtomMapping`] maps each query atom index to its
 /// corresponding target atom index.
 pub fn get_smarts_match(
+    target: &Mol<Atom, Bond>,
+    query: &Mol<AtomExpr, BondExpr>,
+) -> Option<AtomMapping> {
+    if query_references_hydrogen(query) {
+        let explicit = crate::hydrogen::add_hs(target);
+        return get_smarts_match_impl(&explicit, query);
+    }
+    get_smarts_match_impl(target, query)
+}
+
+fn get_smarts_match_impl(
     target: &Mol<Atom, Bond>,
     query: &Mol<AtomExpr, BondExpr>,
 ) -> Option<AtomMapping> {
@@ -125,7 +156,11 @@ pub fn get_smarts_matches(
     target: &Mol<Atom, Bond>,
     query: &Mol<AtomExpr, BondExpr>,
 ) -> Vec<AtomMapping> {
-    uniquify_atom_mappings(&get_smarts_matches_all(target, query))
+    if query_references_hydrogen(query) {
+        let explicit = crate::hydrogen::add_hs(target);
+        return uniquify_atom_mappings(&get_smarts_matches_all_impl(&explicit, query));
+    }
+    uniquify_atom_mappings(&get_smarts_matches_all_impl(target, query))
 }
 
 /// Returns all matches of `query` in `target`, including symmetric permutations.
@@ -134,6 +169,17 @@ pub fn get_smarts_matches(
 /// map to the same set of target atoms in different order — useful for
 /// reactions where each permutation produces a distinct product.
 pub fn get_smarts_matches_all(
+    target: &Mol<Atom, Bond>,
+    query: &Mol<AtomExpr, BondExpr>,
+) -> Vec<AtomMapping> {
+    if query_references_hydrogen(query) {
+        let explicit = crate::hydrogen::add_hs(target);
+        return get_smarts_matches_all_impl(&explicit, query);
+    }
+    get_smarts_matches_all_impl(target, query)
+}
+
+fn get_smarts_matches_all_impl(
     target: &Mol<Atom, Bond>,
     query: &Mol<AtomExpr, BondExpr>,
 ) -> Vec<AtomMapping> {
@@ -186,6 +232,17 @@ pub fn get_smarts_match_chiral(
     target: &Mol<Atom, Bond>,
     query: &Mol<AtomExpr, BondExpr>,
 ) -> Option<AtomMapping> {
+    if query_references_hydrogen(query) {
+        let explicit = crate::hydrogen::add_hs(target);
+        return get_smarts_match_chiral_impl(&explicit, query);
+    }
+    get_smarts_match_chiral_impl(target, query)
+}
+
+fn get_smarts_match_chiral_impl(
+    target: &Mol<Atom, Bond>,
+    query: &Mol<AtomExpr, BondExpr>,
+) -> Option<AtomMapping> {
     let ring_info = RingInfo::sssr(target);
     let recursive_matches = pre_evaluate_recursive(target, query, &ring_info);
 
@@ -226,6 +283,17 @@ pub fn get_smarts_match_chiral(
 ///
 /// See [`has_smarts_match_chiral`] for details on chirality verification.
 pub fn get_smarts_matches_chiral(
+    target: &Mol<Atom, Bond>,
+    query: &Mol<AtomExpr, BondExpr>,
+) -> Vec<AtomMapping> {
+    if query_references_hydrogen(query) {
+        let explicit = crate::hydrogen::add_hs(target);
+        return get_smarts_matches_chiral_impl(&explicit, query);
+    }
+    get_smarts_matches_chiral_impl(target, query)
+}
+
+fn get_smarts_matches_chiral_impl(
     target: &Mol<Atom, Bond>,
     query: &Mol<AtomExpr, BondExpr>,
 ) -> Vec<AtomMapping> {
@@ -1199,7 +1267,8 @@ mod tests {
     fn match_bare_hydrogen() {
         let target = mol("C");
         let query = smarts("H");
-        assert!(!has_smarts_match(&target, &query));
+        assert!(has_smarts_match(&target, &query));
+        assert_eq!(get_smarts_matches(&target, &query).len(), 4);
     }
 
     #[test]
@@ -2322,5 +2391,81 @@ mod tests {
             .bond_between(NodeIndex::new(0), NodeIndex::new(1))
             .unwrap();
         assert_eq!(q.bond(edge_orig), reparsed.bond(edge_re));
+    }
+
+    // ---- [#1] / hydrogen SMARTS matching ----
+
+    #[test]
+    fn hydrogen_by_atomic_num() {
+        let methane = mol("C");
+        let q = smarts("[#1]");
+        assert_eq!(get_smarts_matches(&methane, &q).len(), 4);
+    }
+
+    #[test]
+    fn oh_hydrogen_match() {
+        let ethanol = mol("CCO");
+        let q = smarts("[OX2:1][#1:2]");
+        assert!(has_smarts_match(&ethanol, &q));
+        let matches = get_smarts_matches(&ethanol, &q);
+        assert_eq!(matches.len(), 1);
+    }
+
+    #[test]
+    fn water_hydrogen_matches() {
+        let water = mol("O");
+        let q = smarts("[OX2:1][#1:2]");
+        let matches = get_smarts_matches(&water, &q);
+        assert_eq!(matches.len(), 2);
+    }
+
+    #[test]
+    fn ch_hydrogen_match() {
+        let methane = mol("C");
+        let q = smarts("[CX4:1][#1:2]");
+        let matches = get_smarts_matches(&methane, &q);
+        assert_eq!(matches.len(), 4);
+    }
+
+    #[test]
+    fn no_hydrogen_query_unchanged() {
+        let benzene = mol("c1ccccc1");
+        let q = smarts("[cH]");
+        assert_eq!(get_smarts_matches(&benzene, &q).len(), 6);
+    }
+
+    #[test]
+    fn hydrogen_smarts_match_all() {
+        let methane = mol("C");
+        let q = smarts("[#1]");
+        assert_eq!(get_smarts_matches_all(&methane, &q).len(), 4);
+    }
+
+    #[test]
+    fn hydrogen_has_smarts_match() {
+        let methane = mol("C");
+        let q = smarts("[#1]");
+        assert!(has_smarts_match(&methane, &q));
+    }
+
+    #[test]
+    fn hydrogen_get_smarts_match() {
+        let ethanol = mol("CCO");
+        let q = smarts("[OX2][#1]");
+        assert!(get_smarts_match(&ethanol, &q).is_some());
+    }
+
+    #[test]
+    fn no_hydrogen_on_bare_metal() {
+        let iron = mol("[Fe]");
+        let q = smarts("[#1]");
+        assert!(!has_smarts_match(&iron, &q));
+    }
+
+    #[test]
+    fn bracket_h_matches_methane() {
+        let methane = mol("C");
+        let q = smarts("[H]");
+        assert_eq!(get_smarts_matches(&methane, &q).len(), 4);
     }
 }
