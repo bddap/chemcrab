@@ -75,8 +75,13 @@ where
 pub fn get_substruct_matches_with_unique<A1, B1, A2, B2>(
     target: &Mol<A1, B1>,
     query: &Mol<A2, B2>,
-    atom_match: impl Fn(&A1, &A2) -> bool,
-    bond_match: impl Fn(&B1, &B2, (&A1, &A1), (&A2, &A2)) -> bool,
+    atom_match: impl Fn(NodeIndex, &A1, NodeIndex, &A2) -> bool,
+    bond_match: impl Fn(
+        &B1,
+        &B2,
+        ((NodeIndex, &A1), (NodeIndex, &A1)),
+        ((NodeIndex, &A2), (NodeIndex, &A2)),
+    ) -> bool,
 ) -> Vec<AtomMapping> {
     uniquify_atom_mappings(&get_substruct_matches_with(
         target, query, atom_match, bond_match,
@@ -87,8 +92,13 @@ pub fn get_substruct_matches_with_unique<A1, B1, A2, B2>(
 pub fn has_substruct_match_with<A1, B1, A2, B2>(
     target: &Mol<A1, B1>,
     query: &Mol<A2, B2>,
-    atom_match: impl Fn(&A1, &A2) -> bool,
-    bond_match: impl Fn(&B1, &B2, (&A1, &A1), (&A2, &A2)) -> bool,
+    atom_match: impl Fn(NodeIndex, &A1, NodeIndex, &A2) -> bool,
+    bond_match: impl Fn(
+        &B1,
+        &B2,
+        ((NodeIndex, &A1), (NodeIndex, &A1)),
+        ((NodeIndex, &A2), (NodeIndex, &A2)),
+    ) -> bool,
 ) -> bool {
     get_substruct_match_with(target, query, atom_match, bond_match).is_some()
 }
@@ -97,8 +107,13 @@ pub fn has_substruct_match_with<A1, B1, A2, B2>(
 pub fn get_substruct_match_with<A1, B1, A2, B2>(
     target: &Mol<A1, B1>,
     query: &Mol<A2, B2>,
-    atom_match: impl Fn(&A1, &A2) -> bool,
-    bond_match: impl Fn(&B1, &B2, (&A1, &A1), (&A2, &A2)) -> bool,
+    atom_match: impl Fn(NodeIndex, &A1, NodeIndex, &A2) -> bool,
+    bond_match: impl Fn(
+        &B1,
+        &B2,
+        ((NodeIndex, &A1), (NodeIndex, &A1)),
+        ((NodeIndex, &A2), (NodeIndex, &A2)),
+    ) -> bool,
 ) -> Option<AtomMapping> {
     Vf2::new(target, query, atom_match, bond_match).find_first()
 }
@@ -107,8 +122,13 @@ pub fn get_substruct_match_with<A1, B1, A2, B2>(
 pub fn get_substruct_matches_with<A1, B1, A2, B2>(
     target: &Mol<A1, B1>,
     query: &Mol<A2, B2>,
-    atom_match: impl Fn(&A1, &A2) -> bool,
-    bond_match: impl Fn(&B1, &B2, (&A1, &A1), (&A2, &A2)) -> bool,
+    atom_match: impl Fn(NodeIndex, &A1, NodeIndex, &A2) -> bool,
+    bond_match: impl Fn(
+        &B1,
+        &B2,
+        ((NodeIndex, &A1), (NodeIndex, &A1)),
+        ((NodeIndex, &A2), (NodeIndex, &A2)),
+    ) -> bool,
 ) -> Vec<AtomMapping> {
     Vf2::new(target, query, atom_match, bond_match).find_all()
 }
@@ -117,8 +137,13 @@ pub fn get_substruct_matches_with<A1, B1, A2, B2>(
 pub fn get_substruct_match_with_filter<A1, B1, A2, B2>(
     target: &Mol<A1, B1>,
     query: &Mol<A2, B2>,
-    atom_match: impl Fn(&A1, &A2) -> bool,
-    bond_match: impl Fn(&B1, &B2, (&A1, &A1), (&A2, &A2)) -> bool,
+    atom_match: impl Fn(NodeIndex, &A1, NodeIndex, &A2) -> bool,
+    bond_match: impl Fn(
+        &B1,
+        &B2,
+        ((NodeIndex, &A1), (NodeIndex, &A1)),
+        ((NodeIndex, &A2), (NodeIndex, &A2)),
+    ) -> bool,
     filter: impl Fn(&AtomMapping) -> bool,
 ) -> Option<AtomMapping> {
     Vf2WithFilter::new(target, query, atom_match, bond_match, filter).find_first()
@@ -128,15 +153,22 @@ pub fn get_substruct_match_with_filter<A1, B1, A2, B2>(
 pub fn get_substruct_matches_with_filter<A1, B1, A2, B2>(
     target: &Mol<A1, B1>,
     query: &Mol<A2, B2>,
-    atom_match: impl Fn(&A1, &A2) -> bool,
-    bond_match: impl Fn(&B1, &B2, (&A1, &A1), (&A2, &A2)) -> bool,
+    atom_match: impl Fn(NodeIndex, &A1, NodeIndex, &A2) -> bool,
+    bond_match: impl Fn(
+        &B1,
+        &B2,
+        ((NodeIndex, &A1), (NodeIndex, &A1)),
+        ((NodeIndex, &A2), (NodeIndex, &A2)),
+    ) -> bool,
     filter: impl Fn(&AtomMapping) -> bool,
 ) -> Vec<AtomMapping> {
     Vf2WithFilter::new(target, query, atom_match, bond_match, filter).find_all()
 }
 
 fn default_atom_match<A: HasAtomicNum + HasAromaticity + HasFormalCharge>(
+    _target_idx: NodeIndex,
     target: &A,
+    _query_idx: NodeIndex,
     query: &A,
 ) -> bool {
     if target.atomic_num() != query.atomic_num() {
@@ -154,11 +186,13 @@ fn default_atom_match<A: HasAtomicNum + HasAromaticity + HasFormalCharge>(
 fn default_bond_match<A: HasAromaticity, B: HasBondOrder>(
     target: &B,
     query: &B,
-    target_endpoints: (&A, &A),
-    query_endpoints: (&A, &A),
+    target_endpoints: ((NodeIndex, &A), (NodeIndex, &A)),
+    query_endpoints: ((NodeIndex, &A), (NodeIndex, &A)),
 ) -> bool {
-    let both_target_aromatic = target_endpoints.0.is_aromatic() && target_endpoints.1.is_aromatic();
-    let both_query_aromatic = query_endpoints.0.is_aromatic() && query_endpoints.1.is_aromatic();
+    let both_target_aromatic =
+        target_endpoints.0 .1.is_aromatic() && target_endpoints.1 .1.is_aromatic();
+    let both_query_aromatic =
+        query_endpoints.0 .1.is_aromatic() && query_endpoints.1 .1.is_aromatic();
     if both_query_aromatic && both_target_aromatic {
         return true;
     }
@@ -177,8 +211,13 @@ struct Vf2<'a, A1, B1, A2, B2, FA, FB> {
 
 impl<'a, A1, B1, A2, B2, FA, FB> Vf2<'a, A1, B1, A2, B2, FA, FB>
 where
-    FA: Fn(&A1, &A2) -> bool,
-    FB: Fn(&B1, &B2, (&A1, &A1), (&A2, &A2)) -> bool,
+    FA: Fn(NodeIndex, &A1, NodeIndex, &A2) -> bool,
+    FB: Fn(
+        &B1,
+        &B2,
+        ((NodeIndex, &A1), (NodeIndex, &A1)),
+        ((NodeIndex, &A2), (NodeIndex, &A2)),
+    ) -> bool,
 {
     fn new(
         target: &'a Mol<A1, B1>,
@@ -254,7 +293,12 @@ where
     }
 
     fn is_feasible(&self, query_node: NodeIndex, target_node: NodeIndex) -> bool {
-        if !(self.atom_match)(self.target.atom(target_node), self.query.atom(query_node)) {
+        if !(self.atom_match)(
+            target_node,
+            self.target.atom(target_node),
+            query_node,
+            self.query.atom(query_node),
+        ) {
             return false;
         }
 
@@ -266,10 +310,14 @@ where
                     .expect("bond must exist between neighbors");
                 match self.target.bond_between(target_node, t_mapped) {
                     Some(t_bond) => {
-                        let target_endpoints =
-                            (self.target.atom(target_node), self.target.atom(t_mapped));
-                        let query_endpoints =
-                            (self.query.atom(query_node), self.query.atom(q_neighbor));
+                        let target_endpoints = (
+                            (target_node, self.target.atom(target_node)),
+                            (t_mapped, self.target.atom(t_mapped)),
+                        );
+                        let query_endpoints = (
+                            (query_node, self.query.atom(query_node)),
+                            (q_neighbor, self.query.atom(q_neighbor)),
+                        );
                         if !(self.bond_match)(
                             self.target.bond(t_bond),
                             self.query.bond(q_bond),
@@ -301,8 +349,13 @@ struct Vf2WithFilter<'a, A1, B1, A2, B2, FA, FB, FF> {
 
 impl<'a, A1, B1, A2, B2, FA, FB, FF> Vf2WithFilter<'a, A1, B1, A2, B2, FA, FB, FF>
 where
-    FA: Fn(&A1, &A2) -> bool,
-    FB: Fn(&B1, &B2, (&A1, &A1), (&A2, &A2)) -> bool,
+    FA: Fn(NodeIndex, &A1, NodeIndex, &A2) -> bool,
+    FB: Fn(
+        &B1,
+        &B2,
+        ((NodeIndex, &A1), (NodeIndex, &A1)),
+        ((NodeIndex, &A2), (NodeIndex, &A2)),
+    ) -> bool,
     FF: Fn(&AtomMapping) -> bool,
 {
     fn new(
@@ -383,7 +436,12 @@ where
     }
 
     fn is_feasible(&self, query_node: NodeIndex, target_node: NodeIndex) -> bool {
-        if !(self.atom_match)(self.target.atom(target_node), self.query.atom(query_node)) {
+        if !(self.atom_match)(
+            target_node,
+            self.target.atom(target_node),
+            query_node,
+            self.query.atom(query_node),
+        ) {
             return false;
         }
 
@@ -395,10 +453,14 @@ where
                     .expect("bond must exist between neighbors");
                 match self.target.bond_between(target_node, t_mapped) {
                     Some(t_bond) => {
-                        let target_endpoints =
-                            (self.target.atom(target_node), self.target.atom(t_mapped));
-                        let query_endpoints =
-                            (self.query.atom(query_node), self.query.atom(q_neighbor));
+                        let target_endpoints = (
+                            (target_node, self.target.atom(target_node)),
+                            (t_mapped, self.target.atom(t_mapped)),
+                        );
+                        let query_endpoints = (
+                            (query_node, self.query.atom(query_node)),
+                            (q_neighbor, self.query.atom(q_neighbor)),
+                        );
                         if !(self.bond_match)(
                             self.target.bond(t_bond),
                             self.query.bond(q_bond),
@@ -551,7 +613,7 @@ mod tests {
         let matches = get_substruct_matches_with(
             &target,
             &query,
-            |t: &crate::Atom, q: &crate::Atom| t.atomic_num == q.atomic_num,
+            |_, t: &crate::Atom, _, q: &crate::Atom| t.atomic_num == q.atomic_num,
             |t: &crate::Bond, _q, _, _| t.order == crate::BondOrder::Single,
         );
         assert!(!matches.is_empty());
@@ -564,7 +626,7 @@ mod tests {
         let matches = get_substruct_matches_with(
             &target,
             &query,
-            |t: &crate::Atom, q: &crate::Atom| t.atomic_num == q.atomic_num,
+            |_, t: &crate::Atom, _, q: &crate::Atom| t.atomic_num == q.atomic_num,
             |_t: &crate::Bond, _q, _, _| true,
         );
         assert_eq!(matches.len(), 2);
@@ -577,7 +639,7 @@ mod tests {
         let matches = get_substruct_matches_with(
             &target,
             &query,
-            |t: &crate::Atom, q: &crate::Atom| t.atomic_num == q.atomic_num,
+            |_, t: &crate::Atom, _, q: &crate::Atom| t.atomic_num == q.atomic_num,
             |_t: &crate::Bond, _q, _, _| true,
         );
         assert_eq!(matches.len(), 1);

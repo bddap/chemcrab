@@ -125,23 +125,13 @@ fn get_smarts_match_impl(
     get_substruct_match_with(
         target,
         query,
-        |t_atom: &Atom, q_expr: &AtomExpr| {
-            let idx = target
-                .atoms()
-                .find(|&i| std::ptr::eq(target.atom(i), t_atom))
-                .unwrap();
-            match_atom_expr(q_expr, t_atom, &ctx, idx)
+        |t_idx: NodeIndex, t_atom: &Atom, _q_idx: NodeIndex, q_expr: &AtomExpr| {
+            match_atom_expr(q_expr, t_atom, &ctx, t_idx)
         },
-        |t_bond: &Bond, q_bond: &BondExpr, t_endpoints: (&Atom, &Atom), _q_endpoints| {
-            let t_a = target
-                .atoms()
-                .find(|&i| std::ptr::eq(target.atom(i), t_endpoints.0))
-                .unwrap();
-            let t_b = target
-                .atoms()
-                .find(|&i| std::ptr::eq(target.atom(i), t_endpoints.1))
-                .unwrap();
-            q_bond.matches_with_ring_info(t_bond, t_endpoints, &ring_info, (t_a, t_b))
+        |t_bond: &Bond, q_bond: &BondExpr, t_endpoints, _q_endpoints| {
+            let (t_a, t_atom_a) = t_endpoints.0;
+            let (t_b, t_atom_b) = t_endpoints.1;
+            q_bond.matches_with_ring_info(t_bond, (t_atom_a, t_atom_b), &ring_info, (t_a, t_b))
         },
     )
 }
@@ -193,23 +183,13 @@ fn get_smarts_matches_all_impl(
     get_substruct_matches_with(
         target,
         query,
-        |t_atom: &Atom, q_expr: &AtomExpr| {
-            let idx = target
-                .atoms()
-                .find(|&i| std::ptr::eq(target.atom(i), t_atom))
-                .unwrap();
-            match_atom_expr(q_expr, t_atom, &ctx, idx)
+        |t_idx: NodeIndex, t_atom: &Atom, _q_idx: NodeIndex, q_expr: &AtomExpr| {
+            match_atom_expr(q_expr, t_atom, &ctx, t_idx)
         },
-        |t_bond: &Bond, q_bond: &BondExpr, t_endpoints: (&Atom, &Atom), _q_endpoints| {
-            let t_a = target
-                .atoms()
-                .find(|&i| std::ptr::eq(target.atom(i), t_endpoints.0))
-                .unwrap();
-            let t_b = target
-                .atoms()
-                .find(|&i| std::ptr::eq(target.atom(i), t_endpoints.1))
-                .unwrap();
-            q_bond.matches_with_ring_info(t_bond, t_endpoints, &ring_info, (t_a, t_b))
+        |t_bond: &Bond, q_bond: &BondExpr, t_endpoints, _q_endpoints| {
+            let (t_a, t_atom_a) = t_endpoints.0;
+            let (t_b, t_atom_b) = t_endpoints.1;
+            q_bond.matches_with_ring_info(t_bond, (t_atom_a, t_atom_b), &ring_info, (t_a, t_b))
         },
     )
 }
@@ -255,23 +235,13 @@ fn get_smarts_match_chiral_impl(
     get_substruct_match_with_filter(
         target,
         query,
-        |t_atom: &Atom, q_expr: &AtomExpr| {
-            let idx = target
-                .atoms()
-                .find(|&i| std::ptr::eq(target.atom(i), t_atom))
-                .unwrap();
-            match_atom_expr(q_expr, t_atom, &ctx, idx)
+        |t_idx: NodeIndex, t_atom: &Atom, _q_idx: NodeIndex, q_expr: &AtomExpr| {
+            match_atom_expr(q_expr, t_atom, &ctx, t_idx)
         },
-        |t_bond: &Bond, q_bond: &BondExpr, t_endpoints: (&Atom, &Atom), _q_endpoints| {
-            let t_a = target
-                .atoms()
-                .find(|&i| std::ptr::eq(target.atom(i), t_endpoints.0))
-                .unwrap();
-            let t_b = target
-                .atoms()
-                .find(|&i| std::ptr::eq(target.atom(i), t_endpoints.1))
-                .unwrap();
-            q_bond.matches_with_ring_info(t_bond, t_endpoints, &ring_info, (t_a, t_b))
+        |t_bond: &Bond, q_bond: &BondExpr, t_endpoints, _q_endpoints| {
+            let (t_a, t_atom_a) = t_endpoints.0;
+            let (t_b, t_atom_b) = t_endpoints.1;
+            q_bond.matches_with_ring_info(t_bond, (t_atom_a, t_atom_b), &ring_info, (t_a, t_b))
         },
         |mapping: &AtomMapping| validate_chirality(mapping, target, query, &chiral_query_atoms),
     )
@@ -309,23 +279,13 @@ fn get_smarts_matches_chiral_impl(
     let all = get_substruct_matches_with_filter(
         target,
         query,
-        |t_atom: &Atom, q_expr: &AtomExpr| {
-            let idx = target
-                .atoms()
-                .find(|&i| std::ptr::eq(target.atom(i), t_atom))
-                .unwrap();
-            match_atom_expr(q_expr, t_atom, &ctx, idx)
+        |t_idx: NodeIndex, t_atom: &Atom, _q_idx: NodeIndex, q_expr: &AtomExpr| {
+            match_atom_expr(q_expr, t_atom, &ctx, t_idx)
         },
-        |t_bond: &Bond, q_bond: &BondExpr, t_endpoints: (&Atom, &Atom), _q_endpoints| {
-            let t_a = target
-                .atoms()
-                .find(|&i| std::ptr::eq(target.atom(i), t_endpoints.0))
-                .unwrap();
-            let t_b = target
-                .atoms()
-                .find(|&i| std::ptr::eq(target.atom(i), t_endpoints.1))
-                .unwrap();
-            q_bond.matches_with_ring_info(t_bond, t_endpoints, &ring_info, (t_a, t_b))
+        |t_bond: &Bond, q_bond: &BondExpr, t_endpoints, _q_endpoints| {
+            let (t_a, t_atom_a) = t_endpoints.0;
+            let (t_b, t_atom_b) = t_endpoints.1;
+            q_bond.matches_with_ring_info(t_bond, (t_atom_a, t_atom_b), &ring_info, (t_a, t_b))
         },
         |mapping: &AtomMapping| validate_chirality(mapping, target, query, &chiral_query_atoms),
     );
@@ -532,23 +492,13 @@ fn pre_evaluate_recursive(
         let matches = get_substruct_matches_with(
             target,
             inner_query,
-            |t_atom: &Atom, q_expr: &AtomExpr| {
-                let idx = target
-                    .atoms()
-                    .find(|&i| std::ptr::eq(target.atom(i), t_atom))
-                    .unwrap();
-                match_atom_expr(q_expr, t_atom, &inner_ctx, idx)
+            |t_idx: NodeIndex, t_atom: &Atom, _q_idx: NodeIndex, q_expr: &AtomExpr| {
+                match_atom_expr(q_expr, t_atom, &inner_ctx, t_idx)
             },
-            |t_bond: &Bond, q_bond: &BondExpr, t_endpoints: (&Atom, &Atom), _q_endpoints| {
-                let t_a = target
-                    .atoms()
-                    .find(|&i| std::ptr::eq(target.atom(i), t_endpoints.0))
-                    .unwrap();
-                let t_b = target
-                    .atoms()
-                    .find(|&i| std::ptr::eq(target.atom(i), t_endpoints.1))
-                    .unwrap();
-                q_bond.matches_with_ring_info(t_bond, t_endpoints, ring_info, (t_a, t_b))
+            |t_bond: &Bond, q_bond: &BondExpr, t_endpoints, _q_endpoints| {
+                let (t_a, t_atom_a) = t_endpoints.0;
+                let (t_b, t_atom_b) = t_endpoints.1;
+                q_bond.matches_with_ring_info(t_bond, (t_atom_a, t_atom_b), ring_info, (t_a, t_b))
             },
         );
 
