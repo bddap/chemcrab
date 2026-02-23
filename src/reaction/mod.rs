@@ -1036,4 +1036,13 @@ mod tests {
         let products = rxn.run(&[&r]).unwrap();
         assert_product_sets(&products, 1, &[&["CCNC(=O)OC(C)(C)C"]]);
     }
+
+    #[test]
+    fn parenthesized_component_group_runs() {
+        let rxn = from_reaction_smarts("([C:1](=O)O.[N:2])>>[C:1](=O)[N:2]").unwrap();
+        let r1 = mol("CC(=O)O");
+        let r2 = mol("N");
+        let products = rxn.run(&[&r1, &r2]).unwrap();
+        assert!(!products.is_empty());
+    }
 }
