@@ -126,11 +126,37 @@ fn parse_section(
     let components = split_on_dot(text);
     let mut mols = Vec::with_capacity(components.len());
     for comp in components {
-        let mol = from_smarts(comp)
-            .map_err(|e| ReactionSmartsError::InvalidComponent { section, detail: e })?;
-        mols.push(mol);
+        let stripped = strip_component_group(comp);
+        for sub in split_on_dot(stripped) {
+            let mol = from_smarts(sub)
+                .map_err(|e| ReactionSmartsError::InvalidComponent { section, detail: e })?;
+            mols.push(mol);
+        }
     }
     Ok(mols)
+}
+
+fn strip_component_group(s: &str) -> &str {
+    let bytes = s.as_bytes();
+    if bytes.first() == Some(&b'(') && bytes.last() == Some(&b')') {
+        let mut depth = 0i32;
+        for (i, &b) in bytes.iter().enumerate() {
+            match b {
+                b'(' => depth += 1,
+                b')' => {
+                    depth -= 1;
+                    if depth == 0 && i < bytes.len() - 1 {
+                        return s;
+                    }
+                }
+                _ => {}
+            }
+        }
+        if depth == 0 {
+            return &s[1..s.len() - 1];
+        }
+    }
+    s
 }
 
 #[cfg(test)]
@@ -175,5 +201,45 @@ mod tests {
     fn split_on_dot_with_brackets() {
         let parts = split_on_dot("[C.C]");
         assert_eq!(parts.len(), 1);
+    }
+
+    #[test]
+    fn strip_outer_parens_simple() {
+        assert_eq!(strip_component_group("(A.B)"), "A.B");
+    }
+
+    #[test]
+    fn strip_no_parens() {
+        assert_eq!(strip_component_group("A.B"), "A.B");
+    }
+
+    #[test]
+    fn strip_inner_parens_untouched() {
+        assert_eq!(strip_component_group("(A(=O).B)"), "A(=O).B");
+    }
+
+    #[test]
+    fn strip_non_matching_outer_parens() {
+        assert_eq!(strip_component_group("(A)(B)"), "(A)(B)");
+    }
+
+    #[test]
+    fn parse_section_strips_component_group() {
+        let result = parse_section("([C:1]=O.[N:2])", "reactant").unwrap();
+        assert_eq!(result.len(), 2);
+    }
+
+    #[test]
+    fn parse_parenthesized_reaction() {
+        let rxn = parse_reaction_smarts("([C:1]=O.[N:2])>>[C:1][N:2]").unwrap();
+        assert_eq!(rxn.reactant_templates.len(), 2);
+        assert_eq!(rxn.product_templates.len(), 1);
+    }
+
+    #[test]
+    fn parse_complex_parenthesized_reaction() {
+        let rxn =
+            parse_reaction_smarts("([C:1](=O)[OH].[NH2:2][C:3])>>[C:1](=O)[N:2][C:3]").unwrap();
+        assert_eq!(rxn.reactant_templates.len(), 2);
     }
 }
