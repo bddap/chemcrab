@@ -2100,4 +2100,216 @@ mod tests {
         let matches = get_smarts_matches(&target, &query);
         assert_eq!(matches.len(), 5, "all atoms have 0 implicit H");
     }
+
+    // ---- Compound bond expression parser tests ----
+
+    #[test]
+    fn parse_not_ring_bond() {
+        let q = smarts("C!@C");
+        let edge = q
+            .bond_between(NodeIndex::new(0), NodeIndex::new(1))
+            .unwrap();
+        assert_eq!(*q.bond(edge), BondExpr::Not(Box::new(BondExpr::Ring)));
+    }
+
+    #[test]
+    fn parse_not_aromatic_bond() {
+        let q = smarts("[#6]-!:[#6]");
+        let edge = q
+            .bond_between(NodeIndex::new(0), NodeIndex::new(1))
+            .unwrap();
+        assert_eq!(
+            *q.bond(edge),
+            BondExpr::And(vec![
+                BondExpr::Single,
+                BondExpr::Not(Box::new(BondExpr::Aromatic))
+            ])
+        );
+    }
+
+    #[test]
+    fn parse_bond_or() {
+        let q = smarts("C-,=C");
+        let edge = q
+            .bond_between(NodeIndex::new(0), NodeIndex::new(1))
+            .unwrap();
+        assert_eq!(
+            *q.bond(edge),
+            BondExpr::Or(vec![BondExpr::Single, BondExpr::Double])
+        );
+    }
+
+    #[test]
+    fn parse_bond_and() {
+        let q = smarts("C-&@C");
+        let edge = q
+            .bond_between(NodeIndex::new(0), NodeIndex::new(1))
+            .unwrap();
+        assert_eq!(
+            *q.bond(edge),
+            BondExpr::And(vec![BondExpr::Single, BondExpr::Ring])
+        );
+    }
+
+    #[test]
+    fn parse_compound_bond_not_and() {
+        let q = smarts("C-&!@C");
+        let edge = q
+            .bond_between(NodeIndex::new(0), NodeIndex::new(1))
+            .unwrap();
+        assert_eq!(
+            *q.bond(edge),
+            BondExpr::And(vec![
+                BondExpr::Single,
+                BondExpr::Not(Box::new(BondExpr::Ring))
+            ])
+        );
+    }
+
+    // ---- Compound bond expression match tests (ported from RDKit smatest.cpp) ----
+
+    #[test]
+    fn match_not_ring_bond() {
+        let target = mol("C1CC1CC");
+        let query = smarts("C!@C");
+        let matches = get_smarts_matches(&target, &query);
+        assert_eq!(matches.len(), 2);
+        for m in &matches {
+            assert_eq!(m.len(), 2);
+        }
+    }
+
+    #[test]
+    fn match_not_ring_bond_chain() {
+        let target = mol("CCCCC");
+        let query = smarts("C!@C");
+        let matches = get_smarts_matches(&target, &query);
+        assert_eq!(matches.len(), 4);
+        for m in &matches {
+            assert_eq!(m.len(), 2);
+        }
+    }
+
+    #[test]
+    fn match_not_ring_bond_hetero() {
+        let target = mol("C1CC1CO");
+        let query = smarts("[#6]!@[!#6]");
+        let matches = get_smarts_matches(&target, &query);
+        assert_eq!(matches.len(), 1);
+        for m in &matches {
+            assert_eq!(m.len(), 2);
+        }
+    }
+
+    #[test]
+    fn match_not_ring_bond_hetero_chain() {
+        let target = mol("CCOCC");
+        let query = smarts("[#6]!@[!#6]");
+        let matches = get_smarts_matches(&target, &query);
+        assert_eq!(matches.len(), 2);
+        for m in &matches {
+            assert_eq!(m.len(), 2);
+        }
+    }
+
+    #[test]
+    fn match_bond_or_double_single() {
+        let target = mol("N=C");
+        let query = smarts("N(=,-C)");
+        let matches = get_smarts_matches(&target, &query);
+        assert_eq!(matches.len(), 1);
+        for m in &matches {
+            assert_eq!(m.len(), 2);
+        }
+    }
+
+    #[test]
+    fn match_bond_or_double_single_2() {
+        let target = mol("NC");
+        let query = smarts("N(=,-C)");
+        let matches = get_smarts_matches(&target, &query);
+        assert_eq!(matches.len(), 1);
+        for m in &matches {
+            assert_eq!(m.len(), 2);
+        }
+    }
+
+    #[test]
+    fn match_bond_or_no_triple() {
+        let target = mol("N#C");
+        let query = smarts("N(=,-C)");
+        let matches = get_smarts_matches(&target, &query);
+        assert_eq!(matches.len(), 0);
+    }
+
+    #[test]
+    fn match_complex_not_ring() {
+        let target = mol("N#CCC#N");
+        let query = smarts("[!$(*#*)&!D1]-&!@[!$(*#*)&!D1]");
+        let matches = get_smarts_matches(&target, &query);
+        assert_eq!(matches.len(), 0);
+    }
+
+    #[test]
+    fn match_complex_not_ring_2() {
+        let target = mol("OCCC#N");
+        let query = smarts("[!$(*#*)&!D1]-&!@[!$(*#*)&!D1]");
+        let matches = get_smarts_matches(&target, &query);
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0].len(), 2);
+    }
+
+    #[test]
+    fn match_not_aromatic_bond() {
+        let q = smarts("[#6]-!:[#6]");
+        assert_eq!(q.atom_count(), 2);
+        assert_eq!(q.bond_count(), 1);
+        let target = mol("CC");
+        assert!(has_smarts_match(&target, &q));
+    }
+
+    // ---- Compound bond expression writer round-trip tests ----
+
+    #[test]
+    fn writer_not_ring_bond() {
+        let q = smarts("C!@C");
+        let written = to_smarts(&q);
+        assert!(written.contains("!@"), "expected !@ in {written}");
+    }
+
+    #[test]
+    fn writer_bond_or() {
+        let q = smarts("C-,=C");
+        let written = to_smarts(&q);
+        assert!(written.contains("-,="), "expected -,= in {written}");
+    }
+
+    #[test]
+    fn writer_bond_and_not_round_trip() {
+        let q = smarts("C-&!@C");
+        let written = to_smarts(&q);
+        assert!(written.contains("!@"), "expected !@ in {written}");
+        let reparsed = smarts(&written);
+        let edge_orig = q
+            .bond_between(NodeIndex::new(0), NodeIndex::new(1))
+            .unwrap();
+        let edge_re = reparsed
+            .bond_between(NodeIndex::new(0), NodeIndex::new(1))
+            .unwrap();
+        assert_eq!(q.bond(edge_orig), reparsed.bond(edge_re));
+    }
+
+    #[test]
+    fn writer_not_aromatic_round_trip() {
+        let q = smarts("[#6]-!:[#6]");
+        let written = to_smarts(&q);
+        let reparsed = smarts(&written);
+        let edge_orig = q
+            .bond_between(NodeIndex::new(0), NodeIndex::new(1))
+            .unwrap();
+        let edge_re = reparsed
+            .bond_between(NodeIndex::new(0), NodeIndex::new(1))
+            .unwrap();
+        assert_eq!(q.bond(edge_orig), reparsed.bond(edge_re));
+    }
 }

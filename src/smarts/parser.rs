@@ -102,7 +102,7 @@ impl<'a> Parser<'a> {
                     pending_bond = None;
                     continue;
                 }
-                '-' | '=' | '#' | '~' | ':' | '/' | '\\' | '@' => {
+                '-' | '=' | '#' | '~' | ':' | '/' | '\\' | '@' | '!' => {
                     if pending_bond.is_some() {
                         return Err(SmartsError::InvalidSmarts {
                             pos: self.pos,
@@ -193,6 +193,57 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_bond_expr(&mut self) -> Result<BondExpr, SmartsError> {
+        let mut parts = vec![self.parse_bond_or()?];
+        while self.pos < self.chars.len() && self.chars[self.pos] == ';' {
+            self.pos += 1;
+            parts.push(self.parse_bond_or()?);
+        }
+        Ok(flatten_bond_and(parts))
+    }
+
+    fn parse_bond_or(&mut self) -> Result<BondExpr, SmartsError> {
+        let mut parts = vec![self.parse_bond_and()?];
+        while self.pos < self.chars.len() && self.chars[self.pos] == ',' {
+            self.pos += 1;
+            parts.push(self.parse_bond_and()?);
+        }
+        Ok(flatten_bond_or(parts))
+    }
+
+    fn parse_bond_and(&mut self) -> Result<BondExpr, SmartsError> {
+        let mut parts = vec![self.parse_bond_not()?];
+        loop {
+            if self.pos >= self.chars.len() || !self.is_bond_char(self.chars[self.pos]) {
+                break;
+            }
+            if self.chars[self.pos] == ',' || self.chars[self.pos] == ';' {
+                break;
+            }
+            if self.chars[self.pos] == '&' {
+                self.pos += 1;
+            }
+            parts.push(self.parse_bond_not()?);
+        }
+        Ok(flatten_bond_and(parts))
+    }
+
+    fn parse_bond_not(&mut self) -> Result<BondExpr, SmartsError> {
+        if self.pos < self.chars.len() && self.chars[self.pos] == '!' {
+            self.pos += 1;
+            let inner = self.parse_bond_primitive()?;
+            Ok(BondExpr::Not(Box::new(inner)))
+        } else {
+            self.parse_bond_primitive()
+        }
+    }
+
+    fn parse_bond_primitive(&mut self) -> Result<BondExpr, SmartsError> {
+        if self.pos >= self.chars.len() {
+            return Err(SmartsError::InvalidSmarts {
+                pos: self.pos,
+                msg: "expected bond primitive".into(),
+            });
+        }
         let ch = self.chars[self.pos];
         self.pos += 1;
         match ch {
@@ -209,6 +260,13 @@ impl<'a> Parser<'a> {
                 ch,
             }),
         }
+    }
+
+    fn is_bond_char(&self, ch: char) -> bool {
+        matches!(
+            ch,
+            '-' | '=' | '#' | '~' | ':' | '@' | '/' | '\\' | '!' | ',' | '&' | ';'
+        )
     }
 
     fn parse_bare_atom(&mut self) -> Result<AtomExpr, SmartsError> {
@@ -771,6 +829,36 @@ impl<'a> Parser<'a> {
         }
 
         Err(SmartsError::UnclosedRecursive { pos: start_pos })
+    }
+}
+
+fn flatten_bond_and(mut parts: Vec<BondExpr>) -> BondExpr {
+    let mut flattened = Vec::new();
+    for p in parts.drain(..) {
+        match p {
+            BondExpr::And(inner) => flattened.extend(inner),
+            other => flattened.push(other),
+        }
+    }
+    if flattened.len() == 1 {
+        flattened.pop().unwrap()
+    } else {
+        BondExpr::And(flattened)
+    }
+}
+
+fn flatten_bond_or(mut parts: Vec<BondExpr>) -> BondExpr {
+    let mut flattened = Vec::new();
+    for p in parts.drain(..) {
+        match p {
+            BondExpr::Or(inner) => flattened.extend(inner),
+            other => flattened.push(other),
+        }
+    }
+    if flattened.len() == 1 {
+        flattened.pop().unwrap()
+    } else {
+        BondExpr::Or(flattened)
     }
 }
 
