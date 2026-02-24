@@ -199,6 +199,33 @@ fn default_bond_match<A: HasAromaticity, B: HasBondOrder>(
     target.bond_order() == query.bond_order()
 }
 
+/// CSR-style adjacency list: `adj_data[adj_offset[i]..adj_offset[i+1]]` gives
+/// the neighbor indices of atom `i`.
+struct CsrAdj {
+    offsets: Vec<usize>,
+    data: Vec<usize>,
+}
+
+impl CsrAdj {
+    fn build<A, B>(mol: &Mol<A, B>) -> Self {
+        let n = mol.atom_count();
+        let mut offsets = Vec::with_capacity(n + 1);
+        let mut data = Vec::new();
+        for i in 0..n {
+            offsets.push(data.len());
+            for nb in mol.neighbors(NodeIndex::new(i)) {
+                data.push(nb.index());
+            }
+        }
+        offsets.push(data.len());
+        Self { offsets, data }
+    }
+
+    fn neighbors(&self, i: usize) -> &[usize] {
+        &self.data[self.offsets[i]..self.offsets[i + 1]]
+    }
+}
+
 struct Vf2<'a, A1, B1, A2, B2, FA, FB> {
     target: &'a Mol<A1, B1>,
     query: &'a Mol<A2, B2>,
@@ -207,6 +234,9 @@ struct Vf2<'a, A1, B1, A2, B2, FA, FB> {
     query_order: Vec<NodeIndex>,
     query_map: Vec<Option<NodeIndex>>,
     target_used: Vec<bool>,
+    target_terminal: Vec<u32>,
+    terminal_count: usize,
+    target_adj: CsrAdj,
 }
 
 impl<'a, A1, B1, A2, B2, FA, FB> Vf2<'a, A1, B1, A2, B2, FA, FB>
@@ -226,7 +256,12 @@ where
         bond_match: FB,
     ) -> Self {
         let mut query_order: Vec<NodeIndex> = query.atoms().collect();
-        query_order.sort_by(|&a, &b| query.neighbors(b).count().cmp(&query.neighbors(a).count()));
+        let query_degrees: Vec<usize> = query_order
+            .iter()
+            .map(|&n| query.neighbors(n).count())
+            .collect();
+        query_order.sort_by(|&a, &b| query_degrees[b.index()].cmp(&query_degrees[a.index()]));
+        let n_target = target.atom_count();
         Self {
             target,
             query,
@@ -234,7 +269,10 @@ where
             bond_match,
             query_order,
             query_map: vec![None; query.atom_count()],
-            target_used: vec![false; target.atom_count()],
+            target_used: vec![false; n_target],
+            target_terminal: vec![0; n_target],
+            terminal_count: 0,
+            target_adj: CsrAdj::build(target),
         }
     }
 
@@ -266,9 +304,14 @@ where
         }
 
         let query_node = self.query_order[depth];
+        let n = self.target_used.len();
+        let use_terminal = depth > 0 && self.terminal_count > 0;
 
-        for t_idx in 0..self.target_used.len() {
+        for t_idx in 0..n {
             if self.target_used[t_idx] {
+                continue;
+            }
+            if use_terminal && self.target_terminal[t_idx] == 0 {
                 continue;
             }
 
@@ -280,6 +323,17 @@ where
 
             self.query_map[query_node.index()] = Some(target_node);
             self.target_used[t_idx] = true;
+            if self.target_terminal[t_idx] > 0 {
+                self.terminal_count -= 1;
+            }
+            for &nb in self.target_adj.neighbors(t_idx) {
+                if !self.target_used[nb] {
+                    if self.target_terminal[nb] == 0 {
+                        self.terminal_count += 1;
+                    }
+                    self.target_terminal[nb] += 1;
+                }
+            }
 
             self.recurse(depth + 1, results, first_only);
 
@@ -289,6 +343,17 @@ where
 
             self.query_map[query_node.index()] = None;
             self.target_used[t_idx] = false;
+            for &nb in self.target_adj.neighbors(t_idx) {
+                if !self.target_used[nb] {
+                    self.target_terminal[nb] -= 1;
+                    if self.target_terminal[nb] == 0 {
+                        self.terminal_count -= 1;
+                    }
+                }
+            }
+            if self.target_terminal[t_idx] > 0 {
+                self.terminal_count += 1;
+            }
         }
     }
 
@@ -345,6 +410,9 @@ struct Vf2WithFilter<'a, A1, B1, A2, B2, FA, FB, FF> {
     query_order: Vec<NodeIndex>,
     query_map: Vec<Option<NodeIndex>>,
     target_used: Vec<bool>,
+    target_terminal: Vec<u32>,
+    terminal_count: usize,
+    target_adj: CsrAdj,
 }
 
 impl<'a, A1, B1, A2, B2, FA, FB, FF> Vf2WithFilter<'a, A1, B1, A2, B2, FA, FB, FF>
@@ -366,7 +434,12 @@ where
         filter: FF,
     ) -> Self {
         let mut query_order: Vec<NodeIndex> = query.atoms().collect();
-        query_order.sort_by(|&a, &b| query.neighbors(b).count().cmp(&query.neighbors(a).count()));
+        let query_degrees: Vec<usize> = query_order
+            .iter()
+            .map(|&n| query.neighbors(n).count())
+            .collect();
+        query_order.sort_by(|&a, &b| query_degrees[b.index()].cmp(&query_degrees[a.index()]));
+        let n_target = target.atom_count();
         Self {
             target,
             query,
@@ -375,7 +448,10 @@ where
             filter,
             query_order,
             query_map: vec![None; query.atom_count()],
-            target_used: vec![false; target.atom_count()],
+            target_used: vec![false; n_target],
+            target_terminal: vec![0; n_target],
+            terminal_count: 0,
+            target_adj: CsrAdj::build(target),
         }
     }
 
@@ -409,9 +485,14 @@ where
         }
 
         let query_node = self.query_order[depth];
+        let n = self.target_used.len();
+        let use_terminal = depth > 0 && self.terminal_count > 0;
 
-        for t_idx in 0..self.target_used.len() {
+        for t_idx in 0..n {
             if self.target_used[t_idx] {
+                continue;
+            }
+            if use_terminal && self.target_terminal[t_idx] == 0 {
                 continue;
             }
 
@@ -423,6 +504,17 @@ where
 
             self.query_map[query_node.index()] = Some(target_node);
             self.target_used[t_idx] = true;
+            if self.target_terminal[t_idx] > 0 {
+                self.terminal_count -= 1;
+            }
+            for &nb in self.target_adj.neighbors(t_idx) {
+                if !self.target_used[nb] {
+                    if self.target_terminal[nb] == 0 {
+                        self.terminal_count += 1;
+                    }
+                    self.target_terminal[nb] += 1;
+                }
+            }
 
             self.recurse(depth + 1, results, first_only);
 
@@ -432,6 +524,17 @@ where
 
             self.query_map[query_node.index()] = None;
             self.target_used[t_idx] = false;
+            for &nb in self.target_adj.neighbors(t_idx) {
+                if !self.target_used[nb] {
+                    self.target_terminal[nb] -= 1;
+                    if self.target_terminal[nb] == 0 {
+                        self.terminal_count -= 1;
+                    }
+                }
+            }
+            if self.target_terminal[t_idx] > 0 {
+                self.terminal_count += 1;
+            }
         }
     }
 

@@ -53,7 +53,7 @@ use crate::substruct::{
     get_substruct_matches_with_filter, uniquify_atom_mappings, AtomMapping,
 };
 
-use query::MatchContext;
+use query::{AtomDescriptors, MatchContext};
 
 fn expr_references_hydrogen(expr: &AtomExpr) -> bool {
     match expr {
@@ -120,6 +120,7 @@ fn get_smarts_match_impl(
         mol: target,
         ring_info: &ring_info,
         recursive_matches,
+        descriptors: AtomDescriptors::compute(target),
     };
 
     get_substruct_match_with(
@@ -178,6 +179,7 @@ fn get_smarts_matches_all_impl(
         mol: target,
         ring_info: &ring_info,
         recursive_matches,
+        descriptors: AtomDescriptors::compute(target),
     };
 
     get_substruct_matches_with(
@@ -228,6 +230,7 @@ fn get_smarts_match_chiral_impl(
         mol: target,
         ring_info: &ring_info,
         recursive_matches,
+        descriptors: AtomDescriptors::compute(target),
     };
 
     let chiral_query_atoms = collect_chiral_query_atoms(query);
@@ -272,6 +275,7 @@ fn get_smarts_matches_chiral_impl(
         mol: target,
         ring_info: &ring_info,
         recursive_matches,
+        descriptors: AtomDescriptors::compute(target),
     };
 
     let chiral_query_atoms = collect_chiral_query_atoms(query);
@@ -486,6 +490,7 @@ fn pre_evaluate_recursive(
             mol: target,
             ring_info,
             recursive_matches: inner_recursive,
+            descriptors: AtomDescriptors::compute(target),
         };
 
         let mut matching_atoms = HashSet::new();

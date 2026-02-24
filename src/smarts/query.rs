@@ -164,51 +164,80 @@ pub enum BondExpr {
     Not(Box<BondExpr>),
 }
 
+/// Pre-computed per-atom descriptor table, avoiding redundant neighbor walks.
+pub struct AtomDescriptors {
+    descs: Vec<AtomDescriptor>,
+}
+
+struct AtomDescriptor {
+    degree: u8,
+    non_h_degree: u8,
+    explicit_h_count: u8,
+    bond_order_sum: u8,
+    hetero_neighbor_count: u8,
+    aliphatic_hetero_neighbor_count: u8,
+}
+
+impl AtomDescriptors {
+    pub fn compute(mol: &Mol<Atom, Bond>) -> Self {
+        let n = mol.atom_count();
+        let mut descs = Vec::with_capacity(n);
+        for i in 0..n {
+            let idx = NodeIndex::new(i);
+            let mut degree: u8 = 0;
+            let mut non_h_deg: u8 = 0;
+            let mut exp_h: u8 = 0;
+            let mut hetero: u8 = 0;
+            let mut aliph_hetero: u8 = 0;
+
+            for nb in mol.neighbors(idx) {
+                degree += 1;
+                let nbr = mol.atom(nb);
+                if nbr.atomic_num == 1 {
+                    exp_h += 1;
+                } else {
+                    non_h_deg += 1;
+                    if nbr.atomic_num != 6 {
+                        hetero += 1;
+                        if !nbr.is_aromatic {
+                            aliph_hetero += 1;
+                        }
+                    }
+                }
+            }
+
+            let bo_sum: u8 = mol
+                .bonds_of(idx)
+                .map(|ei| match mol.bond(ei).order {
+                    BondOrder::Single => 1u8,
+                    BondOrder::Double => 2,
+                    BondOrder::Triple => 3,
+                })
+                .sum();
+
+            descs.push(AtomDescriptor {
+                degree,
+                non_h_degree: non_h_deg,
+                explicit_h_count: exp_h,
+                bond_order_sum: bo_sum,
+                hetero_neighbor_count: hetero,
+                aliphatic_hetero_neighbor_count: aliph_hetero,
+            });
+        }
+        Self { descs }
+    }
+
+    fn get(&self, idx: NodeIndex) -> &AtomDescriptor {
+        &self.descs[idx.index()]
+    }
+}
+
 /// Context passed to [`AtomExpr::matches`] during SMARTS evaluation.
 pub struct MatchContext<'a> {
     pub mol: &'a Mol<Atom, Bond>,
     pub ring_info: &'a RingInfo,
     pub recursive_matches: HashMap<usize, HashSet<NodeIndex>>,
-}
-
-fn non_h_degree(mol: &Mol<Atom, Bond>, idx: NodeIndex) -> u8 {
-    mol.neighbors(idx)
-        .filter(|&nb| mol.atom(nb).atomic_num != 1)
-        .count() as u8
-}
-
-fn hetero_neighbor_count(mol: &Mol<Atom, Bond>, idx: NodeIndex) -> u8 {
-    mol.neighbors(idx)
-        .filter(|&nb| {
-            let a = mol.atom(nb).atomic_num;
-            a != 6 && a != 1
-        })
-        .count() as u8
-}
-
-fn aliphatic_hetero_neighbor_count(mol: &Mol<Atom, Bond>, idx: NodeIndex) -> u8 {
-    mol.neighbors(idx)
-        .filter(|&nb| {
-            let nbr = mol.atom(nb);
-            nbr.atomic_num != 6 && nbr.atomic_num != 1 && !nbr.is_aromatic
-        })
-        .count() as u8
-}
-
-fn explicit_h_count(mol: &Mol<Atom, Bond>, idx: NodeIndex) -> u8 {
-    mol.neighbors(idx)
-        .filter(|&nb| mol.atom(nb).atomic_num == 1)
-        .count() as u8
-}
-
-fn bond_order_sum(mol: &Mol<Atom, Bond>, idx: NodeIndex) -> u8 {
-    mol.bonds_of(idx)
-        .map(|ei| match mol.bond(ei).order {
-            BondOrder::Single => 1u8,
-            BondOrder::Double => 2,
-            BondOrder::Triple => 3,
-        })
-        .sum()
+    pub descriptors: AtomDescriptors,
 }
 
 /// Computes the hybridization state of an atom from its bond orders and
@@ -216,7 +245,14 @@ fn bond_order_sum(mol: &Mol<Atom, Bond>, idx: NodeIndex) -> u8 {
 pub fn compute_hybridization(mol: &Mol<Atom, Bond>, idx: NodeIndex) -> Hybridization {
     let atom = mol.atom(idx);
     let explicit_degree = mol.neighbors(idx).count() as u8;
-    let sum_orders = bond_order_sum(mol, idx);
+    let sum_orders: u8 = mol
+        .bonds_of(idx)
+        .map(|ei| match mol.bond(ei).order {
+            BondOrder::Single => 1u8,
+            BondOrder::Double => 2,
+            BondOrder::Triple => 3,
+        })
+        .sum();
     let n_bonds = explicit_degree + atom.hydrogen_count;
     let total_orders = sum_orders + atom.hydrogen_count;
     let n_unsaturations = total_orders.saturating_sub(n_bonds);
@@ -236,11 +272,32 @@ pub fn compute_hybridization(mol: &Mol<Atom, Bond>, idx: NodeIndex) -> Hybridiza
     }
 }
 
+fn hybridization_from_desc(atom: &Atom, desc: &AtomDescriptor) -> Hybridization {
+    let n_bonds = desc.degree + atom.hydrogen_count;
+    let total_orders = desc.bond_order_sum + atom.hydrogen_count;
+    let n_unsaturations = total_orders.saturating_sub(n_bonds);
+
+    match n_unsaturations {
+        0 => match n_bonds {
+            0 | 1 => Hybridization::S,
+            2..=4 => Hybridization::SP3,
+            5 => Hybridization::SP3D,
+            _ => Hybridization::SP3D2,
+        },
+        1 => match n_bonds {
+            1 => Hybridization::SP,
+            _ => Hybridization::SP2,
+        },
+        _ => Hybridization::SP,
+    }
+}
+
 fn range_value(kind: RangeKind, atom: &Atom, ctx: &MatchContext, idx: NodeIndex) -> u8 {
+    let desc = ctx.descriptors.get(idx);
     match kind {
-        RangeKind::Degree => ctx.mol.neighbors(idx).count() as u8,
-        RangeKind::NonHDegree => non_h_degree(ctx.mol, idx),
-        RangeKind::TotalHCount => atom.hydrogen_count + explicit_h_count(ctx.mol, idx),
+        RangeKind::Degree => desc.degree,
+        RangeKind::NonHDegree => desc.non_h_degree,
+        RangeKind::TotalHCount => atom.hydrogen_count + desc.explicit_h_count,
         RangeKind::ImplicitHCount => atom.hydrogen_count,
         RangeKind::SmallestRingSize => ctx
             .ring_info
@@ -248,15 +305,15 @@ fn range_value(kind: RangeKind, atom: &Atom, ctx: &MatchContext, idx: NodeIndex)
             .map(|s| s as u8)
             .unwrap_or(0),
         RangeKind::RingMembership => ctx.ring_info.atom_rings(idx).len() as u8,
-        RangeKind::Valence => bond_order_sum(ctx.mol, idx) + atom.hydrogen_count,
+        RangeKind::Valence => desc.bond_order_sum + atom.hydrogen_count,
         RangeKind::RingBondCount => ctx
             .mol
             .neighbors(idx)
             .filter(|&nb| ctx.ring_info.is_ring_bond(idx, nb))
             .count() as u8,
-        RangeKind::Connectivity => ctx.mol.neighbors(idx).count() as u8 + atom.hydrogen_count,
-        RangeKind::HeteroNeighborCount => hetero_neighbor_count(ctx.mol, idx),
-        RangeKind::AliphaticHeteroNeighborCount => aliphatic_hetero_neighbor_count(ctx.mol, idx),
+        RangeKind::Connectivity => desc.degree + atom.hydrogen_count,
+        RangeKind::HeteroNeighborCount => desc.hetero_neighbor_count,
+        RangeKind::AliphaticHeteroNeighborCount => desc.aliphatic_hetero_neighbor_count,
         RangeKind::PositiveCharge => {
             if atom.formal_charge > 0 {
                 atom.formal_charge as u8
@@ -290,6 +347,7 @@ fn in_range(val: u8, low: Option<u8>, high: Option<u8>) -> bool {
 
 impl AtomExpr {
     pub fn matches(&self, atom: &Atom, ctx: &MatchContext, idx: NodeIndex) -> bool {
+        let desc = ctx.descriptors.get(idx);
         match self {
             AtomExpr::True => true,
             AtomExpr::Element {
@@ -299,23 +357,11 @@ impl AtomExpr {
             AtomExpr::Aromatic => atom.is_aromatic,
             AtomExpr::Aliphatic => !atom.is_aromatic,
             AtomExpr::Isotope(iso) => atom.isotope == *iso,
-            AtomExpr::Degree(d) => {
-                let degree = ctx.mol.neighbors(idx).count() as u8;
-                degree == *d
-            }
-            AtomExpr::NonHDegree(d) => non_h_degree(ctx.mol, idx) == *d,
-            AtomExpr::Valence(v) => {
-                let total = bond_order_sum(ctx.mol, idx) + atom.hydrogen_count;
-                total == *v
-            }
-            AtomExpr::Connectivity(x) => {
-                let degree = ctx.mol.neighbors(idx).count() as u8;
-                let total = degree + atom.hydrogen_count;
-                total == *x
-            }
-            AtomExpr::TotalHCount(h) => {
-                (atom.hydrogen_count + explicit_h_count(ctx.mol, idx)) == *h
-            }
+            AtomExpr::Degree(d) => desc.degree == *d,
+            AtomExpr::NonHDegree(d) => desc.non_h_degree == *d,
+            AtomExpr::Valence(v) => (desc.bond_order_sum + atom.hydrogen_count) == *v,
+            AtomExpr::Connectivity(x) => (desc.degree + atom.hydrogen_count) == *x,
+            AtomExpr::TotalHCount(h) => (atom.hydrogen_count + desc.explicit_h_count) == *h,
             AtomExpr::ImplicitHCount(h) => atom.hydrogen_count == *h,
             AtomExpr::RingMembership(n) => {
                 let count = ctx.ring_info.atom_rings(idx).len() as u8;
@@ -334,15 +380,11 @@ impl AtomExpr {
                 count == *x
             }
             AtomExpr::Charge(c) => atom.formal_charge == *c,
-            AtomExpr::HeteroNeighborCount(n) => hetero_neighbor_count(ctx.mol, idx) == *n,
-            AtomExpr::AliphaticHeteroNeighborCount(n) => {
-                aliphatic_hetero_neighbor_count(ctx.mol, idx) == *n
-            }
-            AtomExpr::HasHeteroNeighbor => hetero_neighbor_count(ctx.mol, idx) > 0,
-            AtomExpr::HasAliphaticHeteroNeighbor => {
-                aliphatic_hetero_neighbor_count(ctx.mol, idx) > 0
-            }
-            AtomExpr::Hybridization(h) => compute_hybridization(ctx.mol, idx) == *h,
+            AtomExpr::HeteroNeighborCount(n) => desc.hetero_neighbor_count == *n,
+            AtomExpr::AliphaticHeteroNeighborCount(n) => desc.aliphatic_hetero_neighbor_count == *n,
+            AtomExpr::HasHeteroNeighbor => desc.hetero_neighbor_count > 0,
+            AtomExpr::HasAliphaticHeteroNeighbor => desc.aliphatic_hetero_neighbor_count > 0,
+            AtomExpr::Hybridization(h) => hybridization_from_desc(atom, desc) == *h,
             AtomExpr::Range { kind, low, high } => {
                 let val = range_value(*kind, atom, ctx, idx);
                 in_range(val, *low, *high)
