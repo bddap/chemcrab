@@ -73,6 +73,42 @@ pub(crate) fn query_references_hydrogen(query: &Mol<AtomExpr, BondExpr>) -> bool
         .any(|idx| expr_references_hydrogen(query.atom(idx)))
 }
 
+fn atom_expr_references_ring(expr: &AtomExpr) -> bool {
+    match expr {
+        AtomExpr::InRing
+        | AtomExpr::NotInRing
+        | AtomExpr::RingMembership(_)
+        | AtomExpr::SmallestRingSize(_)
+        | AtomExpr::RingBondCount(_) => true,
+        AtomExpr::Range { kind, .. } => matches!(
+            kind,
+            RangeKind::SmallestRingSize | RangeKind::RingMembership | RangeKind::RingBondCount
+        ),
+        AtomExpr::And(parts) | AtomExpr::Or(parts) => parts.iter().any(atom_expr_references_ring),
+        AtomExpr::Not(inner) => atom_expr_references_ring(inner),
+        AtomExpr::Recursive(mol) => query_references_ring(mol),
+        _ => false,
+    }
+}
+
+fn bond_expr_references_ring(expr: &BondExpr) -> bool {
+    match expr {
+        BondExpr::Ring => true,
+        BondExpr::And(parts) | BondExpr::Or(parts) => parts.iter().any(bond_expr_references_ring),
+        BondExpr::Not(inner) => bond_expr_references_ring(inner),
+        _ => false,
+    }
+}
+
+fn query_references_ring(query: &Mol<AtomExpr, BondExpr>) -> bool {
+    query
+        .atoms()
+        .any(|idx| atom_expr_references_ring(query.atom(idx)))
+        || query
+            .bonds()
+            .any(|idx| bond_expr_references_ring(query.bond(idx)))
+}
+
 type RecursiveRef<'a> = (*const Mol<AtomExpr, BondExpr>, &'a Mol<AtomExpr, BondExpr>);
 
 /// Parses a SMARTS pattern string into a query molecule.
@@ -109,11 +145,19 @@ pub fn get_smarts_match(
     get_smarts_match_impl(target, query)
 }
 
+fn ring_info_for_query(target: &Mol<Atom, Bond>, query: &Mol<AtomExpr, BondExpr>) -> RingInfo {
+    if query_references_ring(query) {
+        RingInfo::sssr(target)
+    } else {
+        RingInfo::empty()
+    }
+}
+
 fn get_smarts_match_impl(
     target: &Mol<Atom, Bond>,
     query: &Mol<AtomExpr, BondExpr>,
 ) -> Option<AtomMapping> {
-    let ring_info = RingInfo::sssr(target);
+    let ring_info = ring_info_for_query(target, query);
     let recursive_matches = pre_evaluate_recursive(target, query, &ring_info);
 
     let ctx = MatchContext {
@@ -168,11 +212,11 @@ pub fn get_smarts_matches_all(
     get_smarts_matches_all_impl(target, query)
 }
 
-fn get_smarts_matches_all_impl(
+pub(crate) fn get_smarts_matches_all_impl(
     target: &Mol<Atom, Bond>,
     query: &Mol<AtomExpr, BondExpr>,
 ) -> Vec<AtomMapping> {
-    let ring_info = RingInfo::sssr(target);
+    let ring_info = ring_info_for_query(target, query);
     let recursive_matches = pre_evaluate_recursive(target, query, &ring_info);
 
     let ctx = MatchContext {
@@ -223,7 +267,7 @@ fn get_smarts_match_chiral_impl(
     target: &Mol<Atom, Bond>,
     query: &Mol<AtomExpr, BondExpr>,
 ) -> Option<AtomMapping> {
-    let ring_info = RingInfo::sssr(target);
+    let ring_info = ring_info_for_query(target, query);
     let recursive_matches = pre_evaluate_recursive(target, query, &ring_info);
 
     let ctx = MatchContext {
@@ -268,7 +312,7 @@ fn get_smarts_matches_chiral_impl(
     target: &Mol<Atom, Bond>,
     query: &Mol<AtomExpr, BondExpr>,
 ) -> Vec<AtomMapping> {
-    let ring_info = RingInfo::sssr(target);
+    let ring_info = ring_info_for_query(target, query);
     let recursive_matches = pre_evaluate_recursive(target, query, &ring_info);
 
     let ctx = MatchContext {

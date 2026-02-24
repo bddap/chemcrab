@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::{HashMap, HashSet, VecDeque};
 
 use petgraph::graph::NodeIndex;
@@ -7,7 +8,7 @@ use crate::bond::{AromaticBond, AromaticBondOrder, Bond, BondOrder};
 use crate::element::Element;
 use crate::hydrogen;
 use crate::mol::Mol;
-use crate::smarts::{get_smarts_matches_all, query_references_hydrogen, AtomExpr, BondExpr};
+use crate::smarts::{get_smarts_matches_all_impl, query_references_hydrogen, AtomExpr, BondExpr};
 
 use super::error::ReactionError;
 use super::Reaction;
@@ -31,31 +32,25 @@ impl Reaction {
             });
         }
 
-        let needs_explicit: Vec<bool> = self
+        let explicit_mols: Vec<Cow<'_, Mol<Atom, Bond>>> = self
             .reactant_templates
             .iter()
-            .map(query_references_hydrogen)
-            .collect();
-
-        let explicit_mols: Vec<Mol<Atom, Bond>> = needs_explicit
-            .iter()
             .zip(reactants.iter())
-            .map(|(&needs, mol)| {
-                if needs {
-                    hydrogen::add_hs(mol)
+            .map(|(tmpl, mol)| {
+                if query_references_hydrogen(tmpl) {
+                    Cow::Owned(hydrogen::add_hs(mol))
                 } else {
-                    (*mol).clone()
+                    Cow::Borrowed(*mol)
                 }
             })
             .collect();
-        let effective_reactants: Vec<&Mol<Atom, Bond>> = explicit_mols.iter().collect();
 
         let per_template_matches: Vec<Vec<HashMap<NodeIndex, NodeIndex>>> = self
             .reactant_templates
             .iter()
-            .zip(effective_reactants.iter())
+            .zip(explicit_mols.iter())
             .map(|(tmpl, mol)| {
-                get_smarts_matches_all(mol, tmpl)
+                get_smarts_matches_all_impl(mol, tmpl)
                     .into_iter()
                     .map(|mapping| mapping.into_iter().collect())
                     .collect()
@@ -65,6 +60,9 @@ impl Reaction {
         if per_template_matches.iter().any(|m| m.is_empty()) {
             return Ok(Vec::new());
         }
+
+        let effective_reactants: Vec<&Mol<Atom, Bond>> =
+            explicit_mols.iter().map(|c| c.as_ref()).collect();
 
         let combinations = cartesian_product(&per_template_matches, MAX_COMBINATIONS)?;
 
@@ -84,6 +82,8 @@ impl Reaction {
     ) -> Result<Vec<Mol<Atom, AromaticBond>>, ReactionError> {
         let reactant_atom_map = build_reactant_atom_map(&self.reactant_templates, match_combo)?;
 
+        let target_to_map_num = build_target_to_map_num(&reactant_atom_map, reactants.len());
+
         let matched_target_atoms = collect_matched_atoms(match_combo);
 
         let reactant_template_bonds = collect_template_bonds(&self.reactant_templates);
@@ -94,6 +94,7 @@ impl Reaction {
                 generate_single_product(
                     product_tmpl,
                     &reactant_atom_map,
+                    &target_to_map_num,
                     &matched_target_atoms,
                     &reactant_template_bonds,
                     reactants,
@@ -122,6 +123,17 @@ fn build_reactant_atom_map(
         }
     }
     Ok(map)
+}
+
+fn build_target_to_map_num(
+    reactant_atom_map: &HashMap<u16, (usize, NodeIndex)>,
+    num_reactants: usize,
+) -> Vec<HashMap<NodeIndex, u16>> {
+    let mut maps = vec![HashMap::new(); num_reactants];
+    for (&mn, &(ri, t_idx)) in reactant_atom_map {
+        maps[ri].insert(t_idx, mn);
+    }
+    maps
 }
 
 fn collect_matched_atoms(
@@ -176,6 +188,7 @@ fn bond_to_aromatic_bond_aromatic_aware(
 fn generate_single_product(
     product_tmpl: &Mol<AtomExpr, BondExpr>,
     reactant_atom_map: &HashMap<u16, (usize, NodeIndex)>,
+    target_to_map_num: &[HashMap<NodeIndex, u16>],
     matched_target_atoms: &[HashSet<NodeIndex>],
     reactant_template_bonds: &[HashSet<(u16, u16)>],
     reactants: &[&Mol<Atom, Bond>],
@@ -237,13 +250,11 @@ fn generate_single_product(
         let product_node = product_node_map[&p_idx];
         let reactant_mol = reactants[ri];
         let matched = &matched_target_atoms[ri];
+        let reverse_map = &target_to_map_num[ri];
 
         for neighbor in reactant_mol.neighbors(t_idx) {
             if matched.contains(&neighbor) {
-                let neighbor_map = find_map_num_for_target(
-                    &self_reactant_template_ref(reactant_atom_map, ri),
-                    neighbor,
-                );
+                let neighbor_map = reverse_map.get(&neighbor).copied();
 
                 if let Some(n_mn) = neighbor_map {
                     let pair = (map_num.min(n_mn), map_num.max(n_mn));
@@ -407,27 +418,6 @@ fn collect_mapped_bond_pairs(tmpl: &Mol<AtomExpr, BondExpr>) -> HashSet<(u16, u1
         }
     }
     pairs
-}
-
-fn self_reactant_template_ref(
-    reactant_atom_map: &HashMap<u16, (usize, NodeIndex)>,
-    reactant_idx: usize,
-) -> HashMap<u16, NodeIndex> {
-    reactant_atom_map
-        .iter()
-        .filter(|(_, &(ri, _))| ri == reactant_idx)
-        .map(|(&mn, &(_, t_idx))| (mn, t_idx))
-        .collect()
-}
-
-fn find_map_num_for_target(
-    map_num_to_target: &HashMap<u16, NodeIndex>,
-    target_node: NodeIndex,
-) -> Option<u16> {
-    map_num_to_target
-        .iter()
-        .find(|(_, &t)| t == target_node)
-        .map(|(&mn, _)| mn)
 }
 
 fn build_mapped_atom(reactant_atom: &Atom, product_expr: &AtomExpr) -> Atom {

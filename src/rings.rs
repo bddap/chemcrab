@@ -29,6 +29,12 @@ pub struct RingInfo {
 }
 
 impl RingInfo {
+    /// An empty `RingInfo` with no rings. Useful when the caller knows the
+    /// query doesn't reference any ring primitives.
+    pub fn empty() -> Self {
+        Self { rings: vec![] }
+    }
+
     /// Compute the Smallest Set of Smallest Rings.
     pub fn sssr<A, B>(mol: &Mol<A, B>) -> Self {
         let num_expected = Self::expected_ring_count(mol);
