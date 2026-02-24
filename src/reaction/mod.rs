@@ -1062,4 +1062,21 @@ mod tests {
         let products = rxn.run(&[&r1, &r2]).unwrap();
         assert!(!products.is_empty());
     }
+
+    #[test]
+    fn recursive_smarts_hydrogen_reference_no_panic() {
+        let toluene = mol("c1ccccc1C");
+        let rxn =
+            from_reaction_smarts("[*:1][c;!$(c(C)(:c(-C):c):c(:c)-[!#1]):2]>>[*:1].[*:2]").unwrap();
+        let _ = rxn.run(&[&toluene]);
+    }
+
+    #[test]
+    fn recursive_smarts_hydrogen_specific_first_atom() {
+        let toluene = mol("c1ccccc1C");
+        let rxn =
+            from_reaction_smarts("[C:1][c;!$(c(C)(:c(-C):c):c(:c)-[!#1]):2]>>[C:1].[*:2]").unwrap();
+        let products = rxn.run(&[&toluene]).unwrap();
+        assert!(!products.is_empty());
+    }
 }

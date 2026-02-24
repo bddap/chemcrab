@@ -67,7 +67,7 @@ fn expr_references_hydrogen(expr: &AtomExpr) -> bool {
     }
 }
 
-fn query_references_hydrogen(query: &Mol<AtomExpr, BondExpr>) -> bool {
+pub(crate) fn query_references_hydrogen(query: &Mol<AtomExpr, BondExpr>) -> bool {
     query
         .atoms()
         .any(|idx| expr_references_hydrogen(query.atom(idx)))
