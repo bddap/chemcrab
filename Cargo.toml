@@ -9,5 +9,10 @@ description = "A cheminformatics library for Rust"
 petgraph = "0.8.3"
 
 [dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+
+[[bench]]
+name = "reaction"
+harness = false
